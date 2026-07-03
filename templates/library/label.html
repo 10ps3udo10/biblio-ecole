@@ -1,0 +1,3 @@
+{% extends "library/base.html" %}
+{% block title %}Label - {{ school_profile.display_name }}{% endblock %}
+{% block content %}<section class="label-sheet"><div class="label"><p class="label-school">{{ school_profile.display_name }}</p><h1>{{ title }}</h1><div class="qr">{{ qr_svg }}</div><code>{{ payload }}</code>{% if school_profile.label_footer %}<p class="label-footer">{{ school_profile.label_footer }}</p>{% endif %}</div><button class="button primary print" onclick="window.print()">Print</button></section>{% endblock %}

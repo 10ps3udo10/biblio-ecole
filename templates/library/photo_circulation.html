@@ -1,0 +1,42 @@
+{% extends "library/base.html" %}
+{% block title %}Circulation - School Library{% endblock %}
+{% block content %}
+<section class="form-panel scan">
+  <h1>Circulation</h1>
+  <p class="muted">Choose the borrower, choose whether the book is being checked out or checked in, then take or upload a photo of the copy QR label. An ISBN barcode also works when there is only one matching copy.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <p id="barcode-status" class="muted" aria-live="polite"></p>
+    <button class="button primary">Submit</button>
+  </form>
+</section>
+<script>
+(function () {
+  const fileInput = document.getElementById("id_book_photo");
+  const status = document.getElementById("barcode-status");
+  if (!fileInput || !status) return;
+  function setStatus(message) { status.textContent = message; }
+  fileInput.addEventListener("change", async function () {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (!("BarcodeDetector" in window)) {
+      setStatus("The server will try to read the book QR or ISBN barcode after you submit.");
+      return;
+    }
+    try {
+      const detector = new BarcodeDetector({ formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+      const bitmap = await createImageBitmap(file);
+      const barcodes = await detector.detect(bitmap);
+      if (barcodes.length) {
+        setStatus("Detected: " + barcodes.map((item) => item.rawValue).join(", "));
+      } else {
+        setStatus("No barcode detected in the browser. The server will try again after submit.");
+      }
+    } catch (error) {
+      setStatus("The server will try to read the book QR or ISBN barcode after you submit.");
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ school_profile.display_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/library.css' %}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{% url 'dashboard' %}">{{ school_profile.display_name }}</a>
+    <nav>
+      <a href="{% url 'book_list' %}">Books</a>
+      <a href="{% url 'photo_intake' %}">Photo intake</a>
+      <a href="{% url 'borrower_list' %}">Borrowers</a>
+      <a href="{% url 'photo_circulation' %}">Circulation</a>
+      <a href="{% url 'checkout' %}">Checkout</a>
+      <a href="{% url 'return_copy' %}">Return</a>
+      <a href="{% url 'admin:index' %}">Admin</a>
+    </nav>
+  </header>
+  <main class="page">
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}<div class="message {{ message.tags }}">{{ message }}</div>{% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

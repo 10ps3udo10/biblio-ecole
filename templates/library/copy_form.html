@@ -1,0 +1,3 @@
+{% extends "library/base.html" %}
+{% block title %}Add copy - School Library{% endblock %}
+{% block content %}<section class="form-panel"><h1>Add copy</h1><p class="muted">{{ book.title }}</p><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary">Save</button></form></section>{% endblock %}

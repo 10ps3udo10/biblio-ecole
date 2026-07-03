@@ -1,0 +1,53 @@
+{% extends "library/base.html" %}
+{% block title %}Photo intake - School Library{% endblock %}
+{% block content %}
+<section class="form-panel intake">
+  <h1>Photo intake</h1>
+  <p class="muted">Take a photo of the ISBN barcode when possible. The browser will try to read the barcode locally, then the server uses the ISBN to fetch free book metadata.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <p id="barcode-status" class="muted" aria-live="polite"></p>
+    <button class="button primary">Track this book</button>
+  </form>
+</section>
+<script>
+(function () {
+  const fileInput = document.getElementById("id_photos");
+  const isbnInput = document.getElementById("id_isbn");
+  const status = document.getElementById("barcode-status");
+  if (!fileInput || !isbnInput || !status) return;
+
+  function setStatus(message) {
+    status.textContent = message;
+  }
+
+  function normalizeISBN(value) {
+    return (value || "").replace(/[^0-9Xx]/g, "").slice(0, 13);
+  }
+
+  fileInput.addEventListener("change", async function () {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (!("BarcodeDetector" in window)) {
+      setStatus("Barcode reading is not available in this browser. Enter the ISBN if you can see it.");
+      return;
+    }
+    try {
+      const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+      const bitmap = await createImageBitmap(file);
+      const barcodes = await detector.detect(bitmap);
+      const isbn = barcodes.map((item) => normalizeISBN(item.rawValue)).find((value) => value.startsWith("978") || value.startsWith("979"));
+      if (isbn) {
+        isbnInput.value = isbn;
+        setStatus("ISBN barcode read: " + isbn);
+      } else {
+        setStatus("No ISBN barcode found. Try a closer barcode photo or enter the ISBN manually.");
+      }
+    } catch (error) {
+      setStatus("Could not read the barcode from this photo. Enter the ISBN if it is visible.");
+    }
+  });
+})();
+</script>
+{% endblock %}

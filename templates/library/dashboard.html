@@ -1,0 +1,31 @@
+{% extends "library/base.html" %}
+{% block title %}Dashboard - School Library{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <h1>Library dashboard</h1>
+  <div class="actions">
+    <a class="button primary" href="{% url 'book_create' %}">Add book</a>
+    <a class="button" href="{% url 'borrower_create' %}">Add borrower</a>
+  </div>
+</section>
+<section class="stats">
+  <article><strong>{{ total_books }}</strong><span>Books</span></article>
+  <article><strong>{{ total_copies }}</strong><span>Copies</span></article>
+  <article><strong>{{ borrowed_books }}</strong><span>Borrowed</span></article>
+  <article><strong>{{ overdue_books }}</strong><span>Overdue</span></article>
+</section>
+<section class="grid two">
+  <div>
+    <h2>Recently added</h2>
+    <ul class="plain-list">
+      {% for book in recent_books %}<li><a href="{{ book.get_absolute_url }}">{{ book.title }}</a><span>{{ book.authors }}</span></li>{% empty %}<li>No books yet.</li>{% endfor %}
+    </ul>
+  </div>
+  <div>
+    <h2>Recent activity</h2>
+    <ul class="plain-list">
+      {% for loan in recent_loans %}<li><a href="{{ loan.copy.get_absolute_url }}">{{ loan.copy.book.title }}</a><span>{{ loan.borrower.full_name }} due {{ loan.due_date }}</span></li>{% empty %}<li>No loans yet.</li>{% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

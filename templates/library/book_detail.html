@@ -1,0 +1,17 @@
+{% extends "library/base.html" %}
+{% block title %}{{ book.title }} - School Library{% endblock %}
+{% block content %}
+<section class="detail-head">
+  <div>{% if book.cover_image %}<img class="cover" src="{{ book.cover_image.url }}" alt="">{% else %}<div class="cover placeholder">No cover</div>{% endif %}</div>
+  <div>
+    <h1>{{ book.title }}</h1>
+    {% if book.subtitle %}<p class="muted">{{ book.subtitle }}</p>{% endif %}
+    <p>{{ book.authors }}</p>
+    <dl class="meta"><dt>ISBN</dt><dd>{{ book.isbn13|default:book.isbn10|default:"Not set" }}</dd><dt>Publisher</dt><dd>{{ book.publisher|default:"Not set" }}</dd><dt>Year</dt><dd>{{ book.publication_year|default:"Not set" }}</dd><dt>Language</dt><dd>{{ book.language|default:"Not set" }}</dd></dl>
+    <div class="actions"><a class="button primary" href="{% url 'add_copy' book.pk %}">Add copy</a></div>
+  </div>
+</section>
+{% if book.description %}<section><h2>Description</h2><p>{{ book.description }}</p></section>{% endif %}
+<section><h2>Copies</h2><div class="table-wrap"><table><thead><tr><th>Copy</th><th>Status</th><th>Shelf</th><th>Condition</th><th></th></tr></thead><tbody>{% for copy in book.copies.all %}<tr><td><a href="{{ copy.get_absolute_url }}">#{{ copy.copy_number }}</a></td><td>{{ copy.get_status_display }}</td><td>{{ copy.shelf_location }}</td><td>{{ copy.get_condition_display }}</td><td><a href="{% url 'label' 'copy' copy.pk %}">Print QR</a></td></tr>{% empty %}<tr><td colspan="5">No copies.</td></tr>{% endfor %}</tbody></table></div></section>
+<section><h2>Loan history</h2><ul class="plain-list">{% for loan in loans %}<li>{{ loan.copy }} to {{ loan.borrower.full_name }} on {{ loan.checkout_date }}</li>{% empty %}<li>No loans yet.</li>{% endfor %}</ul></section>
+{% endblock %}
