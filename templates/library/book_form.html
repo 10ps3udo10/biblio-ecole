@@ -9,7 +9,7 @@
     {{ form.as_p }}
     <p class="isbn-entry-status" id="isbn-entry-status" aria-live="polite"></p>
     <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a>
-    <button class="button primary">Save book</button>
+    <button class="button primary" id="save-book">Save book</button>
   </form>
 </section>
 <script>
@@ -18,6 +18,7 @@
   const isbn10 = document.getElementById("id_isbn10");
   const status = document.getElementById("isbn-entry-status");
   const webSearch = document.getElementById("book-isbn-web-search");
+  const saveButton = document.getElementById("save-book");
   const metadataUrl = "{% url 'isbn_metadata' %}";
   const fieldMap = {
     title: "id_title",
@@ -28,21 +29,29 @@
     language: "id_language",
     description: "id_description"
   };
-  if (!isbn13 || !isbn10 || !status) return;
+  if (!isbn13 || !isbn10 || !status || !saveButton) return;
   document.documentElement.dataset.bookEntryReady = "true";
 
   let timer;
   let lastLookup = "";
-  async function lookupISBN(source) {
-    const isbn = source.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
-    if (![10, 13].includes(isbn.length) || isbn === lastLookup) return;
+  let lookupSequence = 0;
+  function setWaiting(waiting) {
+    saveButton.disabled = waiting;
+    saveButton.textContent = waiting ? "Waiting for book details..." : "Save book";
+    saveButton.setAttribute("aria-busy", String(waiting));
+  }
+
+  async function lookupISBN(source, isbn, sequence) {
+    if (![10, 13].includes(isbn.length)) {
+      setWaiting(false);
+      return;
+    }
     lastLookup = isbn;
     source.value = isbn;
-    status.textContent = "Looking up ISBN...";
-    webSearch.hidden = true;
     try {
       const response = await fetch(metadataUrl + "?isbn=" + encodeURIComponent(isbn), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
+      if (sequence !== lookupSequence) return;
       if (!response.ok) throw new Error(payload.error || "ISBN lookup failed.");
       Object.entries(fieldMap).forEach(([key, id]) => {
         const input = document.getElementById(id);
@@ -55,17 +64,42 @@
         webSearch.hidden = false;
       }
     } catch (error) {
+      if (sequence !== lookupSequence) return;
       status.textContent = error.message;
       status.dataset.state = "warning";
+    } finally {
+      if (sequence === lookupSequence) setWaiting(false);
     }
   }
 
   [isbn13, isbn10].forEach((input) => {
     input.addEventListener("input", function () {
       clearTimeout(timer);
-      timer = setTimeout(function () { lookupISBN(input); }, 500);
+      const isbn = input.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
+      if ([10, 13].includes(isbn.length) && isbn !== lastLookup) {
+        const sequence = ++lookupSequence;
+        status.textContent = "Waiting for book details...";
+        status.dataset.state = "waiting";
+        webSearch.hidden = true;
+        setWaiting(true);
+        timer = setTimeout(function () { lookupISBN(input, isbn, sequence); }, 500);
+      } else if (![10, 13].includes(isbn.length)) {
+        ++lookupSequence;
+        setWaiting(false);
+      }
     });
-    input.addEventListener("change", function () { lookupISBN(input); });
+    input.addEventListener("change", function () {
+      clearTimeout(timer);
+      const isbn = input.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
+      if ([10, 13].includes(isbn.length) && isbn !== lastLookup) {
+        const sequence = ++lookupSequence;
+        status.textContent = "Waiting for book details...";
+        status.dataset.state = "waiting";
+        webSearch.hidden = true;
+        setWaiting(true);
+        lookupISBN(input, isbn, sequence);
+      }
+    });
   });
 })();
 </script>

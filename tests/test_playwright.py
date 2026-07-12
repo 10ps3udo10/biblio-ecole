@@ -107,6 +107,8 @@ def test_librarian_can_prefill_manual_book_from_isbn(page, live_server, django_u
     expect(page.locator("html")).to_have_attribute("data-book-entry-ready", "true")
     page.locator("input[name='isbn13']").fill("9788408052524")
 
+    expect(page.locator("#isbn-entry-status")).to_have_text("Waiting for book details...")
+    expect(page.get_by_role("button", name="Waiting for book details...")).to_be_disabled()
     page.wait_for_timeout(700)
     assert not page_errors, page_errors
     expect(page.locator("#isbn-entry-status")).not_to_be_empty()
@@ -114,6 +116,7 @@ def test_librarian_can_prefill_manual_book_from_isbn(page, live_server, django_u
     expect(page.locator("textarea[name='authors']")).to_have_value("Carlos Ruiz Zafon")
     expect(page.locator("input[name='publisher']")).to_have_value("Planeta")
     expect(page.locator("input[name='publication_year']")).to_have_value("2005")
+    expect(page.get_by_role("button", name="Save book")).to_be_enabled()
     page.get_by_role("button", name="Save book").click()
 
     expect(page.get_by_role("heading", name="La sombra del viento")).to_be_visible()
