@@ -2,12 +2,12 @@
   <a href="https://github.com/mrueda/shelf-school">
     <img src="docs-site/static/img/shelf-school-logo.svg" width="180" alt="Shelf-School logo">
   </a>
-  <p><em>Open-source circulation for small school libraries</em></p>
+  <p><em>Open-source circulation for school libraries</em></p>
 </div>
 
 # Shelf-School
 
-**A small, self-hosted library system centered on the moment a student borrows
+**A self-hosted library system centered on the moment a student borrows
 or returns a physical book.**
 
 [![Build](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml)
@@ -63,8 +63,8 @@ python manage.py createsuperuser
 python manage.py runserver 127.0.0.1:8001
 ```
 
-Open the public kiosk at <http://127.0.0.1:8001/> and staff login at
-<http://127.0.0.1:8001/admin/login/>.
+Open the public kiosk at <http://127.0.0.1:8001/>. Staff can select **Admin
+login** in its header or open <http://127.0.0.1:8001/admin/login/> directly.
 
 ## Development
 

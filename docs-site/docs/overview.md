@@ -1,6 +1,6 @@
 # Overview
 
-Shelf-School is an open-source library system for small schools. Its primary
+Shelf-School is an open-source library system for schools. Its primary
 screen is a public circulation kiosk where a student selects their name,
 chooses checkout or return, and photographs one book at a time.
 
@@ -11,7 +11,8 @@ release. Back up school data before upgrades.
 
 **Students do not need passwords, accounts, or library cards.** Staff use a single
 administrator session for cataloging, borrower management, reports, settings,
-and backups.
+and backups. The public header labels the staff entry point **Admin login** so it
+is not confused with a student login.
 
 ## Core workflow
 

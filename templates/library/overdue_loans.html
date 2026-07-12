@@ -3,7 +3,7 @@
 {% block content %}
 <section class="hero compact">
   <h1>Overdue loans</h1>
-  <div class="actions"><a class="button" href="{% url 'overdue_loans_csv' %}">Export CSV</a></div>
+  <div class="actions"><a class="button" href="{% url 'overdue_loans_csv' %}"><i data-lucide="download" aria-hidden="true"></i>Export CSV</a></div>
 </section>
 <div class="table-wrap"><table>
   <thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>

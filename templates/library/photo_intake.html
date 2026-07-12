@@ -7,7 +7,7 @@
     <h1>Photo intake</h1>
     <p>Photograph the ISBN barcode to identify the book and create its library copy.</p>
   </div>
-  <a class="button" href="{% url 'book_create' %}">Enter manually</a>
+  <a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Enter manually</a>
 </header>
 
 <form class="intake-workspace" method="post" enctype="multipart/form-data">
@@ -70,7 +70,7 @@
       </div>
     </div>
     <div class="intake-submit">
-      <button class="button primary intake-primary">Track this book</button>
+      <button class="button primary intake-primary"><i data-lucide="book-plus" aria-hidden="true"></i>Track this book</button>
       <span>Creates one physical copy and its QR label.</span>
     </div>
   </section>

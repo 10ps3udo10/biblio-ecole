@@ -20,3 +20,10 @@ def test_project_version_markers_are_consistent():
     assert docs_lock["version"] == version
     assert docs_lock["packages"][""]["version"] == version
     assert f"version-{version.replace('-', '--')}-" in readme
+
+
+def test_vendored_lucide_icons_include_license():
+    vendor_root = ROOT / "static" / "vendor" / "lucide"
+
+    assert (vendor_root / "lucide.min.js").stat().st_size > 100_000
+    assert "ISC License" in (vendor_root / "LICENSE").read_text(encoding="utf-8")

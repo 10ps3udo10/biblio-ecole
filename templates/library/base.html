@@ -7,27 +7,36 @@
   <title>{% block title %}{{ school_profile.display_name }}{% endblock %}</title>
   <link rel="icon" href="{% static 'img/shelf-school-logo.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/library.css' %}">
+  <script defer src="{% static 'vendor/lucide/lucide.min.js' %}"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () { if (window.lucide) window.lucide.createIcons(); });</script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="{% url 'photo_circulation' %}">
       {% if school_profile.logo %}<img src="{{ school_profile.logo.url }}" alt="">{% else %}<img src="{% static 'img/shelf-school-logo.svg' %}" alt="Shelf-School">{% endif %}
-      <span>{{ school_profile.display_name }}</span>
+      <span class="brand-lockup"><strong>Shelf-School</strong><span aria-hidden="true"></span><small>{{ school_profile.display_name }}</small></span>
     </a>
     {% if request.user.is_authenticated %}<nav>
-      <a class="nav-circulation{% if request.resolver_match.url_name == 'photo_circulation' or request.resolver_match.url_name == 'circulation_alias' %} active{% endif %}" href="{% url 'photo_circulation' %}">Circulation</a>
-      <a href="{% url 'dashboard' %}">Overview</a>
-      <details class="nav-menu{% if request.resolver_match.url_name == 'book_list' or request.resolver_match.url_name == 'book_create' or request.resolver_match.url_name == 'book_detail' or request.resolver_match.url_name == 'photo_intake' %} active{% endif %}">
-        <summary>Catalog</summary>
-        <div><a href="{% url 'book_list' %}">Books</a><a href="{% url 'photo_intake' %}">Photo intake</a></div>
+      <a class="nav-circulation{% if request.resolver_match.url_name == 'photo_circulation' or request.resolver_match.url_name == 'circulation_alias' %} active{% endif %}" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Circulation</a>
+      <details class="nav-menu{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'book_list' or request.resolver_match.url_name == 'book_create' or request.resolver_match.url_name == 'book_detail' or request.resolver_match.url_name == 'photo_intake' or request.resolver_match.url_name == 'borrower_list' or request.resolver_match.url_name == 'borrower_detail' or request.resolver_match.url_name == 'overdue_loans' %} active{% endif %}">
+        <summary><i data-lucide="library" aria-hidden="true"></i>Library</summary>
+        <div>
+          <a href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard" aria-hidden="true"></i>Overview</a>
+          <a href="{% url 'book_list' %}"><i data-lucide="book-open" aria-hidden="true"></i>Catalog</a>
+          <a href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Photo intake</a>
+          <a href="{% url 'borrower_list' %}"><i data-lucide="users" aria-hidden="true"></i>Borrowers</a>
+          <a href="{% url 'overdue_loans' %}"><i data-lucide="clock-alert" aria-hidden="true"></i>Overdue</a>
+        </div>
       </details>
-      <a href="{% url 'borrower_list' %}">Borrowers</a>
-      <a href="{% url 'overdue_loans' %}">Overdue</a>
-      <a href="{{ docs_url }}">Docs</a>
-      {% if request.user.is_staff %}<a href="{% url 'school_settings' %}">Settings</a>{% endif %}
-      <span class="staff-user" aria-label="Signed in as {{ request.user.get_full_name|default:request.user.username }}"><span class="staff-user-mark" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>{{ request.user.get_full_name|default:request.user.username }}</span>
-      <form class="nav-logout" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}">Sign out</button></form>
-    </nav>{% else %}<a class="public-docs" href="{{ docs_url }}">Docs</a>{% endif %}
+      <a href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a>
+      <details class="nav-menu account-menu{% if request.resolver_match.url_name == 'school_settings' %} active{% endif %}">
+        <summary class="staff-user" aria-label="Signed in as {{ request.user.get_full_name|default:request.user.username }}"><span class="staff-user-mark" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>{{ request.user.get_full_name|default:request.user.username }}</summary>
+        <div>
+          {% if request.user.is_staff %}<a href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>Settings</a>{% endif %}
+          <form class="nav-logout" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}"><i data-lucide="log-out" aria-hidden="true"></i>Sign out</button></form>
+        </div>
+      </details>
+    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'admin:login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Admin login</a></nav>{% endif %}
   </header>
   <main class="page">
     {% if messages %}

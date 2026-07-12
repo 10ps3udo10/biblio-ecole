@@ -32,7 +32,8 @@ def test_public_circulation_desk_does_not_require_admin_login(client):
 
     assert response.status_code == 200
     assert b"Borrow or return a book" in response.content
-    assert b"/admin/login/" not in response.content
+    assert b'href="/admin/login/?next=/dashboard/"' in response.content
+    assert b"Admin login" in response.content
     assert b"The photo is read once and never saved" in response.content
     assert b"https://mrueda.github.io/shelf-school/" in response.content
 

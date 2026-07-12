@@ -34,6 +34,26 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
     expect(page.get_by_label("Signed in as librarian")).to_be_visible()
     expect(page.get_by_role("img", name="Checkouts and returns during the last seven days")).to_be_visible()
     expect(page.get_by_role("heading", name="Copy availability")).to_be_visible()
+    nav_items = page.locator("nav > a, nav > details > summary")
+    assert nav_items.count() == 4
+    for index in range(nav_items.count()):
+        item = nav_items.nth(index)
+        icon = item.locator("svg.lucide")
+        item_box = item.bounding_box()
+        assert item_box
+        assert item_box["height"] == 36
+        if icon.count():
+            expect(icon).to_be_visible()
+            icon_box = icon.bounding_box()
+            assert icon_box
+            assert abs((item_box["y"] + item_box["height"] / 2) - (icon_box["y"] + icon_box["height"] / 2)) < 1
+    page.get_by_text("Library", exact=True).click()
+    expect(page.get_by_role("link", name="Catalog", exact=True)).to_be_visible()
+    expect(page.get_by_role("link", name="Borrowers", exact=True)).to_be_visible()
+    expect(page.get_by_role("link", name="Overdue", exact=True)).to_be_visible()
+    page.get_by_label("Signed in as librarian").click()
+    expect(page.get_by_role("link", name="Settings", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
 
     page.goto(f"{live_server.url}/checkout/")
     page.locator("input[name='borrower_code']").fill(borrower.qr_code)
@@ -148,8 +168,9 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
 
     page.goto(live_server.url)
     expect(page.get_by_role("heading", name="Borrow or return a book")).to_be_visible()
-    expect(page.get_by_role("navigation")).not_to_be_visible()
+    expect(page.get_by_role("navigation", name="Utility navigation")).to_be_visible()
     expect(page.get_by_role("link", name="Docs")).to_have_attribute("href", "https://mrueda.github.io/shelf-school/")
+    expect(page.get_by_role("link", name="Admin login")).to_have_attribute("href", "/admin/login/?next=/dashboard/")
 
     select_borrower(page, "mia", "mia - Mia Lopez", borrower.id)
     page.locator("input[name='action'][value='checkout']").check()

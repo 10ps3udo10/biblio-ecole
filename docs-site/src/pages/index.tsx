@@ -31,41 +31,75 @@ const featureLinks = [
 ];
 
 export default function Home() {
-  const heroImage = useBaseUrl('/img/circulation-desk.png');
+  const logo = useBaseUrl('/img/shelf-school-logo.svg');
+  const libraryIllustration = useBaseUrl('/img/montessori-library.svg');
+  const circulationImage = useBaseUrl('/img/circulation-desk.png');
 
   return (
     <Layout
       title="Shelf-School"
-      description="Open-source circulation and cataloging for small school libraries">
+      description="Open-source circulation and cataloging for school libraries">
       <main className={styles.page}>
-        <section className={styles.hero} style={{backgroundImage: `url(${heroImage})`}}>
-          <div className={styles.heroContent}>
+        <section className={styles.intro}>
+          <div className={styles.introContent}>
+            <img className={styles.productLogo} src={logo} alt="" />
             <p className={styles.kicker}>Open-source school library software</p>
             <h1>Shelf-School</h1>
             <p className={styles.lede}>
-              Public self-checkout with book photos, simple cataloging, and
-              staff controls for small school libraries.
+              A focused circulation and cataloging system built around how
+              students and school staff actually use a library.
             </p>
             <div className={styles.actions}>
               <Link className="button button--primary button--lg" to="/docs/overview">
-                Read the docs
+                User guide
               </Link>
               <Link className="button button--secondary button--lg" to="/docs/getting-started/quickstart">
                 Quick start
               </Link>
             </div>
+            <div className={styles.principles} aria-label="Product principles">
+              <span>No student accounts</span>
+              <span>Self-hosted</span>
+              <span>No paid AI required</span>
+            </div>
+            <img
+              className={styles.libraryIllustration}
+              src={libraryIllustration}
+              alt="Montessori library with accessible shelves and children reading"
+            />
           </div>
         </section>
 
         <section className={styles.sections} aria-label="Documentation sections">
+          <header className={styles.sectionHeading}>
+            <p className={styles.kicker}>Documentation</p>
+            <h2>Find the right guide</h2>
+            <p>Start with daily library work or go directly to setup and operations.</p>
+          </header>
           <div className={styles.grid}>
             {featureLinks.map((feature) => (
               <Link className={styles.card} to={feature.to} key={feature.title}>
                 <span>{feature.label}</span>
                 <h2>{feature.title}</h2>
                 <p>{feature.text}</p>
+                <strong aria-hidden="true">View guide →</strong>
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section className={styles.productView} aria-labelledby="product-view-title">
+          <div className={styles.productViewInner}>
+            <header className={styles.sectionHeading}>
+              <p className={styles.kicker}>Designed for daily use</p>
+              <h2 id="product-view-title">A circulation desk students can understand</h2>
+              <p>Borrower, book, and confirmation stay visible as one clear workflow.</p>
+            </header>
+            <img
+              className={styles.productImage}
+              src={circulationImage}
+              alt="Shelf-School public circulation desk showing checkout, borrower search, and three workflow steps"
+            />
           </div>
         </section>
       </main>

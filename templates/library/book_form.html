@@ -4,7 +4,7 @@
 <section class="form-panel book-entry">
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    <div class="book-form-heading"><div><h1>{{ title }}</h1>{% if is_edit %}<p class="muted">Correct the catalog details for this title.</p>{% else %}<p class="muted">Start with an ISBN to fill available details and cover automatically.</p>{% endif %}</div><button class="button primary" id="save-book">Save book</button></div>
+    <div class="book-form-heading"><div><h1>{{ title }}</h1>{% if is_edit %}<p class="muted">Correct the catalog details for this title.</p>{% else %}<p class="muted">Start with an ISBN to fill available details and cover automatically.</p>{% endif %}</div><button class="button primary" id="save-book"><i data-lucide="save" aria-hidden="true"></i>Save book</button></div>
     {{ form.as_p }}
     <p class="isbn-entry-status" id="isbn-entry-status" aria-live="polite"></p>
     <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a>

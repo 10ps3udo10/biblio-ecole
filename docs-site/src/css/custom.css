@@ -21,14 +21,150 @@
 }
 
 .markdown img {
+  display: block;
   max-width: 100%;
   height: auto;
+  margin: 1.5rem auto 2rem;
   border: 1px solid var(--ifm-color-emphasis-200);
   border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 14px 34px rgba(23, 32, 42, 0.1);
 }
 
 .theme-doc-sidebar-container {
   border-right: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-surface-color);
+}
+
+.theme-doc-sidebar-menu {
+  padding: 0.75rem 0.6rem 1.5rem;
+}
+
+.theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible .menu__link {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.menu__link {
+  border-radius: 5px;
+}
+
+.menu__link--active:not(.menu__link--sublist) {
+  box-shadow: inset 3px 0 var(--ifm-color-primary);
+  font-weight: 750;
+}
+
+.theme-doc-markdown {
+  color: var(--ifm-color-emphasis-900);
+  font-size: 1.02rem;
+  line-height: 1.72;
+}
+
+.theme-doc-markdown > header + p,
+.theme-doc-markdown > h1 + p {
+  color: var(--ifm-color-emphasis-700);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.theme-doc-markdown h1:first-child {
+  margin-bottom: 1.25rem;
+  color: var(--ifm-color-emphasis-900);
+  font-size: 2.65rem;
+  line-height: 1.1;
+}
+
+.theme-doc-markdown h2 {
+  margin-top: 2.75rem;
+  margin-bottom: 1rem;
+  padding-top: 0.2rem;
+  color: var(--ifm-color-emphasis-900);
+  font-size: 1.65rem;
+  line-height: 1.25;
+}
+
+.theme-doc-markdown h3 {
+  margin-top: 2rem;
+  font-size: 1.25rem;
+}
+
+.theme-doc-markdown li {
+  margin: 0.35rem 0;
+  padding-left: 0.2rem;
+}
+
+.theme-doc-markdown li::marker {
+  color: var(--ifm-color-primary);
+  font-weight: 750;
+}
+
+.theme-doc-markdown table {
+  display: table;
+  width: 100%;
+  margin: 1.4rem 0 2rem;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+}
+
+.theme-doc-markdown table th {
+  color: var(--ifm-color-emphasis-800);
+  background: var(--ifm-color-emphasis-100);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+}
+
+.theme-doc-markdown table th,
+.theme-doc-markdown table td {
+  padding: 0.85rem 1rem;
+  border-color: var(--ifm-color-emphasis-200);
+}
+
+.theme-doc-markdown blockquote {
+  margin: 1.5rem 0;
+  padding: 1rem 1.15rem;
+  border-left: 4px solid #67c18c;
+  border-radius: 0 6px 6px 0;
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-color-emphasis-800);
+}
+
+.theme-doc-markdown .alert {
+  margin: 1.5rem 0 2rem;
+  padding: 1.1rem 1.2rem;
+  border-width: 1px 1px 1px 4px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(23, 32, 42, 0.06);
+}
+
+.theme-doc-markdown code {
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.theme-doc-markdown a:not(.button) {
+  font-weight: 650;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.table-of-contents {
+  padding-left: 1rem;
+  border-left-color: var(--ifm-color-emphasis-300);
+  font-size: 0.84rem;
+}
+
+.pagination-nav__link {
+  border-color: var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pagination-nav__link:hover {
+  border-color: var(--ifm-color-primary-light);
+  box-shadow: 0 8px 18px rgba(23, 32, 42, 0.07);
 }
 
 .navbar__logo {
@@ -60,9 +196,13 @@
 }
 
 .workflow > div {
-  padding: 1rem;
-  border-left: 4px solid #67c18c;
-  background: var(--ifm-color-emphasis-100);
+  min-height: 126px;
+  padding: 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-top: 4px solid #67c18c;
+  border-radius: 7px;
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 8px 18px rgba(23, 32, 42, 0.05);
 }
 
 .workflow strong {
@@ -71,6 +211,30 @@
 }
 
 @media (max-width: 768px) {
+  .theme-doc-markdown {
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  .theme-doc-markdown h1:first-child {
+    font-size: 2.1rem;
+  }
+
+  .theme-doc-markdown h2 {
+    margin-top: 2.25rem;
+    font-size: 1.45rem;
+  }
+
+  .theme-doc-markdown table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .markdown img {
+    margin: 1.25rem auto 1.6rem;
+    box-shadow: 0 10px 24px rgba(23, 32, 42, 0.08);
+  }
+
   .workflow {
     grid-template-columns: 1fr;
   }

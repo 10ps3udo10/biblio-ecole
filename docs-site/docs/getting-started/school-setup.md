@@ -21,7 +21,7 @@ The administrator account operates Shelf-School and Django administration.
 Borrowers are separate records representing students or teachers who receive
 books. **Borrowers do not log in and do not need passwords.**
 
-One administrator is enough for a small deployment. Additional Django staff
+A single administrator is enough for a local deployment. Additional Django staff
 accounts are only necessary when several adults maintain the catalog or school
 configuration.
 

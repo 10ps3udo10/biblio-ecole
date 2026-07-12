@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Shelf-School Docs',
-  tagline: 'Open-source circulation and cataloging for small school libraries',
+  tagline: 'Open-source circulation and cataloging for school libraries',
   url: 'https://mrueda.github.io',
   baseUrl: '/shelf-school/',
   organizationName: 'mrueda',

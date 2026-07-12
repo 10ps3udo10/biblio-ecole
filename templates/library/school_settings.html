@@ -3,13 +3,13 @@
 {% block content %}
 <section class="hero compact">
   <div><h1>School settings</h1><p class="muted">Configure this installation for one school.</p></div>
-  <div class="actions"><a class="button" href="{% url 'backup_sqlite' %}">Download database backup</a><a class="button" href="{% url 'admin:auth_user_changelist' %}">Manage users</a><a class="button" href="{% url 'admin:index' %}">Django admin</a></div>
+  <div class="actions"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a><a class="button" href="{% url 'admin:auth_user_changelist' %}"><i data-lucide="users" aria-hidden="true"></i>Manage users</a><a class="button" href="{% url 'admin:index' %}"><i data-lucide="wrench" aria-hidden="true"></i>Django admin</a></div>
 </section>
 <section class="form-panel settings-panel">
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button class="button primary">Save school settings</button>
+    <button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save school settings</button>
   </form>
 </section>
 {% endblock %}

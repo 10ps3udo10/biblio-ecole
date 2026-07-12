@@ -37,7 +37,8 @@ Open the public circulation kiosk:
 http://127.0.0.1:8001/
 ```
 
-Open staff administration:
+Open staff administration directly, or select **Admin login** in the public
+header:
 
 ```text
 http://127.0.0.1:8001/admin/login/

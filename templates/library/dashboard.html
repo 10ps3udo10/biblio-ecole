@@ -4,10 +4,10 @@
 {% if setup_needed and request.user.is_staff %}
 <section class="setup-banner">
   <div><strong>Finish setting up Shelf-School</strong><span>Add your school identity and default loan period before daily use.</span></div>
-  <a class="button primary" href="{% url 'school_settings' %}">School settings</a>
+  <a class="button primary" href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>School settings</a>
 </section>
 {% endif %}
-<header class="dashboard-heading"><div><span class="eyebrow">Staff overview</span><h1>Overview</h1><p>{{ school_profile.display_name }} · {% now "l, F j" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}">Circulation desk</a></header>
+<header class="dashboard-heading"><div><span class="eyebrow">Staff overview</span><h1>Overview</h1><p>{{ school_profile.display_name }} · {% now "l, F j" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Circulation desk</a></header>
 <section class="dashboard-metrics">
   <article><span>Catalog titles</span><strong>{{ total_books }}</strong><small>{{ total_copies }} physical copies</small></article>
   <article><span>Available now</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% of inventory</small></article>

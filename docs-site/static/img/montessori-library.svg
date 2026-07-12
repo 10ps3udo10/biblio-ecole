@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" role="img" aria-labelledby="title description">
+  <title id="title">Montessori school library</title>
+  <desc id="description">A calm classroom library with low wooden shelves, front-facing books, child-sized furniture, plants, and children reading.</desc>
+  <rect width="1200" height="440" fill="#eef4f8"/>
+  <rect y="328" width="1200" height="112" fill="#d9e3e8"/>
+  <rect x="64" y="42" width="330" height="196" rx="6" fill="#ffffff" stroke="#9eb8c9" stroke-width="4"/>
+  <path d="M229 44v192M66 140h326" stroke="#b7cad6" stroke-width="4"/>
+  <path d="M78 63h139v64H78zM241 63h139v64H241zM78 153h139v71H78zM241 153h139v71H241z" fill="#d9f0f4"/>
+  <circle cx="118" cy="93" r="20" fill="#f5c451"/>
+  <path d="M86 205c35-50 69-49 105 0M257 206c34-53 74-54 111 0" fill="#a8d5ba"/>
+
+  <rect x="444" y="55" width="692" height="24" rx="5" fill="#8a633f"/>
+  <path d="M462 79v40M1118 79v40" stroke="#8a633f" stroke-width="10"/>
+  <g fill="#ffffff" stroke="#c4d0d8" stroke-width="3">
+    <rect x="490" y="89" width="92" height="116" rx="4"/>
+    <rect x="607" y="89" width="92" height="116" rx="4"/>
+    <rect x="724" y="89" width="92" height="116" rx="4"/>
+    <rect x="841" y="89" width="92" height="116" rx="4"/>
+    <rect x="958" y="89" width="92" height="116" rx="4"/>
+  </g>
+  <g>
+    <rect x="503" y="103" width="66" height="82" rx="2" fill="#176cbb"/>
+    <circle cx="536" cy="132" r="15" fill="#f5c451"/>
+    <path d="M518 170h36" stroke="#ffffff" stroke-width="6"/>
+    <rect x="620" y="103" width="66" height="82" rx="2" fill="#c94b45"/>
+    <path d="M633 118h40v34h-40z" fill="#f7d88a"/>
+    <path d="M635 169h36" stroke="#ffffff" stroke-width="6"/>
+    <rect x="737" y="103" width="66" height="82" rx="2" fill="#16804a"/>
+    <path d="M748 147c18-30 31-30 44 0" fill="#bde2ca"/>
+    <path d="M752 169h36" stroke="#ffffff" stroke-width="6"/>
+    <rect x="854" y="103" width="66" height="82" rx="2" fill="#714b9b"/>
+    <circle cx="887" cy="135" r="18" fill="#e2c9f2"/>
+    <path d="M869 169h36" stroke="#ffffff" stroke-width="6"/>
+    <rect x="971" y="103" width="66" height="82" rx="2" fill="#d68b00"/>
+    <path d="M985 121h38v30h-38z" fill="#fff4d6"/>
+    <path d="M986 169h36" stroke="#ffffff" stroke-width="6"/>
+  </g>
+
+  <g>
+    <rect x="70" y="261" width="342" height="124" rx="6" fill="#b78552"/>
+    <rect x="82" y="273" width="318" height="82" rx="3" fill="#f7fafc"/>
+    <path d="M188 273v82M294 273v82" stroke="#b78552" stroke-width="8"/>
+    <path d="M70 362h342" stroke="#8a633f" stroke-width="8"/>
+    <g>
+      <rect x="96" y="289" width="18" height="50" fill="#176cbb"/>
+      <rect x="116" y="281" width="15" height="58" fill="#c94b45"/>
+      <rect x="134" y="293" width="20" height="46" fill="#16804a"/>
+      <rect x="203" y="286" width="19" height="53" fill="#714b9b"/>
+      <rect x="225" y="295" width="15" height="44" fill="#d68b00"/>
+      <rect x="243" y="283" width="21" height="56" fill="#287e8c"/>
+      <rect x="310" y="290" width="16" height="49" fill="#c94b45"/>
+      <rect x="329" y="281" width="20" height="58" fill="#176cbb"/>
+      <rect x="352" y="297" width="17" height="42" fill="#16804a"/>
+    </g>
+  </g>
+
+  <ellipse cx="741" cy="361" rx="235" ry="58" fill="#8cc6ca"/>
+  <ellipse cx="741" cy="361" rx="177" ry="38" fill="#b9dfe1"/>
+  <g>
+    <rect x="1016" y="286" width="105" height="18" rx="5" fill="#8a633f"/>
+    <path d="M1031 304v70M1106 304v70" stroke="#8a633f" stroke-width="10"/>
+    <path d="M1069 286v-44" stroke="#607b62" stroke-width="6"/>
+    <path d="M1068 258c-36-4-43-31-44-53 29 2 46 18 44 53zM1071 250c35-4 43-31 44-53-30 2-47 18-44 53z" fill="#4d9967"/>
+    <rect x="1043" y="257" width="52" height="29" rx="4" fill="#c94b45"/>
+  </g>
+
+  <g>
+    <circle cx="640" cy="280" r="28" fill="#8c5b3f"/>
+    <path d="M610 276c3-31 18-45 34-45 22 0 34 21 29 51-8-17-18-25-31-27-9 13-20 20-32 21z" fill="#293845"/>
+    <path d="M606 324c9-27 27-40 53-37 27 4 40 23 40 55v42h-97z" fill="#d68b00"/>
+    <path d="M654 330l67 22-9 36-71-27z" fill="#ffffff" stroke="#176cbb" stroke-width="4"/>
+    <path d="M676 338l-8 35M699 346l-8 34" stroke="#9eb8c9" stroke-width="3"/>
+  </g>
+  <g>
+    <circle cx="827" cy="281" r="28" fill="#d8a078"/>
+    <path d="M798 281c-1-30 13-49 31-49 23 0 35 20 31 48-8-12-17-20-28-24-10 15-21 23-34 25z" fill="#754a36"/>
+    <path d="M785 384v-47c0-30 18-48 47-48 27 0 44 18 46 48v47z" fill="#176cbb"/>
+    <path d="M801 337l-65 18 8 35 68-25z" fill="#ffffff" stroke="#16804a" stroke-width="4"/>
+    <path d="M780 344l9 34M757 350l9 34" stroke="#9eb8c9" stroke-width="3"/>
+  </g>
+  <path d="M0 410h1200" stroke="#9eb0b9" stroke-width="3"/>
+</svg>

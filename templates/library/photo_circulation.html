@@ -2,8 +2,18 @@
 {% block title %}Circulation - {{ school_profile.display_name }}{% endblock %}
 {% block content %}
 <header class="desk-heading">
+  <span class="eyebrow">{{ school_profile.display_name }}</span>
   <h1>Borrow or return a book</h1>
+  <p>Self-service library desk</p>
 </header>
+
+{% if has_borrowers or confirmation %}
+<ol class="desk-progress" id="desk-progress" aria-label="Circulation progress">
+  <li{% if not confirmation %} class="active"{% else %} class="complete"{% endif %}><span>1</span>Borrower</li>
+  <li{% if confirmation %} class="complete"{% endif %}><span>2</span>Book</li>
+  <li{% if confirmation %} class="active"{% endif %}><span>3</span>Confirm</li>
+</ol>
+{% endif %}
 
 {% if confirmation %}
 <section class="transaction-confirmation">
@@ -38,8 +48,8 @@
   <form method="post" class="confirmation-actions">
     {% csrf_token %}
     <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
-    <button class="button primary confirm-transaction">Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
-    <a class="button" href="{% url 'photo_circulation' %}">Cancel</a>
+    <button class="button primary confirm-transaction"><i data-lucide="circle-check" aria-hidden="true"></i>Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
+    <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Cancel</a>
   </form>
 </section>
 {% else %}
@@ -50,8 +60,12 @@
   {% csrf_token %}
   {{ form.non_field_errors }}
   <section class="desk-controls" aria-label="Transaction details"{% if form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
-    <h2>What are you doing?</h2>
+    <div class="desk-section-heading">
+      <span class="desk-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
+      <div><span class="eyebrow">Step 1</span><h2>Start a transaction</h2></div>
+    </div>
     <div class="control-block mode-block">
+      <span class="control-label">Choose an action</span>
       <div class="mode-switch">{{ form.action }}</div>
       {{ form.action.errors }}
     </div>
@@ -59,28 +73,34 @@
     <div class="control-block borrower-block">
       <label class="control-label" id="borrower-label" for="borrower-search">Choose your name</label>
       {{ form.borrower }}
-      <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.username|default:selected_borrower.full_name }} - {{ selected_borrower.full_name }}{% endif %}">
-      <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
+      <div class="borrower-search-field">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.username|default:selected_borrower.full_name }} - {{ selected_borrower.full_name }}{% endif %}">
+        <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
+      </div>
       <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your username or name.</p>
       {{ form.borrower.errors }}
     </div>
-    <button class="button primary continue-circulation" id="continue-circulation" type="button">Continue</button>
+    <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continue</button>
   </section>
 
   <section class="desk-scan" aria-labelledby="scan-title"{% if not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors and not form.return_copies.errors %} hidden{% endif %}>
-    <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button">Change</button></div>
-    <div class="scan-heading"><div><h2 id="scan-title">Choose the book</h2></div></div>
+    <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button"><i data-lucide="refresh-cw" aria-hidden="true"></i>Change</button></div>
+    <div class="desk-section-heading scan-heading">
+      <span class="desk-section-icon"><i data-lucide="book-open" aria-hidden="true"></i></span>
+      <div><span class="eyebrow">Step 2</span><h2 id="scan-title">Choose the book</h2></div>
+    </div>
     {{ form.book_photo.errors }}
     <div class="identification-switch" id="identification-switch" role="tablist" aria-label="Book identification method">
-      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="true">Take photo</button>
-      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="false">Find manually</button>
+      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="true"><i data-lucide="camera" aria-hidden="true"></i>Take photo</button>
+      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="false"><i data-lucide="search" aria-hidden="true"></i>Find manually</button>
     </div>
     <div id="photo-method" class="identification-method" role="tabpanel" aria-labelledby="photo-method-tab">
       <div class="book-scan-target" id="book-scan-target">
         {{ form.book_photo }}
         <img id="scan-preview" alt="Selected book code photo">
         <div class="scan-prompt" id="scan-prompt">
-          <span class="scan-mark" aria-hidden="true"></span>
+          <i class="scan-illustration" data-lucide="scan-line" aria-hidden="true"></i>
           <strong>Take a photo</strong>
           <span>Point the camera at the book label</span>
         </div>
@@ -89,7 +109,7 @@
       <div class="barcode-result" id="circulation-barcode-result" aria-live="polite">
         <span class="status-dot" aria-hidden="true"></span><span id="barcode-status">Waiting for a book</span>
       </div>
-      <p class="photo-privacy">The photo is read once and never saved.</p>
+      <p class="photo-privacy"><i data-lucide="shield-check" aria-hidden="true"></i>The photo is read once and never saved.</p>
     </div>
     <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab" hidden>
       <label class="control-label" for="copy-filter">Search title, author, ISBN, shelf, or copy number</label>
@@ -104,7 +124,7 @@
       <p id="no-return-loans" class="empty-return" hidden>This borrower has no books to return.</p>
       {{ form.return_copies.errors }}
     </div>
-    <button class="button primary identify-book" id="identify-book">Identify book</button>
+    <button class="button primary identify-book" id="identify-book"><i data-lucide="scan-search" aria-hidden="true"></i><span id="identify-book-label">Identify book</span></button>
   </section>
 </form>
 {% endif %}
@@ -141,7 +161,9 @@
   const returnOptions = document.getElementById("return-loan-options");
   const noReturnLoans = document.getElementById("no-return-loans");
   const identifyButton = document.getElementById("identify-book");
+  const identifyButtonLabel = document.getElementById("identify-book-label");
   const scanTitle = document.getElementById("scan-title");
+  const progressSteps = Array.from(document.querySelectorAll("#desk-progress li"));
   const borrowerSearchUrl = "{% url 'circulation_borrower_search' %}";
   const borrowerLoansUrl = "{% url 'circulation_borrower_loans' '00000000-0000-0000-0000-000000000000' %}";
   if (!fileInput || !status || !preview || !borrowerId || !borrowerSearch) return;
@@ -268,7 +290,7 @@
     identificationSwitch.hidden = returning;
     returnMethod.hidden = !returning;
     scanTitle.textContent = returning ? "Choose books to return" : "Choose the book";
-    identifyButton.textContent = returning ? "Review return" : "Identify book";
+    identifyButtonLabel.textContent = returning ? "Review return" : "Identify book";
     if (returning) {
       photoMethod.hidden = true;
       manualMethod.hidden = true;
@@ -278,6 +300,7 @@
     }
     controls.hidden = true;
     scan.hidden = false;
+    progressSteps.forEach((step, index) => { step.className = index === 0 ? "complete" : index === 1 ? "active" : ""; });
     const firstControl = returning ? returnOptions.querySelector("input") : scan.querySelector("input, button");
     if (firstControl) firstControl.focus();
   }
@@ -285,6 +308,7 @@
   changeSession.addEventListener("click", function () {
     scan.hidden = true;
     controls.hidden = false;
+    progressSteps.forEach((step, index) => { step.className = index === 0 ? "active" : ""; });
     borrowerSearch.focus();
   });
   if (!scan.hidden) showScan();
