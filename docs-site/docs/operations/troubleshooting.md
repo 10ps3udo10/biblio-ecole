@@ -8,12 +8,12 @@
 - Try the Shelf-School copy QR instead of the ISBN.
 - Confirm `zxing-cpp` and Pillow are installed through `requirements.txt`.
 
-The browser may not implement `BarcodeDetector`. This is not fatal: the server
+The browser may not implement `BarcodeDetector`. **This is not fatal:** the server
 performs a second local decode after submission.
 
 ## ISBN matches multiple copies
 
-ISBN identifies an edition, not one physical item. Attach and photograph the
+**ISBN identifies an edition, not one physical item.** Attach and photograph the
 unique Shelf-School copy QR label.
 
 ## Book is not cataloged

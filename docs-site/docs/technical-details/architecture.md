@@ -22,7 +22,7 @@ Browser camera or uploaded image
 | `Borrower` | Student or teacher who can receive books. |
 | `Loan` | Checkout, due date, and optional return date for one copy. |
 
-The database enforces one active loan per physical copy.
+**The database enforces one active loan per physical copy.**
 
 ## Trust boundaries
 
@@ -34,7 +34,7 @@ users.
 Photo identification does not mutate circulation state. It creates a signed,
 short-lived confirmation token containing copy, borrower, action, and due date.
 The confirmation request locks and revalidates the copy before changing the
-loan, protecting against stale or repeated submissions.
+loan, **protecting against stale or repeated submissions**.
 
 ## Storage and external services
 

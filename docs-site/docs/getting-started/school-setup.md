@@ -12,14 +12,14 @@ Configure:
 - Default loan duration in days.
 - Footer printed on copy and borrower labels.
 
-The current design supports one school per installation. Separate schools
+**The current design supports one school per installation.** Separate schools
 should run separate Shelf-School installations and databases.
 
 ## Accounts and borrowers
 
 The administrator account operates Shelf-School and Django administration.
 Borrowers are separate records representing students or teachers who receive
-books. Borrowers do not log in and do not need passwords.
+books. **Borrowers do not log in and do not need passwords.**
 
 One administrator is enough for a small deployment. Additional Django staff
 accounts are only necessary when several adults maintain the catalog or school

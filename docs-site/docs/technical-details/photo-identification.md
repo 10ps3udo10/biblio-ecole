@@ -4,8 +4,8 @@ Shelf-School treats a photograph as input to an identifier decoder, not as the
 library record itself.
 
 :::info Storage behavior
-ISBN-intake and circulation images are temporary request data and are discarded
-after decoding. Available Open Library covers are downloaded when the book is
+ISBN-intake and circulation images are temporary request data and **are discarded
+after decoding**. Available Open Library covers are downloaded when the book is
 created. A no-ISBN intake image is stored only when staff supplies a manual
 title and intends that image to be the cover.
 :::
@@ -36,5 +36,5 @@ books and propose catalog matches. A safe implementation must:
 - Require review before creating any loan.
 - Preserve one `Loan` record per `Copy`.
 
-Cover recognition alone cannot reliably identify which physical copy is being
-borrowed when several copies share the same title.
+**Cover recognition alone cannot reliably identify which physical copy is being
+borrowed when several copies share the same title.**

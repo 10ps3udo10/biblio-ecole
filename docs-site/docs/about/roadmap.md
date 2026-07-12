@@ -18,6 +18,6 @@ Longer-term ideas:
 - Multiple language support.
 - Optional student privacy modes for shared kiosks.
 
-Multi-book recognition must remain an identification aid. Shelf-School will
+**Multi-book recognition must remain an identification aid.** Shelf-School will
 continue to require a catalog match and a specific physical copy before a loan
 can be confirmed.

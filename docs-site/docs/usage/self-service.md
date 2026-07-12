@@ -1,7 +1,7 @@
 # Self-Service Circulation
 
-The public kiosk at `/` is the center of Shelf-School. It does not require the
-administrator to remain signed in.
+The public kiosk at `/` is the center of Shelf-School. **It does not require the
+administrator to remain signed in.**
 
 ![Public Shelf-School circulation desk](/img/circulation-desk.png)
 
@@ -38,7 +38,7 @@ another book can be processed immediately.
 
 Only books currently loaned to the selected borrower appear. The list is also
 validated on the server, preventing a mistaken name selection from changing
-another student's record. A return does not require a photograph.
+another student's record. **A return does not require a photograph.**
 
 ## Identifier behavior
 

@@ -20,12 +20,12 @@ before saving. Its catalog cover is downloaded when the book is created.
 8. Print the generated QR label and attach it to the physical book.
 
 Barcode decoding runs locally with `zxing-cpp`. When an ISBN is available,
-Shelf-School requests free metadata from Open Library. No paid AI API is
-required.
+Shelf-School requests free metadata from Open Library. **No paid AI API is
+required.**
 
 When Open Library has a cover, Shelf-School downloads and stores it when staff
 selects **Track this book**. The uploaded ISBN photograph is scanner input and
-is never stored. If no catalog cover is available, the book remains without a
+**is never stored**. If no catalog cover is available, the book remains without a
 cover.
 
 When staff intentionally adds a book without an ISBN using a manual title, the

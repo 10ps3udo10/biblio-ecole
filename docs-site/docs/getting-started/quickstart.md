@@ -43,8 +43,8 @@ Open staff administration:
 http://127.0.0.1:8001/admin/login/
 ```
 
-The Django development server is suitable for local testing. Do not expose it
-directly to the public internet.
+The Django development server is suitable for local testing. **Do not expose it
+directly to the public internet.**
 
 ## Next steps
 

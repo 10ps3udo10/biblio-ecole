@@ -1,7 +1,7 @@
 # Borrowers
 
-Borrowers are students or teachers who may hold books. They are not Django
-login accounts.
+Borrowers are students or teachers who may hold books. **They are not Django
+login accounts.**
 
 Each borrower stores:
 
@@ -35,8 +35,8 @@ leo,Leo,Martinez,4A,leo@example.org,true
 Username is the update key. Importing an existing username updates that
 borrower rather than creating a duplicate.
 
-Inactive borrowers remain in historical loan records but are removed from the
-public kiosk dropdown.
+**Inactive borrowers remain in historical loan records** but are removed from
+the public kiosk dropdown.
 
 ## Review a borrower
 

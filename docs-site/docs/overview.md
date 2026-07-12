@@ -4,7 +4,7 @@ Shelf-School is an open-source library system for small schools. Its primary
 screen is a public circulation kiosk where a student selects their name,
 chooses checkout or return, and photographs one book at a time.
 
-Students do not need passwords, accounts, or library cards. Staff use a single
+**Students do not need passwords, accounts, or library cards.** Staff use a single
 administrator session for cataloging, borrower management, reports, settings,
 and backups.
 
@@ -31,7 +31,7 @@ and backups.
 
 ## Important boundary
 
-A book must be cataloged before it can circulate. Photo identification finds a
+**A book must be cataloged before it can circulate.** Photo identification finds a
 known physical copy; it never creates a loan for an unregistered book.
 
 Shelf-School currently processes one photograph and one physical copy per

@@ -8,7 +8,7 @@ media/
 ```
 
 The SQLite database contains books, copies, borrowers, school settings, and
-loan history. The media directory contains uploaded covers and branding.
+loan history. **The media directory contains uploaded covers and branding.**
 
 ## Download the database
 
@@ -17,7 +17,7 @@ backup**. The backup endpoint is unavailable to signed-out kiosk users.
 
 ## Complete backup
 
-For a complete recovery point:
+For a **complete recovery point**, preserve both the database and media:
 
 1. Stop Shelf-School so the database is not changing.
 2. Copy `db.sqlite3`.
