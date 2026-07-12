@@ -4,6 +4,10 @@ Photo intake is a staff workflow at `/books/photo-intake/`.
 
 ![Shelf-School photo intake screen](/img/photo-intake.png)
 
+The regular **Add book** form is also ISBN-first. Entering ISBN-13 or ISBN-10
+fills available title, author, publisher, year, language, and description fields
+before saving. Its catalog cover is downloaded when the book is created.
+
 ## Add a title and first copy
 
 1. Sign in as the administrator.

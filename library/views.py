@@ -1,5 +1,6 @@
 import csv
 import uuid
+from datetime import timedelta
 from io import StringIO, TextIOWrapper
 from urllib.parse import quote_plus
 
@@ -120,9 +121,21 @@ def _perform_circulation(copy, borrower, action, due_date=None):
 
 
 def _circulation_context(form, **extra):
+    borrower_loans = {}
+    active_loans = Loan.objects.filter(return_date__isnull=True).select_related("copy__book", "borrower").order_by("copy__book__title")
+    for loan in active_loans:
+        borrower_loans.setdefault(str(loan.borrower_id), []).append(
+            {
+                "copy_id": str(loan.copy_id),
+                "title": loan.copy.book.title,
+                "copy_number": loan.copy.copy_number,
+                "due_date": loan.due_date.isoformat(),
+            }
+        )
     context = {
         "form": form,
         "has_borrowers": Borrower.objects.filter(active=True).exists(),
+        "borrower_loans": borrower_loans,
     }
     context.update(extra)
     return context
@@ -131,11 +144,35 @@ def _circulation_context(form, **extra):
 @login_required
 def dashboard(request):
     active_loans = Loan.objects.filter(return_date__isnull=True)
+    total_copies = Copy.objects.count()
+    available_copies = Copy.objects.filter(status=Copy.Status.AVAILABLE).count()
+    unavailable_copies = Copy.objects.filter(status__in=[Copy.Status.DAMAGED, Copy.Status.ARCHIVED]).count()
+    today = timezone.localdate()
+    circulation_days = []
+    for days_ago in range(6, -1, -1):
+        day = today - timedelta(days=days_ago)
+        circulation_days.append(
+            {
+                "date": day,
+                "checkouts": Loan.objects.filter(checkout_date=day).count(),
+                "returns": Loan.objects.filter(return_date=day).count(),
+            }
+        )
+    max_daily_activity = max(
+        [item["checkouts"] for item in circulation_days] + [item["returns"] for item in circulation_days] + [1]
+    )
     context = {
         "total_books": Book.objects.count(),
-        "total_copies": Copy.objects.count(),
+        "total_copies": total_copies,
+        "available_copies": available_copies,
+        "unavailable_copies": unavailable_copies,
+        "available_percent": round((available_copies / total_copies) * 100) if total_copies else 0,
+        "borrowed_percent": round((active_loans.count() / total_copies) * 100) if total_copies else 0,
+        "unavailable_percent": round((unavailable_copies / total_copies) * 100) if total_copies else 0,
         "borrowed_books": active_loans.count(),
         "overdue_books": active_loans.filter(due_date__lt=timezone.localdate()).count(),
+        "circulation_days": circulation_days,
+        "max_daily_activity": max_daily_activity,
         "recent_books": Book.objects.order_by("-created_at")[:6],
         "recent_loans": Loan.objects.select_related("copy__book", "borrower").order_by("-checkout_date")[:8],
         "setup_needed": not SchoolProfile.current().setup_completed,
@@ -235,9 +272,12 @@ def isbn_metadata(request):
         {
             "source": "open_library",
             "title": metadata.get("title", ""),
+            "subtitle": metadata.get("subtitle", ""),
             "authors": metadata.get("authors", ""),
             "publisher": metadata.get("publisher", ""),
             "publication_year": metadata.get("publication_year"),
+            "language": metadata.get("language", ""),
+            "description": metadata.get("description", ""),
             "cover_url": metadata.get("cover_url", ""),
             "message": "Book details filled from the free Open Library catalog.",
         }
@@ -249,7 +289,11 @@ def book_create(request):
     if request.method == "POST":
         form = BookForm(request.POST, request.FILES)
         if form.is_valid():
-            book = form.save()
+            book = form.save(commit=False)
+            isbn = book.isbn13 or book.isbn10
+            if not book.cover_image:
+                _attach_intake_cover(book, isbn, None)
+            book.save()
             Copy.objects.create(
                 book=book,
                 copy_number=1,
@@ -353,7 +397,13 @@ def copy_detail(request, pk):
 @login_required
 def borrower_list(request):
     query = request.GET.get("q", "").strip()
-    borrowers = Borrower.objects.all()
+    borrowers = Borrower.objects.annotate(
+        active_loan_count=Count("loans", filter=Q(loans__return_date__isnull=True)),
+        overdue_loan_count=Count(
+            "loans",
+            filter=Q(loans__return_date__isnull=True, loans__due_date__lt=timezone.localdate()),
+        ),
+    )
     if query:
         borrowers = borrowers.filter(
             Q(username__icontains=query)
@@ -362,7 +412,17 @@ def borrower_list(request):
             | Q(class_name__icontains=query)
             | Q(email__icontains=query)
         )
-    return render(request, "library/borrower_list.html", {"borrowers": borrowers, "query": query})
+    return render(
+        request,
+        "library/borrower_list.html",
+        {
+            "borrowers": borrowers,
+            "query": query,
+            "total_borrowers": Borrower.objects.count(),
+            "active_borrowers": Borrower.objects.filter(active=True).count(),
+            "borrowers_with_loans": Borrower.objects.filter(loans__return_date__isnull=True).distinct().count(),
+        },
+    )
 
 
 @login_required
@@ -373,7 +433,13 @@ def borrower_detail(request, pk):
     return render(
         request,
         "library/borrower_detail.html",
-        {"borrower": borrower, "active_loans": active_loans, "loan_history": loan_history},
+        {
+            "borrower": borrower,
+            "active_loans": active_loans,
+            "loan_history": loan_history,
+            "active_loan_count": active_loans.count(),
+            "overdue_loan_count": active_loans.filter(due_date__lt=timezone.localdate()).count(),
+        },
     )
 
 
@@ -400,8 +466,18 @@ def photo_circulation(request):
                 action = payload["action"]
                 due_date = payload.get("due_date") or None
                 with transaction.atomic():
-                    copy = Copy.objects.select_for_update().select_related("book").get(pk=payload["copy_id"])
-                    success_message = _perform_circulation(copy, borrower, action, due_date)
+                    copy_ids = payload.get("copy_ids") or []
+                    if copy_ids:
+                        copies = list(Copy.objects.select_for_update().select_related("book").filter(pk__in=copy_ids))
+                        if len(copies) != len(copy_ids):
+                            raise ValueError("One of the selected books is no longer available.")
+                        for selected_copy in copies:
+                            _perform_circulation(selected_copy, borrower, action)
+                        copy = copies[0]
+                        success_message = f"Returned {len(copies)} book{'s' if len(copies) != 1 else ''} for {borrower.full_name}."
+                    else:
+                        copy = Copy.objects.select_for_update().select_related("book").get(pk=payload["copy_id"])
+                        success_message = _perform_circulation(copy, borrower, action, due_date)
             except signing.BadSignature:
                 messages.error(request, "That circulation confirmation expired. Please scan the book again.")
                 return redirect("photo_circulation")
@@ -416,6 +492,34 @@ def photo_circulation(request):
         if form.is_valid():
             action = form.cleaned_data["action"]
             borrower = form.cleaned_data["borrower"]
+            return_copies = list(form.cleaned_data.get("return_copies") or [])
+            if action == PhotoCirculationForm.Action.CHECKIN and return_copies:
+                for selected_copy in return_copies:
+                    loan = selected_copy.active_loan
+                    if loan is None or loan.borrower_id != borrower.id:
+                        form.add_error("return_copies", "One of these books is not checked out to the selected borrower.")
+                        return render(request, "library/photo_circulation.html", _circulation_context(form))
+                token = signing.dumps(
+                    {
+                        "copy_ids": [str(selected_copy.id) for selected_copy in return_copies],
+                        "borrower_id": str(borrower.id),
+                        "action": action,
+                        "due_date": "",
+                    },
+                    salt=CIRCULATION_SALT,
+                )
+                return render(
+                    request,
+                    "library/photo_circulation.html",
+                    _circulation_context(
+                        form,
+                        confirmation=True,
+                        confirmation_token=token,
+                        copies=return_copies,
+                        borrower=borrower,
+                        action=action,
+                    ),
+                )
             copy = form.cleaned_data.get("manual_copy")
             if copy is None:
                 try:

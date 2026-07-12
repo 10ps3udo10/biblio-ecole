@@ -1,3 +1,72 @@
 {% extends "library/base.html" %}
-{% block title %}{{ title }} - School Library{% endblock %}
-{% block content %}<section class="form-panel"><h1>{{ title }}</h1><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button class="button primary">Save</button></form></section>{% endblock %}
+{% block title %}{{ title }} - {{ school_profile.display_name }}{% endblock %}
+{% block content %}
+<section class="form-panel book-entry">
+  <h1>{{ title }}</h1>
+  <p class="muted">Start with an ISBN to fill available details and cover automatically.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <p class="isbn-entry-status" id="isbn-entry-status" aria-live="polite"></p>
+    <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a>
+    <button class="button primary">Save book</button>
+  </form>
+</section>
+<script>
+(function () {
+  const isbn13 = document.getElementById("id_isbn13");
+  const isbn10 = document.getElementById("id_isbn10");
+  const status = document.getElementById("isbn-entry-status");
+  const webSearch = document.getElementById("book-isbn-web-search");
+  const metadataUrl = "{% url 'isbn_metadata' %}";
+  const fieldMap = {
+    title: "id_title",
+    subtitle: "id_subtitle",
+    authors: "id_authors",
+    publisher: "id_publisher",
+    publication_year: "id_publication_year",
+    language: "id_language",
+    description: "id_description"
+  };
+  if (!isbn13 || !isbn10 || !status) return;
+  document.documentElement.dataset.bookEntryReady = "true";
+
+  let timer;
+  let lastLookup = "";
+  async function lookupISBN(source) {
+    const isbn = source.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
+    if (![10, 13].includes(isbn.length) || isbn === lastLookup) return;
+    lastLookup = isbn;
+    source.value = isbn;
+    status.textContent = "Looking up ISBN...";
+    webSearch.hidden = true;
+    try {
+      const response = await fetch(metadataUrl + "?isbn=" + encodeURIComponent(isbn), {headers: {"Accept": "application/json"}});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "ISBN lookup failed.");
+      Object.entries(fieldMap).forEach(([key, id]) => {
+        const input = document.getElementById(id);
+        if (input && payload[key] && !input.value) input.value = payload[key];
+      });
+      status.textContent = payload.message;
+      status.dataset.state = payload.source === "none" ? "warning" : "success";
+      if (payload.search_url) {
+        webSearch.href = payload.search_url;
+        webSearch.hidden = false;
+      }
+    } catch (error) {
+      status.textContent = error.message;
+      status.dataset.state = "warning";
+    }
+  }
+
+  [isbn13, isbn10].forEach((input) => {
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { lookupISBN(input); }, 500);
+    });
+    input.addEventListener("change", function () { lookupISBN(input); });
+  });
+})();
+</script>
+{% endblock %}

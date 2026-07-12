@@ -58,6 +58,27 @@ def test_add_book_creates_first_copy(logged_in_client):
 
 
 @pytest.mark.django_db
+def test_add_book_downloads_catalog_cover_from_isbn(logged_in_client, tmp_path, settings, monkeypatch):
+    settings.MEDIA_ROOT = tmp_path
+    monkeypatch.setattr("library.views.download_cover_by_isbn", lambda isbn: (b"downloaded cover", "jpg"))
+
+    response = logged_in_client.post(
+        reverse("book_create"),
+        {
+            "isbn13": "9788408052524",
+            "title": "La sombra del viento",
+            "authors": "Carlos Ruiz Zafon",
+            "first_copy_condition": Copy.Condition.GOOD,
+        },
+    )
+
+    assert response.status_code == 302
+    book = Book.objects.get(isbn13="9788408052524")
+    with book.cover_image.open("rb") as cover:
+        assert cover.read() == b"downloaded cover"
+
+
+@pytest.mark.django_db
 def test_checkout_and_return_flow_updates_copy_status(logged_in_client):
     book = Book.objects.create(title="Matilda")
     copy = Copy.objects.create(book=book, copy_number=1)
@@ -368,10 +389,9 @@ def test_photo_circulation_checkout_and_checkin_with_borrower_dropdown(logged_in
     assert copy.status == Copy.Status.CHECKED_OUT
     assert Loan.objects.filter(copy=copy, borrower=borrower, return_date__isnull=True).exists()
 
-    photo = SimpleUploadedFile("copy-qr.png", b"fake image bytes", content_type="image/png")
     checkin = logged_in_client.post(
         reverse("photo_circulation"),
-        {"action": "checkin", "borrower": str(borrower.id), "book_photo": photo},
+        {"action": "checkin", "borrower": str(borrower.id), "return_copies": [str(copy.id)]},
     )
 
     assert checkin.status_code == 200
@@ -434,24 +454,53 @@ def test_circulation_accepts_exact_copy_from_manual_fallback(client):
 
 
 @pytest.mark.django_db
-def test_photo_circulation_rejects_checkin_for_wrong_borrower(logged_in_client, monkeypatch):
+def test_photo_circulation_rejects_checkin_for_wrong_borrower(logged_in_client):
     book = Book.objects.create(title="Borrower mismatch")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
     borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez")
     other = Borrower.objects.create(username="leo", first_name="Leo", last_name="Garcia")
     Loan.objects.create(copy=copy, borrower=borrower)
-    monkeypatch.setattr("library.views.decode_barcodes_from_image", lambda photo: [copy.qr_code])
-    photo = SimpleUploadedFile("copy-qr.png", b"fake image bytes", content_type="image/png")
-
     response = logged_in_client.post(
         reverse("photo_circulation"),
-        {"action": "checkin", "borrower": str(other.id), "book_photo": photo},
+        {"action": "checkin", "borrower": str(other.id), "return_copies": [str(copy.id)]},
     )
 
     assert response.status_code == 200
-    assert b"checked out to a different borrower" in response.content
+    assert b"Select a valid choice" in response.content
     copy.refresh_from_db()
     assert copy.status == Copy.Status.CHECKED_OUT
+
+
+@pytest.mark.django_db
+def test_borrower_can_return_multiple_active_loans_together(client):
+    borrower = Borrower.objects.create(username="reader", first_name="Test", last_name="Reader")
+    other = Borrower.objects.create(username="other", first_name="Other", last_name="Reader")
+    first = Copy.objects.create(book=Book.objects.create(title="First return"), copy_number=1, status=Copy.Status.CHECKED_OUT)
+    second = Copy.objects.create(book=Book.objects.create(title="Second return"), copy_number=1, status=Copy.Status.CHECKED_OUT)
+    other_copy = Copy.objects.create(book=Book.objects.create(title="Not this borrower"), copy_number=1, status=Copy.Status.CHECKED_OUT)
+    Loan.objects.create(copy=first, borrower=borrower)
+    Loan.objects.create(copy=second, borrower=borrower)
+    Loan.objects.create(copy=other_copy, borrower=other)
+
+    response = client.post(
+        reverse("photo_circulation"),
+        {
+            "action": "checkin",
+            "borrower": str(borrower.id),
+            "return_copies": [str(first.id), str(second.id)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.context["copies"] == [first, second]
+    response = client.post(
+        reverse("photo_circulation"),
+        {"confirmation_token": response.context["confirmation_token"]},
+    )
+
+    assert response.status_code == 302
+    assert not Loan.objects.filter(copy__in=[first, second], return_date__isnull=True).exists()
+    assert Loan.objects.filter(copy=other_copy, return_date__isnull=True).exists()
 
 
 @pytest.mark.django_db

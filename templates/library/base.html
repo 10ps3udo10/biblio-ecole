@@ -25,6 +25,7 @@
       <a href="{% url 'overdue_loans' %}">Overdue</a>
       <a href="{{ docs_url }}">Docs</a>
       {% if request.user.is_staff %}<a href="{% url 'school_settings' %}">Settings</a>{% endif %}
+      <span class="staff-user" aria-label="Signed in as {{ request.user.get_full_name|default:request.user.username }}"><span class="staff-user-mark" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>{{ request.user.get_full_name|default:request.user.username }}</span>
       <form class="nav-logout" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}">Sign out</button></form>
     </nav>{% else %}<a class="public-docs" href="{{ docs_url }}">Docs</a>{% endif %}
   </header>

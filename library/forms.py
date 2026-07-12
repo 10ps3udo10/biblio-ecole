@@ -23,11 +23,11 @@ class BookForm(forms.ModelForm):
     class Meta:
         model = Book
         fields = [
+            "isbn13",
+            "isbn10",
             "title",
             "subtitle",
             "authors",
-            "isbn10",
-            "isbn13",
             "publisher",
             "publication_year",
             "language",
@@ -118,6 +118,11 @@ class CopyChoiceField(forms.ModelChoiceField):
         return f"{copy.book.title} - {authors} - copy #{copy.copy_number} - {isbn} - {shelf} - {copy.get_status_display()}"
 
 
+class CopyMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, copy):
+        return f"{copy.book.title} - copy #{copy.copy_number}"
+
+
 class PhotoCirculationForm(forms.Form):
     class Action(models.TextChoices):
         CHECKOUT = "checkout", "Check out"
@@ -137,6 +142,7 @@ class PhotoCirculationForm(forms.Form):
         help_text="Use the copy QR label when available. ISBN barcode works when there is only one matching copy.",
     )
     manual_copy = CopyChoiceField(label="Book copy", queryset=Copy.objects.none(), required=False)
+    return_copies = CopyMultipleChoiceField(label="Books to return", queryset=Copy.objects.none(), required=False)
     due_date = forms.DateField(
         label="Due date",
         required=False,
@@ -150,10 +156,19 @@ class PhotoCirculationForm(forms.Form):
         self.fields["borrower"].empty_label = "Select borrower"
         self.fields["manual_copy"].queryset = Copy.objects.exclude(status=Copy.Status.ARCHIVED).select_related("book").order_by("book__title", "copy_number")
         self.fields["manual_copy"].empty_label = "Select an exact book copy"
+        return_copies = Copy.objects.filter(status=Copy.Status.CHECKED_OUT, loans__return_date__isnull=True)
+        borrower_id = self.data.get("borrower") if self.is_bound else self.initial.get("borrower")
+        if borrower_id:
+            return_copies = return_copies.filter(loans__borrower_id=borrower_id)
+        else:
+            return_copies = return_copies.none()
+        self.fields["return_copies"].queryset = return_copies.select_related("book").distinct().order_by("book__title", "copy_number")
 
     def clean(self):
         cleaned_data = super().clean()
-        if not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
+        if cleaned_data.get("action") == self.Action.CHECKIN and not cleaned_data.get("return_copies"):
+            raise forms.ValidationError("Select at least one borrowed book to return.")
+        if cleaned_data.get("action") == self.Action.CHECKOUT and not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
             raise forms.ValidationError("Take a book photo or select the book manually.")
         return cleaned_data
 

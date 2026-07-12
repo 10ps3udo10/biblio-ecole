@@ -7,6 +7,18 @@
 
 {% if confirmation %}
 <section class="transaction-confirmation">
+  {% if copies %}
+  <div class="confirmation-book-list">
+    <span class="eyebrow">Books selected</span>
+    <h2>{{ copies|length }} book{{ copies|length|pluralize }} to return</h2>
+    {% for selected_copy in copies %}
+    <div class="confirmation-book-row">
+      <strong>{{ selected_copy.book.title }}</strong>
+      <span>Copy #{{ selected_copy.copy_number }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
   <div class="confirmation-book">
     {% if copy.book.cover_image %}<img src="{{ copy.book.cover_image.url }}" alt="Cover of {{ copy.book.title }}">{% else %}<div class="book-placeholder">Book</div>{% endif %}
     <div>
@@ -16,9 +28,11 @@
       <span class="copy-tag">Copy #{{ copy.copy_number }}</span>
     </div>
   </div>
+  {% endif %}
   <dl class="transaction-summary">
     <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
     <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No username" }}<span>{{ borrower.full_name }}</span></dd></div>
+    {% if copies %}<div><dt>Books</dt><dd>{{ copies|length }}</dd></div>{% endif %}
     {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
   </dl>
   <form method="post" class="confirmation-actions">
@@ -35,7 +49,7 @@
 <form class="circulation-desk" method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {{ form.non_field_errors }}
-  <section class="desk-controls" aria-label="Transaction details"{% if form.non_field_errors or form.book_photo.errors or form.manual_copy.errors %} hidden{% endif %}>
+  <section class="desk-controls" aria-label="Transaction details"{% if form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
     <h2>What are you doing?</h2>
     <div class="control-block mode-block">
       <div class="mode-switch">{{ form.action }}</div>
@@ -50,11 +64,11 @@
     <button class="button primary continue-circulation" id="continue-circulation" type="button">Continue</button>
   </section>
 
-  <section class="desk-scan" aria-labelledby="scan-title"{% if not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors %} hidden{% endif %}>
+  <section class="desk-scan" aria-labelledby="scan-title"{% if not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors and not form.return_copies.errors %} hidden{% endif %}>
     <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button">Change</button></div>
     <div class="scan-heading"><div><h2 id="scan-title">Choose the book</h2></div></div>
     {{ form.book_photo.errors }}
-    <div class="identification-switch" role="tablist" aria-label="Book identification method">
+    <div class="identification-switch" id="identification-switch" role="tablist" aria-label="Book identification method">
       <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="true">Take photo</button>
       <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="false">Find manually</button>
     </div>
@@ -81,7 +95,14 @@
       {{ form.manual_copy.errors }}
       <p>Select the exact physical copy. Its availability is checked before confirmation.</p>
     </div>
-    <button class="button primary identify-book">Identify book</button>
+    {{ borrower_loans|json_script:"borrower-loans-data" }}
+    <div id="return-method" class="return-book-list" hidden>
+      <p class="return-guidance">Select one or more books this borrower is returning.</p>
+      <div id="return-loan-options"></div>
+      <p id="no-return-loans" class="empty-return" hidden>This borrower has no books to return.</p>
+      {{ form.return_copies.errors }}
+    </div>
+    <button class="button primary identify-book" id="identify-book">Identify book</button>
   </section>
 </form>
 {% endif %}
@@ -110,6 +131,13 @@
   const manualMethodTab = document.getElementById("manual-method-tab");
   const photoMethod = document.getElementById("photo-method");
   const manualMethod = document.getElementById("manual-method");
+  const identificationSwitch = document.getElementById("identification-switch");
+  const returnMethod = document.getElementById("return-method");
+  const returnOptions = document.getElementById("return-loan-options");
+  const noReturnLoans = document.getElementById("no-return-loans");
+  const identifyButton = document.getElementById("identify-book");
+  const scanTitle = document.getElementById("scan-title");
+  const borrowerLoans = JSON.parse(document.getElementById("borrower-loans-data").textContent);
   if (!fileInput || !status || !preview || !borrowerSelect) return;
 
   const copyOptions = Array.from(copySelect.options).map((option) => ({ value: option.value, text: option.text }));
@@ -137,11 +165,24 @@
       return;
     }
     borrowerSelect.setCustomValidity("");
-    const action = document.querySelector("input[name='action']:checked").value === "checkin" ? "Return" : "Check out";
+    const returning = document.querySelector("input[name='action']:checked").value === "checkin";
+    const action = returning ? "Return" : "Check out";
     sessionSummary.textContent = action + " · " + borrowerSelect.options[borrowerSelect.selectedIndex].text;
+    identificationSwitch.hidden = returning;
+    returnMethod.hidden = !returning;
+    scanTitle.textContent = returning ? "Choose books to return" : "Choose the book";
+    identifyButton.textContent = returning ? "Review return" : "Identify book";
+    if (returning) {
+      photoMethod.hidden = true;
+      manualMethod.hidden = true;
+      renderReturnLoans();
+    } else {
+      selectMethod(manualMethodTab.getAttribute("aria-selected") === "true" ? "manual" : "photo");
+    }
     controls.hidden = true;
     scan.hidden = false;
-    scan.querySelector("input, button").focus();
+    const firstControl = returning ? returnOptions.querySelector("input") : scan.querySelector("input, button");
+    if (firstControl) firstControl.focus();
   }
   continueButton.addEventListener("click", showScan);
   changeSession.addEventListener("click", function () {
@@ -162,6 +203,32 @@
   photoMethodTab.addEventListener("click", function () { selectMethod("photo"); });
   manualMethodTab.addEventListener("click", function () { selectMethod("manual"); });
   if (copySelect.value) selectMethod("manual");
+
+  function renderReturnLoans() {
+    const selectedValues = new Set(Array.from(document.querySelectorAll("input[name='return_copies']:checked")).map((input) => input.value));
+    const loans = borrowerLoans[borrowerSelect.value] || [];
+    returnOptions.replaceChildren();
+    loans.forEach((loan) => {
+      const label = document.createElement("label");
+      label.className = "return-loan-option";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = "return_copies";
+      input.value = loan.copy_id;
+      input.checked = selectedValues.has(loan.copy_id);
+      const details = document.createElement("span");
+      details.innerHTML = "<strong></strong><small></small>";
+      details.querySelector("strong").textContent = loan.title;
+      details.querySelector("small").textContent = "Copy #" + loan.copy_number + " · Due " + loan.due_date;
+      label.append(input, details);
+      returnOptions.append(label);
+    });
+    noReturnLoans.hidden = loans.length !== 0;
+    identifyButton.disabled = loans.length === 0;
+  }
+  borrowerSelect.addEventListener("change", function () {
+    if (!returnMethod.hidden) renderReturnLoans();
+  });
 
   function setStatus(message, state) {
     status.textContent = message;

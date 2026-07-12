@@ -37,3 +37,9 @@ borrower rather than creating a duplicate.
 
 Inactive borrowers remain in historical loan records but are removed from the
 public kiosk dropdown.
+
+## Review a borrower
+
+The staff **Borrowers** page shows how many active borrowers currently have
+books out and flags overdue loans. Select a borrower to see their contact and
+class details, current loans with due dates, and recent loan history.

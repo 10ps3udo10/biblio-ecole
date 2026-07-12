@@ -32,13 +32,13 @@ another book can be processed immediately.
 
 1. Select **Check in / return**.
 2. Find and select the borrower returning the book.
-3. Photograph the book label.
-4. Review the identified copy.
-5. Select **Confirm return**.
+3. Select one or more books from that borrower's current loans.
+4. Select **Review return**.
+5. Check the selected titles and select **Confirm return**.
 
-Shelf-School refuses a return when the selected borrower does not hold the
-active loan. This prevents a mistaken name selection from silently changing
-another student's record.
+Only books currently loaned to the selected borrower appear. The list is also
+validated on the server, preventing a mistaken name selection from changing
+another student's record. A return does not require a photograph.
 
 ## Identifier behavior
 
@@ -52,8 +52,8 @@ another student's record.
 
 ## Manual fallback
 
-Photo and manual lookup have equal weight on the book step. Select **Find
-manually** whenever it is faster or the camera cannot read a code.
+For checkout, photo and manual lookup have equal weight on the book step. Select
+**Find manually** whenever it is faster or the camera cannot read a code.
 The filter uses partial matching against title, author, ISBN, shelf, and copy
 number. Select one exact physical copy, then continue to the normal review and
 confirmation screen. Availability and borrower ownership are validated again

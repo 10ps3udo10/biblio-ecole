@@ -19,10 +19,11 @@ or returns a physical book.**
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Shelf-School provides a public self-service kiosk where students choose their
-name, select checkout or return, and identify one book at a time. Books are
+name and select checkout or return. Checkout books are
 normally identified from a photograph of a Shelf-School QR label or ISBN. If a
 photo cannot be read, partial title, author, ISBN, shelf, and copy-number search
-provides a manual fallback.
+provides a manual fallback. For returns, Shelf-School shows only the selected
+borrower's current loans and allows one or several books to be returned together.
 
 Students need no accounts or library cards. Staff sign in separately for
 cataloging, borrowers, reports, school settings, and backups.

@@ -18,7 +18,10 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
     page.locator("input[name='username']").fill("librarian")
     page.locator("input[name='password']").fill("secret")
     page.locator("input[type='submit']").click()
-    expect(page.get_by_role("heading", name="Library dashboard")).to_be_visible()
+    expect(page.get_by_role("heading", name="Overview")).to_be_visible()
+    expect(page.get_by_label("Signed in as librarian")).to_be_visible()
+    expect(page.get_by_role("img", name="Checkouts and returns during the last seven days")).to_be_visible()
+    expect(page.get_by_role("heading", name="Copy availability")).to_be_visible()
 
     page.goto(f"{live_server.url}/checkout/")
     page.locator("input[name='borrower_code']").fill(borrower.qr_code)
@@ -82,6 +85,42 @@ def test_librarian_can_track_book_from_photo_in_browser(page, live_server, djang
 
 
 @pytest.mark.django_db(transaction=True)
+def test_librarian_can_prefill_manual_book_from_isbn(page, live_server, django_user_model, monkeypatch):
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    monkeypatch.setattr(
+        "library.views.lookup_book_by_isbn",
+        lambda isbn: {
+            "title": "La sombra del viento",
+            "authors": "Carlos Ruiz Zafon",
+            "isbn13": isbn,
+            "publisher": "Planeta",
+            "publication_year": 2005,
+        },
+    )
+    django_user_model.objects.create_superuser(username="isbn", password="secret", email="")
+
+    page.goto(f"{live_server.url}/admin/login/?next=/books/add/")
+    page.locator("input[name='username']").fill("isbn")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+    expect(page.locator("html")).to_have_attribute("data-book-entry-ready", "true")
+    page.locator("input[name='isbn13']").fill("9788408052524")
+
+    page.wait_for_timeout(700)
+    assert not page_errors, page_errors
+    expect(page.locator("#isbn-entry-status")).not_to_be_empty()
+    expect(page.locator("input[name='title']")).to_have_value("La sombra del viento")
+    expect(page.locator("textarea[name='authors']")).to_have_value("Carlos Ruiz Zafon")
+    expect(page.locator("input[name='publisher']")).to_have_value("Planeta")
+    expect(page.locator("input[name='publication_year']")).to_have_value("2005")
+    page.get_by_role("button", name="Save book").click()
+
+    expect(page.get_by_role("heading", name="La sombra del viento")).to_be_visible()
+    assert Book.objects.filter(title="La sombra del viento", isbn13="9788408052524").exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_student_can_self_circulate_copy_without_admin_login(page, live_server, tmp_path):
     import qrcode
 
@@ -114,12 +153,15 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
 
     page.locator("input[name='action'][value='checkin']").check()
     page.get_by_role("button", name="Continue").click()
-    page.locator("input[name='book_photo']").set_input_files(str(qr_path))
-    page.get_by_role("button", name="Identify book").click()
+    expect(page.get_by_role("heading", name="Choose books to return")).to_be_visible()
+    expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
+    expect(page.locator("input[name='return_copies']")).to_have_count(1)
+    page.locator("input[name='return_copies']").check()
+    page.get_by_role("button", name="Review return").click()
     expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
     assert Loan.objects.get(copy=copy).return_date is None
     page.get_by_role("button", name="Confirm return").click()
-    expect(page.get_by_text("Checked in Dropdown Circulation from Mia Lopez.")).to_be_visible()
+    expect(page.get_by_text("Returned 1 book for Mia Lopez.")).to_be_visible()
 
     copy.refresh_from_db()
     loan = Loan.objects.get(copy=copy, borrower=borrower)
@@ -146,6 +188,31 @@ def test_student_can_find_book_manually_with_partial_text(page, live_server):
     page.get_by_role("button", name="Confirm checkout").click()
     expect(page.get_by_text("Checked out Manual Search Book to Alex Reader.")).to_be_visible()
     assert Loan.objects.filter(copy=copy, borrower=borrower, return_date__isnull=True).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_borrower_view_highlights_current_and_overdue_loans(page, live_server, django_user_model):
+    from datetime import timedelta
+    from django.utils import timezone
+
+    django_user_model.objects.create_superuser(username="borrowers", password="secret", email="")
+    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez", class_name="3B")
+    copy = Copy.objects.create(book=Book.objects.create(title="Overdue classroom book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
+    Loan.objects.create(copy=copy, borrower=borrower, due_date=timezone.localdate() - timedelta(days=2))
+
+    page.goto(f"{live_server.url}/admin/login/?next=/borrowers/")
+    page.locator("input[name='username']").fill("borrowers")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+
+    expect(page.get_by_role("heading", name="Borrowers")).to_be_visible()
+    expect(page.get_by_text("With books out")).to_be_visible()
+    expect(page.get_by_text("1 overdue")).to_be_visible()
+    page.get_by_role("link", name="ML Mia Lopez mia").click()
+    expect(page.get_by_role("heading", name="Mia Lopez")).to_be_visible()
+    expect(page.get_by_role("heading", name="Currently borrowed")).to_be_visible()
+    expect(page.get_by_role("link", name="Overdue classroom book Copy #1")).to_be_visible()
+    expect(page.get_by_text("1 overdue book needs attention.")).to_be_visible()
 
 
 @pytest.mark.django_db(transaction=True)
