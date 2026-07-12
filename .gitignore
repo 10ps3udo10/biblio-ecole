@@ -3,7 +3,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 db.sqlite3
-media/covers/
+media/
 *.sqlite3
 playwright-report/
 test-results/
+docs-site/node_modules/
+docs-site/build/
+docs-site/.docusaurus/

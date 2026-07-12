@@ -1,42 +1,197 @@
 {% extends "library/base.html" %}
-{% block title %}Circulation - School Library{% endblock %}
+{% block title %}Circulation - {{ school_profile.display_name }}{% endblock %}
 {% block content %}
-<section class="form-panel scan">
-  <h1>Circulation</h1>
-  <p class="muted">Choose the borrower, choose whether the book is being checked out or checked in, then take or upload a photo of the copy QR label. An ISBN barcode also works when there is only one matching copy.</p>
-  <form method="post" enctype="multipart/form-data">
+<header class="desk-heading">
+  <h1>Borrow or return a book</h1>
+</header>
+
+{% if confirmation %}
+<section class="transaction-confirmation">
+  <div class="confirmation-book">
+    {% if copy.book.cover_image %}<img src="{{ copy.book.cover_image.url }}" alt="Cover of {{ copy.book.title }}">{% else %}<div class="book-placeholder">Book</div>{% endif %}
+    <div>
+      <span class="eyebrow">Book identified</span>
+      <h2>{{ copy.book.title }}</h2>
+      <p>{{ copy.book.authors|default:"Author not recorded" }}</p>
+      <span class="copy-tag">Copy #{{ copy.copy_number }}</span>
+    </div>
+  </div>
+  <dl class="transaction-summary">
+    <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
+    <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No username" }}<span>{{ borrower.full_name }}</span></dd></div>
+    {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
+  </dl>
+  <form method="post" class="confirmation-actions">
     {% csrf_token %}
-    {{ form.as_p }}
-    <p id="barcode-status" class="muted" aria-live="polite"></p>
-    <button class="button primary">Submit</button>
+    <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
+    <button class="button primary confirm-transaction">Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
+    <a class="button" href="{% url 'photo_circulation' %}">Cancel</a>
   </form>
 </section>
+{% else %}
+{% if not has_borrowers %}
+<section class="empty-desk"><h2>Circulation is not ready</h2><p>A staff member must add at least one borrower before books can be checked out.</p></section>
+{% else %}
+<form class="circulation-desk" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <section class="desk-controls" aria-label="Transaction details"{% if form.non_field_errors or form.book_photo.errors or form.manual_copy.errors %} hidden{% endif %}>
+    <h2>What are you doing?</h2>
+    <div class="control-block mode-block">
+      <div class="mode-switch">{{ form.action }}</div>
+      {{ form.action.errors }}
+    </div>
+
+    <div class="control-block borrower-block">
+      <label class="control-label" id="borrower-label" for="{{ form.borrower.id_for_label }}">Choose your name</label>
+      {{ form.borrower }}
+      {{ form.borrower.errors }}
+    </div>
+    <button class="button primary continue-circulation" id="continue-circulation" type="button">Continue</button>
+  </section>
+
+  <section class="desk-scan" aria-labelledby="scan-title"{% if not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors %} hidden{% endif %}>
+    <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button">Change</button></div>
+    <div class="scan-heading"><div><h2 id="scan-title">Choose the book</h2></div></div>
+    {{ form.book_photo.errors }}
+    <div class="identification-switch" role="tablist" aria-label="Book identification method">
+      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="true">Take photo</button>
+      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="false">Find manually</button>
+    </div>
+    <div id="photo-method" class="identification-method" role="tabpanel" aria-labelledby="photo-method-tab">
+      <div class="book-scan-target" id="book-scan-target">
+        {{ form.book_photo }}
+        <img id="scan-preview" alt="Selected book code photo">
+        <div class="scan-prompt" id="scan-prompt">
+          <span class="scan-mark" aria-hidden="true"></span>
+          <strong>Take a photo</strong>
+          <span>Point the camera at the book label</span>
+        </div>
+        <button class="change-photo" id="change-scan-photo" type="button">Change photo</button>
+      </div>
+      <div class="barcode-result" id="circulation-barcode-result" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span><span id="barcode-status">Waiting for a book</span>
+      </div>
+      <p class="photo-privacy">The photo is read once and never saved.</p>
+    </div>
+    <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab" hidden>
+      <label class="control-label" for="copy-filter">Search title, author, ISBN, shelf, or copy number</label>
+      <input id="copy-filter" type="search" placeholder="Start typing to filter books" autocomplete="off">
+      {{ form.manual_copy }}
+      {{ form.manual_copy.errors }}
+      <p>Select the exact physical copy. Its availability is checked before confirmation.</p>
+    </div>
+    <button class="button primary identify-book">Identify book</button>
+  </section>
+</form>
+{% endif %}
+{% endif %}
+
+{% if not confirmation and has_borrowers %}
 <script>
 (function () {
   const fileInput = document.getElementById("id_book_photo");
   const status = document.getElementById("barcode-status");
-  if (!fileInput || !status) return;
-  function setStatus(message) { status.textContent = message; }
-  fileInput.addEventListener("change", async function () {
+  const result = document.getElementById("circulation-barcode-result");
+  const preview = document.getElementById("scan-preview");
+  const prompt = document.getElementById("scan-prompt");
+  const changeButton = document.getElementById("change-scan-photo");
+  const borrowerSelect = document.getElementById("id_borrower");
+  const borrowerLabel = document.getElementById("borrower-label");
+  const actionInputs = document.querySelectorAll("input[name='action']");
+  const copyFilter = document.getElementById("copy-filter");
+  const copySelect = document.getElementById("id_manual_copy");
+  const controls = document.querySelector(".desk-controls");
+  const scan = document.querySelector(".desk-scan");
+  const continueButton = document.getElementById("continue-circulation");
+  const changeSession = document.getElementById("change-session");
+  const sessionSummary = document.getElementById("session-summary");
+  const photoMethodTab = document.getElementById("photo-method-tab");
+  const manualMethodTab = document.getElementById("manual-method-tab");
+  const photoMethod = document.getElementById("photo-method");
+  const manualMethod = document.getElementById("manual-method");
+  if (!fileInput || !status || !preview || !borrowerSelect) return;
+
+  const copyOptions = Array.from(copySelect.options).map((option) => ({ value: option.value, text: option.text }));
+  copyFilter.addEventListener("input", function () {
+    const query = copyFilter.value.trim().toLowerCase();
+    const selected = copySelect.value;
+    copySelect.replaceChildren();
+    copyOptions.filter((option) => !query || option.text.toLowerCase().includes(query)).forEach((option) => {
+      copySelect.add(new Option(option.text, option.value, false, option.value === selected));
+    });
+  });
+
+  function updateMode() {
+    const action = document.querySelector("input[name='action']:checked").value;
+    const returning = action === "checkin";
+    borrowerLabel.textContent = "Choose your name";
+  }
+  actionInputs.forEach((input) => input.addEventListener("change", updateMode));
+  updateMode();
+
+  function showScan() {
+    if (!borrowerSelect.value) {
+      borrowerSelect.setCustomValidity("Choose your name first.");
+      borrowerSelect.reportValidity();
+      return;
+    }
+    borrowerSelect.setCustomValidity("");
+    const action = document.querySelector("input[name='action']:checked").value === "checkin" ? "Return" : "Check out";
+    sessionSummary.textContent = action + " · " + borrowerSelect.options[borrowerSelect.selectedIndex].text;
+    controls.hidden = true;
+    scan.hidden = false;
+    scan.querySelector("input, button").focus();
+  }
+  continueButton.addEventListener("click", showScan);
+  changeSession.addEventListener("click", function () {
+    scan.hidden = true;
+    controls.hidden = false;
+    borrowerSelect.focus();
+  });
+  if (!scan.hidden) showScan();
+
+  function selectMethod(method) {
+    const manual = method === "manual";
+    photoMethod.hidden = manual;
+    manualMethod.hidden = !manual;
+    photoMethodTab.setAttribute("aria-selected", String(!manual));
+    manualMethodTab.setAttribute("aria-selected", String(manual));
+    (manual ? copyFilter : fileInput).focus();
+  }
+  photoMethodTab.addEventListener("click", function () { selectMethod("photo"); });
+  manualMethodTab.addEventListener("click", function () { selectMethod("manual"); });
+  if (copySelect.value) selectMethod("manual");
+
+  function setStatus(message, state) {
+    status.textContent = message;
+    result.dataset.state = state || "waiting";
+  }
+  async function handlePhoto() {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    preview.classList.add("visible");
+    prompt.hidden = true;
+    changeButton.classList.add("visible");
+    setStatus("Reading book label...", "reading");
     if (!("BarcodeDetector" in window)) {
-      setStatus("The server will try to read the book QR or ISBN barcode after you submit.");
+      setStatus("Photo ready. Shelf-School will read it next.", "ready");
       return;
     }
     try {
       const detector = new BarcodeDetector({ formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
       const bitmap = await createImageBitmap(file);
       const barcodes = await detector.detect(bitmap);
-      if (barcodes.length) {
-        setStatus("Detected: " + barcodes.map((item) => item.rawValue).join(", "));
-      } else {
-        setStatus("No barcode detected in the browser. The server will try again after submit.");
-      }
+      setStatus(barcodes.length ? "Book label detected" : "Photo ready. Shelf-School will try again.", barcodes.length ? "success" : "ready");
     } catch (error) {
-      setStatus("The server will try to read the book QR or ISBN barcode after you submit.");
+      setStatus("Photo ready. Shelf-School will read it next.", "ready");
     }
-  });
+  }
+  changeButton.addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("input", handlePhoto);
+  fileInput.addEventListener("change", handlePhoto);
 })();
 </script>
+{% endif %}
 {% endblock %}

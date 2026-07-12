@@ -1,10 +1,18 @@
 {% extends "library/base.html" %}
 {% block title %}Dashboard - School Library{% endblock %}
 {% block content %}
+{% if setup_needed and request.user.is_staff %}
+<section class="setup-banner">
+  <div><strong>Finish setting up Shelf-School</strong><span>Add your school identity and default loan period before daily use.</span></div>
+  <a class="button primary" href="{% url 'school_settings' %}">School settings</a>
+</section>
+{% endif %}
 <section class="hero compact">
   <h1>Library dashboard</h1>
   <div class="actions">
-    <a class="button primary" href="{% url 'book_create' %}">Add book</a>
+    <a class="button primary" href="{% url 'photo_circulation' %}">Open circulation desk</a>
+    <a class="button" href="{% url 'photo_intake' %}">Photograph a book</a>
+    <a class="button" href="{% url 'book_create' %}">Add manually</a>
     <a class="button" href="{% url 'borrower_create' %}">Add borrower</a>
   </div>
 </section>
@@ -12,7 +20,7 @@
   <article><strong>{{ total_books }}</strong><span>Books</span></article>
   <article><strong>{{ total_copies }}</strong><span>Copies</span></article>
   <article><strong>{{ borrowed_books }}</strong><span>Borrowed</span></article>
-  <article><strong>{{ overdue_books }}</strong><span>Overdue</span></article>
+  <article><strong>{{ overdue_books }}</strong><span><a href="{% url 'overdue_loans' %}">Overdue</a></span></article>
 </section>
 <section class="grid two">
   <div>

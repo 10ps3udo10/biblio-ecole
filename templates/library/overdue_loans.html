@@ -1,0 +1,12 @@
+{% extends "library/base.html" %}
+{% block title %}Overdue loans - Shelf-School{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <h1>Overdue loans</h1>
+  <div class="actions"><a class="button" href="{% url 'overdue_loans_csv' %}">Export CSV</a></div>
+</section>
+<div class="table-wrap"><table>
+  <thead><tr><th>Due</th><th>Book</th><th>Copy</th><th>Borrower</th><th>Username</th><th>Class</th></tr></thead>
+  <tbody>{% for loan in loans %}<tr><td>{{ loan.due_date }}</td><td><a href="{{ loan.copy.get_absolute_url }}">{{ loan.copy.book.title }}</a></td><td>#{{ loan.copy.copy_number }}</td><td><a href="{{ loan.borrower.get_absolute_url }}">{{ loan.borrower.full_name }}</a></td><td>{{ loan.borrower.username|default:"" }}</td><td>{{ loan.borrower.class_name }}</td></tr>{% empty %}<tr><td colspan="6">No overdue loans.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

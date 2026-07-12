@@ -5,6 +5,7 @@ from django.db import models
 from django.utils import timezone
 
 from .models import Book, Borrower, Copy, SchoolProfile
+from .photo_intake import clean_isbn, is_valid_isbn
 
 
 def default_form_due_date():
@@ -50,6 +51,27 @@ class BorrowerForm(forms.ModelForm):
         return self.cleaned_data.get("username") or None
 
 
+class SchoolProfileForm(forms.ModelForm):
+    class Meta:
+        model = SchoolProfile
+        fields = [
+            "school_name",
+            "short_name",
+            "logo",
+            "address",
+            "contact_email",
+            "contact_phone",
+            "default_loan_days",
+            "label_footer",
+        ]
+
+    def clean_default_loan_days(self):
+        days = self.cleaned_data["default_loan_days"]
+        if days < 1 or days > 365:
+            raise forms.ValidationError("Enter a loan period between 1 and 365 days.")
+        return days
+
+
 class CheckoutForm(forms.Form):
     borrower_code = forms.CharField(label="Borrower QR or UUID")
     copy_code = forms.CharField(label="Copy QR or UUID")
@@ -75,6 +97,12 @@ class PhotoIntakeForm(forms.Form):
     shelf_location = forms.CharField(label="Shelf location", max_length=128, required=False)
     condition = forms.ChoiceField(label="Condition", choices=Copy.Condition.choices, initial=Copy.Condition.GOOD)
 
+    def clean_isbn(self):
+        isbn = clean_isbn(self.cleaned_data.get("isbn"))
+        if isbn and not is_valid_isbn(isbn):
+            raise forms.ValidationError("Enter a valid ISBN-10 or ISBN-13.")
+        return isbn
+
 
 class BorrowerChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, borrower):
@@ -82,18 +110,33 @@ class BorrowerChoiceField(forms.ModelChoiceField):
         return f"{username} - {borrower.full_name}"
 
 
+class CopyChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, copy):
+        isbn = copy.book.isbn13 or copy.book.isbn10 or "no ISBN"
+        authors = copy.book.authors or "author not recorded"
+        shelf = copy.shelf_location or "no shelf"
+        return f"{copy.book.title} - {authors} - copy #{copy.copy_number} - {isbn} - {shelf} - {copy.get_status_display()}"
+
+
 class PhotoCirculationForm(forms.Form):
     class Action(models.TextChoices):
         CHECKOUT = "checkout", "Check out"
         CHECKIN = "checkin", "Check in / return"
 
-    action = forms.ChoiceField(label="Action", choices=Action.choices, initial=Action.CHECKOUT)
+    action = forms.ChoiceField(
+        label="Action",
+        choices=Action.choices,
+        initial=Action.CHECKOUT,
+        widget=forms.RadioSelect,
+    )
     borrower = BorrowerChoiceField(label="Borrower", queryset=Borrower.objects.none())
     book_photo = forms.FileField(
         label="Book QR or ISBN barcode photo",
+        required=False,
         widget=forms.ClearableFileInput(attrs={"accept": "image/*", "capture": "environment"}),
         help_text="Use the copy QR label when available. ISBN barcode works when there is only one matching copy.",
     )
+    manual_copy = CopyChoiceField(label="Book copy", queryset=Copy.objects.none(), required=False)
     due_date = forms.DateField(
         label="Due date",
         required=False,
@@ -105,7 +148,19 @@ class PhotoCirculationForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["borrower"].queryset = Borrower.objects.filter(active=True).order_by("username", "last_name", "first_name")
         self.fields["borrower"].empty_label = "Select borrower"
+        self.fields["manual_copy"].queryset = Copy.objects.exclude(status=Copy.Status.ARCHIVED).select_related("book").order_by("book__title", "copy_number")
+        self.fields["manual_copy"].empty_label = "Select an exact book copy"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
+            raise forms.ValidationError("Take a book photo or select the book manually.")
+        return cleaned_data
 
 
 class CsvImportForm(forms.Form):
     csv_file = forms.FileField(label="CSV file")
+
+
+class BorrowerCsvImportForm(forms.Form):
+    csv_file = forms.FileField(label="Borrower CSV file")

@@ -1,36 +1,157 @@
 {% extends "library/base.html" %}
-{% block title %}Photo intake - School Library{% endblock %}
+{% block title %}Photo intake - {{ school_profile.display_name }}{% endblock %}
 {% block content %}
-<section class="form-panel intake">
-  <h1>Photo intake</h1>
-  <p class="muted">Take a photo of the ISBN barcode when possible. The browser will try to read the barcode locally, then the server uses the ISBN to fetch free book metadata.</p>
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <p id="barcode-status" class="muted" aria-live="polite"></p>
-    <button class="button primary">Track this book</button>
-  </form>
-</section>
+<header class="intake-heading">
+  <div>
+    <span class="eyebrow">Catalog a physical copy</span>
+    <h1>Photo intake</h1>
+    <p>Photograph the ISBN barcode to identify the book and create its library copy.</p>
+  </div>
+  <a class="button" href="{% url 'book_create' %}">Enter manually</a>
+</header>
+
+<form class="intake-workspace" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <section class="capture-column" aria-labelledby="capture-title">
+    <div class="section-heading">
+      <span class="step-number">1</span>
+      <div><h2 id="capture-title">Photograph the barcode</h2><p>A close, sharp image works best.</p></div>
+    </div>
+    {{ form.photos.errors }}
+    <div class="photo-capture" id="photo-capture">
+      {{ form.photos }}
+      <img id="photo-preview" alt="Selected book photo">
+      <div class="capture-prompt" id="capture-prompt">
+        <span class="camera-mark" aria-hidden="true"></span>
+        <strong>Take or choose a photo</strong>
+        <span>ISBN barcode facing the camera</span>
+      </div>
+      <button class="change-photo" id="change-photo" type="button">Change photo</button>
+    </div>
+    <div class="barcode-result" id="barcode-result" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="barcode-status">Waiting for a photo</span>
+    </div>
+    <div class="isbn-field">
+      <label for="{{ form.isbn.id_for_label }}">ISBN</label>
+      {{ form.isbn }}
+      {{ form.isbn.errors }}
+      <p class="isbn-lookup-note">A valid ISBN automatically fills available title and author details from the free Open Library catalog. <span id="metadata-status" aria-live="polite"></span><a id="isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a></p>
+    </div>
+  </section>
+
+  <section class="details-column" aria-labelledby="details-title">
+    <div class="section-heading">
+      <span class="step-number">2</span>
+      <div><h2 id="details-title">Book details</h2><p>Metadata and cover are downloaded when available.</p></div>
+    </div>
+    <img class="catalog-cover-preview" id="catalog-cover-preview" alt="Catalog cover from Open Library" hidden>
+    <div class="field-group">
+      <label for="{{ form.title.id_for_label }}">Title</label>
+      {{ form.title }}
+      {{ form.title.errors }}
+    </div>
+    <div class="field-group">
+      <label for="{{ form.authors.id_for_label }}">Author(s)</label>
+      {{ form.authors }}
+      {{ form.authors.errors }}
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label for="{{ form.shelf_location.id_for_label }}">Shelf location</label>
+        {{ form.shelf_location }}
+        {{ form.shelf_location.errors }}
+      </div>
+      <div class="field-group">
+        <label for="{{ form.condition.id_for_label }}">Condition</label>
+        {{ form.condition }}
+        {{ form.condition.errors }}
+      </div>
+    </div>
+    <div class="intake-submit">
+      <button class="button primary intake-primary">Track this book</button>
+      <span>Creates one physical copy and its QR label.</span>
+    </div>
+  </section>
+</form>
+
 <script>
 (function () {
   const fileInput = document.getElementById("id_photos");
   const isbnInput = document.getElementById("id_isbn");
   const status = document.getElementById("barcode-status");
-  if (!fileInput || !isbnInput || !status) return;
+  const result = document.getElementById("barcode-result");
+  const preview = document.getElementById("photo-preview");
+  const prompt = document.getElementById("capture-prompt");
+  const changeButton = document.getElementById("change-photo");
+  const titleInput = document.getElementById("id_title");
+  const authorsInput = document.getElementById("id_authors");
+  const metadataStatus = document.getElementById("metadata-status");
+  const webSearch = document.getElementById("isbn-web-search");
+  const catalogCover = document.getElementById("catalog-cover-preview");
+  const metadataUrl = "{% url 'isbn_metadata' %}";
+  if (!fileInput || !isbnInput || !status || !preview || !prompt) return;
+  document.documentElement.dataset.photoIntakeReady = "true";
 
-  function setStatus(message) {
+  function setStatus(message, state) {
     status.textContent = message;
+    result.dataset.state = state || "waiting";
   }
 
   function normalizeISBN(value) {
     return (value || "").replace(/[^0-9Xx]/g, "").slice(0, 13);
   }
 
-  fileInput.addEventListener("change", async function () {
+  let lookupTimer;
+  let lastLookup = "";
+  async function lookupMetadata() {
+    const isbn = normalizeISBN(isbnInput.value);
+    if (![10, 13].includes(isbn.length) || isbn === lastLookup) return;
+    lastLookup = isbn;
+    isbnInput.value = isbn;
+    metadataStatus.textContent = "Looking up ISBN...";
+    webSearch.hidden = true;
+    try {
+      const response = await fetch(metadataUrl + "?isbn=" + encodeURIComponent(isbn), {headers: {"Accept": "application/json"}});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "ISBN lookup failed.");
+      if (payload.title && !titleInput.value) titleInput.value = payload.title;
+      if (payload.authors && !authorsInput.value) authorsInput.value = payload.authors;
+      metadataStatus.textContent = payload.message;
+      metadataStatus.dataset.state = payload.source === "none" ? "warning" : "success";
+      if (payload.search_url) {
+        webSearch.href = payload.search_url;
+        webSearch.hidden = false;
+      }
+      if (payload.cover_url) {
+        catalogCover.src = payload.cover_url;
+        catalogCover.hidden = false;
+      }
+    } catch (error) {
+      metadataStatus.textContent = error.message;
+      metadataStatus.dataset.state = "warning";
+    }
+  }
+
+  isbnInput.addEventListener("input", function () {
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(lookupMetadata, 500);
+  });
+  isbnInput.addEventListener("change", lookupMetadata);
+
+  changeButton.addEventListener("click", function () { fileInput.click(); });
+  async function handlePhotoSelection() {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    preview.classList.add("visible");
+    prompt.hidden = true;
+    changeButton.classList.add("visible");
+    setStatus("Reading barcode...", "reading");
+
     if (!("BarcodeDetector" in window)) {
-      setStatus("Barcode reading is not available in this browser. Enter the ISBN if you can see it.");
+      setStatus("Photo ready. The server will read the barcode.", "ready");
       return;
     }
     try {
@@ -40,14 +161,17 @@
       const isbn = barcodes.map((item) => normalizeISBN(item.rawValue)).find((value) => value.startsWith("978") || value.startsWith("979"));
       if (isbn) {
         isbnInput.value = isbn;
-        setStatus("ISBN barcode read: " + isbn);
+        setStatus("ISBN detected: " + isbn, "success");
+        lookupMetadata();
       } else {
-        setStatus("No ISBN barcode found. Try a closer barcode photo or enter the ISBN manually.");
+        setStatus("Photo ready. The server will try the barcode again.", "ready");
       }
     } catch (error) {
-      setStatus("Could not read the barcode from this photo. Enter the ISBN if it is visible.");
+      setStatus("Photo ready. The server will try the barcode.", "ready");
     }
-  });
+  }
+  fileInput.addEventListener("input", handlePhotoSelection);
+  fileInput.addEventListener("change", handlePhotoSelection);
 })();
 </script>
 {% endblock %}

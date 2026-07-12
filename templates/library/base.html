@@ -5,20 +5,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ school_profile.display_name }}{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/shelf-school-logo.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/library.css' %}">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{% url 'dashboard' %}">{{ school_profile.display_name }}</a>
-    <nav>
-      <a href="{% url 'book_list' %}">Books</a>
-      <a href="{% url 'photo_intake' %}">Photo intake</a>
+    <a class="brand" href="{% url 'photo_circulation' %}">
+      {% if school_profile.logo %}<img src="{{ school_profile.logo.url }}" alt="">{% else %}<img src="{% static 'img/shelf-school-logo.svg' %}" alt="Shelf-School">{% endif %}
+      <span>{{ school_profile.display_name }}</span>
+    </a>
+    {% if request.user.is_authenticated %}<nav>
+      <a class="nav-circulation{% if request.resolver_match.url_name == 'photo_circulation' or request.resolver_match.url_name == 'circulation_alias' %} active{% endif %}" href="{% url 'photo_circulation' %}">Circulation</a>
+      <a href="{% url 'dashboard' %}">Overview</a>
+      <details class="nav-menu{% if request.resolver_match.url_name == 'book_list' or request.resolver_match.url_name == 'book_create' or request.resolver_match.url_name == 'book_detail' or request.resolver_match.url_name == 'photo_intake' %} active{% endif %}">
+        <summary>Catalog</summary>
+        <div><a href="{% url 'book_list' %}">Books</a><a href="{% url 'photo_intake' %}">Photo intake</a></div>
+      </details>
       <a href="{% url 'borrower_list' %}">Borrowers</a>
-      <a href="{% url 'photo_circulation' %}">Circulation</a>
-      <a href="{% url 'checkout' %}">Checkout</a>
-      <a href="{% url 'return_copy' %}">Return</a>
-      <a href="{% url 'admin:index' %}">Admin</a>
-    </nav>
+      <a href="{% url 'overdue_loans' %}">Overdue</a>
+      <a href="{{ docs_url }}">Docs</a>
+      {% if request.user.is_staff %}<a href="{% url 'school_settings' %}">Settings</a>{% endif %}
+      <form class="nav-logout" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}">Sign out</button></form>
+    </nav>{% else %}<a class="public-docs" href="{{ docs_url }}">Docs</a>{% endif %}
   </header>
   <main class="page">
     {% if messages %}

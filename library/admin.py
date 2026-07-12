@@ -43,7 +43,7 @@ class LoanAdmin(admin.ModelAdmin):
 
 @admin.register(SchoolProfile)
 class SchoolProfileAdmin(admin.ModelAdmin):
-    list_display = ("school_name", "short_name", "default_loan_days", "contact_email", "updated_at")
+    list_display = ("school_name", "short_name", "default_loan_days", "contact_email", "setup_completed", "updated_at")
 
     def has_add_permission(self, request):
         return not SchoolProfile.objects.exists()

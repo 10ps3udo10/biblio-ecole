@@ -8,7 +8,8 @@
     {% if book.subtitle %}<p class="muted">{{ book.subtitle }}</p>{% endif %}
     <p>{{ book.authors }}</p>
     <dl class="meta"><dt>ISBN</dt><dd>{{ book.isbn13|default:book.isbn10|default:"Not set" }}</dd><dt>Publisher</dt><dd>{{ book.publisher|default:"Not set" }}</dd><dt>Year</dt><dd>{{ book.publication_year|default:"Not set" }}</dd><dt>Language</dt><dd>{{ book.language|default:"Not set" }}</dd></dl>
-    <div class="actions"><a class="button primary" href="{% url 'add_copy' book.pk %}">Add copy</a></div>
+    <div class="actions"><a class="button primary" href="{% url 'add_copy' book.pk %}">Add copy</a>{% if book.cover_image %}<form method="post" action="{% url 'delete_book_photo' book.pk %}">{% csrf_token %}<button class="button danger" onclick="return confirm('Delete this stored photo?')">Delete stored photo</button></form>{% endif %}{% if not has_active_loans %}<form method="post" action="{% url 'delete_book' book.pk %}">{% csrf_token %}<button class="button danger" onclick="return confirm('Delete this book, all copies, and loan history?')">Delete book</button></form>{% endif %}</div>
+    {% if has_active_loans %}<p class="muted">Return all checked-out copies before deleting this book.</p>{% endif %}
   </div>
 </section>
 {% if book.description %}<section><h2>Description</h2><p>{{ book.description }}</p></section>{% endif %}

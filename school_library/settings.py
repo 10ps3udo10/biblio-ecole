@@ -78,3 +78,4 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/admin/login/"
 LOGIN_REDIRECT_URL = "dashboard"
+SHELF_SCHOOL_DOCS_URL = os.environ.get("SHELF_SCHOOL_DOCS_URL", "https://mrueda.github.io/shelf-school/")

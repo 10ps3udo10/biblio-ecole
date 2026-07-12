@@ -1,154 +1,97 @@
-# ShelfSchool
+<div align="center">
+  <a href="https://github.com/mrueda/shelf-school">
+    <img src="docs-site/static/img/shelf-school-logo.svg" width="180" alt="Shelf-School logo">
+  </a>
+  <p><em>Open-source circulation for small school libraries</em></p>
+</div>
 
-Open-source library management for small schools.
+# Shelf-School
 
-ShelfSchool helps small school libraries catalog books, track physical copies, and handle circulation with QR/barcode photos. It is self-hosted, Django-based, and designed for simple day-to-day use by librarians, teachers, and school staff.
+**A small, self-hosted library system centered on the moment a student borrows
+or returns a physical book.**
 
-## Features
+[![Build](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml)
+[![Documentation Status](https://github.com/mrueda/shelf-school/actions/workflows/documentation.yml/badge.svg)](https://github.com/mrueda/shelf-school/actions/workflows/documentation.yml)
+[![Documentation](https://img.shields.io/badge/docs-online-0b5cad)](https://mrueda.github.io/shelf-school/)
+[![Version](https://img.shields.io/badge/version-0.1.0-16804a)](https://github.com/mrueda/shelf-school)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](requirements.txt)
+[![Django](https://img.shields.io/badge/django-5.x-0c4b33)](https://www.djangoproject.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- Book catalog with title, author, ISBN, publisher, year, language, cover image, and description
-- Physical copy tracking with one QR code per copy
-- Borrower records with usernames, classes, email addresses, and borrower QR codes
-- Circulation workflow for checking books out and checking them back in
-- Photo-based circulation using copy QR labels, with ISBN barcode fallback when only one matching copy exists
-- No-cost photo intake from ISBN barcode photos using local barcode decoding and Open Library metadata lookup
-- Configurable school profile for school name, contact details, label footer, and default loan period
-- Dashboard with book/copy/loan/overdue counts
-- CSV import/export
-- SQLite backup download
-- Django admin for maintenance
-- Pytest and Playwright test coverage
+Shelf-School provides a public self-service kiosk where students choose their
+name, select checkout or return, and identify one book at a time. Books are
+normally identified from a photograph of a Shelf-School QR label or ISBN. If a
+photo cannot be read, partial title, author, ISBN, shelf, and copy-number search
+provides a manual fallback.
 
-## How It Works
+Students need no accounts or library cards. Staff sign in separately for
+cataloging, borrowers, reports, school settings, and backups.
 
-ShelfSchool separates titles from physical books:
+**Documentation:** <https://mrueda.github.io/shelf-school/>
 
-- `Book` represents a title, such as *The Hobbit*.
-- `Copy` represents one physical item on a shelf.
-- `Loan` always references a `Copy`, not just a `Book`.
+**Quick Start:** <https://mrueda.github.io/shelf-school/docs/getting-started/quickstart>
 
-Each copy gets its own QR payload:
+**Self-Service:** <https://mrueda.github.io/shelf-school/docs/usage/self-service>
 
-```text
-COPY:<copy-uuid>
-```
+## Highlights
 
-That copy QR code is the preferred identifier for circulation because ISBNs identify titles, not individual physical copies.
+- Public checkout and return with a short, child-facing workflow.
+- Local QR and ISBN decoding with `zxing-cpp`.
+- Free Open Library metadata lookup and exact-ISBN web-search fallback.
+- One QR label and loan history per physical copy.
+- Photo intake, borrower CSV import, overdue reports, and SQLite backup.
+- No paid AI service or student authentication required.
+- Pytest and Playwright browser coverage.
 
-## No-Cost Photo Workflows
+ISBN-intake and circulation photos are decoded for one request and never
+stored. Available catalog covers are downloaded from Open Library; intentional
+no-ISBN cover photos are stored in `media/covers/` and can be removed later.
 
-ShelfSchool does not require a paid AI API.
-
-For book intake:
-
-1. Take or upload a close-up photo of the ISBN barcode.
-2. ShelfSchool decodes the barcode locally with open-source tooling.
-3. The app looks up metadata through the free Open Library Books API.
-4. A `Book` and first `Copy` are created.
-5. A QR label can be printed for the physical copy.
-
-For circulation:
-
-1. Select the borrower.
-2. Choose `Check out` or `Check in / return`.
-3. Take or upload a photo of the copy QR label.
-4. ShelfSchool updates the copy status and loan history.
-
-An ISBN barcode can be used for circulation only when it resolves to exactly one matching copy.
-
-## Technology Stack
-
-- Python
-- Django
-- SQLite by default
-- Django templates
-- Local filesystem media storage
-- `qrcode` for QR label generation
-- `zxing-cpp` for local barcode/QR decoding
-- Pytest
-- Playwright
-
-## Local Development
-
-Create a virtual environment and install dependencies:
+## Quick Start
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python -m playwright install chromium
-```
-
-Create the database and admin user:
-
-```bash
 python manage.py migrate
 python manage.py createsuperuser
-```
-
-Run the development server:
-
-```bash
 python manage.py runserver 127.0.0.1:8001
 ```
 
-Open:
+Open the public kiosk at <http://127.0.0.1:8001/> and staff login at
+<http://127.0.0.1:8001/admin/login/>.
 
-```text
-http://127.0.0.1:8001/
-```
+## Development
 
-If port `8001` is already in use, choose another port.
-
-## First Setup
-
-After logging in as an admin:
-
-1. Open the Django admin.
-2. Edit `School profile` to set the school name, contact details, label footer, and default loan period.
-3. Add borrowers with usernames.
-4. Add books manually, by CSV import, or through photo intake.
-5. Print copy QR labels and attach them to books.
-6. Use `Circulation` for check out and check in.
-
-## Useful URLs
-
-```text
-/                       Dashboard
-/books/                 Book search and catalog
-/books/photo-intake/    Add a book from a barcode photo
-/borrowers/             Borrower list
-/circulation/           Check out / check in workflow
-/admin/                 Django admin
-```
-
-## Tests
-
-Run the full test suite:
+Run application checks:
 
 ```bash
-pytest
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python -m pytest -q
 ```
 
-Run only the browser tests:
+Build the documentation:
 
 ```bash
-pytest tests/test_playwright.py
+cd docs-site
+npm ci
+npm run typecheck
+npm run build
 ```
 
-The Playwright tests use Django's live test server and exercise real rendered pages in Chromium.
+The **Build and test** and **Documentation** GitHub Actions workflows are
+manual-only and must be started from the repository Actions tab.
 
-## Data and Backups
+## Author
 
-By default, local data is stored in:
+Written by Manuel Rueda.
 
-```text
-db.sqlite3
-media/
-```
+Repository: <https://github.com/mrueda/shelf-school>
 
-These files are ignored by git. Use the SQLite backup download in the app before moving, upgrading, or redeploying a live school installation.
+## Copyright and License
 
-## License
+Copyright (C) 2026 Shelf-School contributors.
 
-ShelfSchool is released under the MIT License. See `LICENSE`.
+Shelf-School is distributed under the MIT License. See [LICENSE](LICENSE).

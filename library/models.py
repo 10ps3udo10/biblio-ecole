@@ -10,11 +10,13 @@ from django.utils import timezone
 class SchoolProfile(models.Model):
     school_name = models.CharField(max_length=255, default="School Library")
     short_name = models.CharField(max_length=80, blank=True)
+    logo = models.ImageField(upload_to="branding/", blank=True)
     address = models.TextField(blank=True)
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=40, blank=True)
     default_loan_days = models.PositiveIntegerField(default=14)
     label_footer = models.CharField(max_length=160, blank=True)
+    setup_completed = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
