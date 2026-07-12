@@ -92,6 +92,9 @@ label { display: block; margin-bottom: 5px; font-weight: 650; }
 table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
 th { background: #f1f4f8; font-size: .9rem; color: #475467; }
+.table-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; white-space: nowrap; }
+.table-actions form { margin: 0; }
+.link-danger { min-height: 0; padding: 0; border: 0; color: #9f231b; background: transparent; font-weight: 650; }
 .detail-head { display: grid; grid-template-columns: 180px 1fr; gap: 22px; margin-bottom: 18px; }
 .cover { width: 180px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; border: 1px solid #d9dee7; }
 .placeholder { display: grid; place-items: center; color: #667085; background: #eef1f5; }

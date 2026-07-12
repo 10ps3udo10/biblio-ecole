@@ -28,6 +28,16 @@ unambiguous when the library owns several copies of one ISBN.
 
 Condition is recorded separately as new, good, worn, or damaged.
 
+## Delete one copy
+
+When a title has multiple physical copies, staff can open a copy and select
+**Delete copy**. This removes only that physical copy and its completed loan
+history. Other copies and the shared book metadata remain unchanged.
+
+A checked-out copy cannot be deleted. The last remaining copy must be removed
+with **Delete book** so the application does not leave a title with no physical
+items.
+
 ## Delete a book
 
 Staff can delete a book from its detail page when none of its copies is checked

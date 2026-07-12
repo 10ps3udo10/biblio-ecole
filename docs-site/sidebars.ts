@@ -1,7 +1,7 @@
 import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
-  docsSidebar: [
+  userGuide: [
     {type: 'doc', id: 'overview', label: 'Overview'},
     {
       type: 'category',
@@ -13,7 +13,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Use',
+      label: 'Daily Use',
       items: [
         {type: 'doc', id: 'usage/self-service', label: 'Self-Service Circulation'},
         {type: 'doc', id: 'usage/photo-intake', label: 'Photo Intake'},
@@ -29,6 +29,8 @@ const sidebars: SidebarsConfig = {
         {type: 'doc', id: 'operations/troubleshooting', label: 'Troubleshooting'},
       ],
     },
+  ],
+  developerGuide: [
     {
       type: 'category',
       label: 'Technical Details',
@@ -40,7 +42,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'About',
+      label: 'Project',
       items: [
         {type: 'doc', id: 'about/roadmap', label: 'Roadmap'},
         {type: 'doc', id: 'about/license', label: 'License'},

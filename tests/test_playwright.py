@@ -219,6 +219,28 @@ def test_admin_borrower_view_highlights_current_and_overdue_loans(page, live_ser
 
 
 @pytest.mark.django_db(transaction=True)
+def test_admin_can_delete_one_physical_copy_in_browser(page, live_server, django_user_model):
+    django_user_model.objects.create_superuser(username="copies", password="secret", email="")
+    book = Book.objects.create(title="Duplicate classroom title")
+    first = Copy.objects.create(book=book, copy_number=1)
+    second = Copy.objects.create(book=book, copy_number=2)
+
+    page.goto(f"{live_server.url}/admin/login/?next={second.get_absolute_url()}")
+    page.locator("input[name='username']").fill("copies")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+
+    expect(page.get_by_role("heading", name="Duplicate classroom title #2")).to_be_visible()
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Delete copy").click()
+
+    expect(page.get_by_text("Deleted copy #2 of Duplicate classroom title")).to_be_visible()
+    expect(page.get_by_role("heading", name="Duplicate classroom title")).to_be_visible()
+    assert Copy.objects.filter(pk=first.id).exists()
+    assert not Copy.objects.filter(pk=second.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_admin_can_complete_school_setup_in_browser(page, live_server, django_user_model):
     from library.models import SchoolProfile
 

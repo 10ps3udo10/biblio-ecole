@@ -325,6 +325,51 @@ def test_checked_out_book_cannot_be_deleted(logged_in_client):
 
 
 @pytest.mark.django_db
+def test_staff_can_delete_one_of_multiple_copies_and_its_returned_history(logged_in_client):
+    book = Book.objects.create(title="Several physical copies")
+    first = Copy.objects.create(book=book, copy_number=1)
+    second = Copy.objects.create(book=book, copy_number=2)
+    borrower = Borrower.objects.create(username="copy-history", first_name="Copy", last_name="History")
+    Loan.objects.create(copy=second, borrower=borrower, return_date=timezone.localdate())
+
+    response = logged_in_client.post(reverse("delete_copy", args=[second.id]), follow=True)
+
+    assert response.status_code == 200
+    assert Book.objects.filter(pk=book.id).exists()
+    assert Copy.objects.filter(pk=first.id).exists()
+    assert not Copy.objects.filter(pk=second.id).exists()
+    assert not Loan.objects.filter(copy_id=second.id).exists()
+    assert b"Deleted copy #2 of Several physical copies" in response.content
+
+
+@pytest.mark.django_db
+def test_checked_out_copy_cannot_be_deleted(logged_in_client):
+    book = Book.objects.create(title="Loaned duplicate")
+    Copy.objects.create(book=book, copy_number=1)
+    loaned = Copy.objects.create(book=book, copy_number=2, status=Copy.Status.CHECKED_OUT)
+    borrower = Borrower.objects.create(username="copy-active", first_name="Active", last_name="Copy")
+    Loan.objects.create(copy=loaned, borrower=borrower)
+
+    response = logged_in_client.post(reverse("delete_copy", args=[loaned.id]), follow=True)
+
+    assert response.status_code == 200
+    assert Copy.objects.filter(pk=loaned.id).exists()
+    assert b"cannot be deleted while it is checked out" in response.content
+
+
+@pytest.mark.django_db
+def test_last_copy_must_be_deleted_with_book(logged_in_client):
+    book = Book.objects.create(title="Only physical copy")
+    copy = Copy.objects.create(book=book, copy_number=1)
+
+    response = logged_in_client.post(reverse("delete_copy", args=[copy.id]), follow=True)
+
+    assert response.status_code == 200
+    assert Copy.objects.filter(pk=copy.id).exists()
+    assert b"last copy cannot be deleted separately" in response.content
+
+
+@pytest.mark.django_db
 def test_photo_intake_adds_copy_to_existing_isbn_instead_of_duplicate_book(logged_in_client, tmp_path, settings, monkeypatch):
     settings.MEDIA_ROOT = tmp_path
     book = Book.objects.create(title="Existing title", isbn13="9780316381994")

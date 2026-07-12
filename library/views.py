@@ -205,8 +205,21 @@ def book_list(request):
 def book_detail(request, pk):
     book = get_object_or_404(Book, pk=pk)
     loans = Loan.objects.filter(copy__book=book).select_related("copy", "borrower")[:20]
-    has_active_loans = Loan.objects.filter(copy__book=book, return_date__isnull=True).exists()
-    return render(request, "library/book_detail.html", {"book": book, "loans": loans, "has_active_loans": has_active_loans})
+    copies = list(book.copies.all())
+    active_copy_ids = set(Loan.objects.filter(copy__book=book, return_date__isnull=True).values_list("copy_id", flat=True))
+    for copy in copies:
+        copy.has_active_loan = copy.id in active_copy_ids
+    return render(
+        request,
+        "library/book_detail.html",
+        {
+            "book": book,
+            "copies": copies,
+            "loans": loans,
+            "has_active_loans": bool(active_copy_ids),
+            "has_multiple_copies": len(copies) > 1,
+        },
+    )
 
 
 @login_required
@@ -391,7 +404,36 @@ def add_copy(request, book_pk):
 def copy_detail(request, pk):
     copy = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
     loans = copy.loans.select_related("borrower").all()[:20]
-    return render(request, "library/copy_detail.html", {"copy": copy, "loans": loans})
+    active_loan = copy.active_loan
+    return render(
+        request,
+        "library/copy_detail.html",
+        {
+            "copy": copy,
+            "loans": loans,
+            "active_loan": active_loan,
+            "has_multiple_copies": copy.book.copies.count() > 1,
+        },
+    )
+
+
+@login_required
+@require_POST
+def delete_copy(request, pk):
+    with transaction.atomic():
+        copy = get_object_or_404(Copy.objects.select_for_update().select_related("book"), pk=pk)
+        book = Book.objects.select_for_update().get(pk=copy.book_id)
+        if copy.loans.filter(return_date__isnull=True).exists():
+            messages.error(request, "This copy cannot be deleted while it is checked out.")
+            return redirect(copy)
+        if Copy.objects.filter(book=book).count() <= 1:
+            messages.error(request, "The last copy cannot be deleted separately. Delete the book instead.")
+            return redirect(copy)
+        copy_number = copy.copy_number
+        copy.loans.all().delete()
+        copy.delete()
+    messages.success(request, f"Deleted copy #{copy_number} of {book.title} and its loan history.")
+    return redirect(book)
 
 
 @login_required

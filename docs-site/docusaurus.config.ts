@@ -60,19 +60,15 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'docsSidebar',
+          sidebarId: 'userGuide',
           position: 'left',
-          label: 'Docs',
+          label: 'User Guide',
         },
         {
-          to: '/docs/getting-started/quickstart',
-          label: 'Quick Start',
+          type: 'docSidebar',
+          sidebarId: 'developerGuide',
           position: 'left',
-        },
-        {
-          to: '/docs/usage/self-service',
-          label: 'Self-Service',
-          position: 'left',
+          label: 'Developer Guide',
         },
         {
           href: 'https://github.com/mrueda/shelf-school',
@@ -85,7 +81,7 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Use Shelf-School',
+          title: 'User Guide',
           items: [
             {label: 'Overview', to: '/docs/overview'},
             {label: 'Quick Start', to: '/docs/getting-started/quickstart'},
@@ -95,10 +91,18 @@ const config: Config = {
           ],
         },
         {
+          title: 'Developer Guide',
+          items: [
+            {label: 'Architecture', to: '/docs/technical-details/architecture'},
+            {label: 'Photo Identification', to: '/docs/technical-details/photo-identification'},
+            {label: 'Testing', to: '/docs/technical-details/testing'},
+          ],
+        },
+        {
           title: 'Project',
           items: [
             {label: 'Repository', href: 'https://github.com/mrueda/shelf-school'},
-            {label: 'Architecture', to: '/docs/technical-details/architecture'},
+            {label: 'Roadmap', to: '/docs/about/roadmap'},
             {label: 'License', href: 'https://github.com/mrueda/shelf-school/blob/main/LICENSE'},
           ],
         },
