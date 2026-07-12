@@ -57,8 +57,11 @@
     </div>
 
     <div class="control-block borrower-block">
-      <label class="control-label" id="borrower-label" for="{{ form.borrower.id_for_label }}">Choose your name</label>
+      <label class="control-label" id="borrower-label" for="borrower-search">Choose your name</label>
       {{ form.borrower }}
+      <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.username|default:selected_borrower.full_name }} - {{ selected_borrower.full_name }}{% endif %}">
+      <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
+      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your username or name.</p>
       {{ form.borrower.errors }}
     </div>
     <button class="button primary continue-circulation" id="continue-circulation" type="button">Continue</button>
@@ -95,7 +98,6 @@
       {{ form.manual_copy.errors }}
       <p>Select the exact physical copy. Its availability is checked before confirmation.</p>
     </div>
-    {{ borrower_loans|json_script:"borrower-loans-data" }}
     <div id="return-method" class="return-book-list" hidden>
       <p class="return-guidance">Select one or more books this borrower is returning.</p>
       <div id="return-loan-options"></div>
@@ -117,8 +119,11 @@
   const preview = document.getElementById("scan-preview");
   const prompt = document.getElementById("scan-prompt");
   const changeButton = document.getElementById("change-scan-photo");
-  const borrowerSelect = document.getElementById("id_borrower");
-  const borrowerLabel = document.getElementById("borrower-label");
+  const borrowerId = document.getElementById("id_borrower");
+  const borrowerSearch = document.getElementById("borrower-search");
+  const borrowerResults = document.getElementById("borrower-results");
+  const borrowerSearchStatus = document.getElementById("borrower-search-status");
+  const borrowerLabelElement = document.getElementById("borrower-label");
   const actionInputs = document.querySelectorAll("input[name='action']");
   const copyFilter = document.getElementById("copy-filter");
   const copySelect = document.getElementById("id_manual_copy");
@@ -137,8 +142,9 @@
   const noReturnLoans = document.getElementById("no-return-loans");
   const identifyButton = document.getElementById("identify-book");
   const scanTitle = document.getElementById("scan-title");
-  const borrowerLoans = JSON.parse(document.getElementById("borrower-loans-data").textContent);
-  if (!fileInput || !status || !preview || !borrowerSelect) return;
+  const borrowerSearchUrl = "{% url 'circulation_borrower_search' %}";
+  const borrowerLoansUrl = "{% url 'circulation_borrower_loans' '00000000-0000-0000-0000-000000000000' %}";
+  if (!fileInput || !status || !preview || !borrowerId || !borrowerSearch) return;
 
   const copyOptions = Array.from(copySelect.options).map((option) => ({ value: option.value, text: option.text }));
   copyFilter.addEventListener("input", function () {
@@ -150,24 +156,115 @@
     });
   });
 
-  function updateMode() {
-    const action = document.querySelector("input[name='action']:checked").value;
-    const returning = action === "checkin";
-    borrowerLabel.textContent = "Choose your name";
-  }
-  actionInputs.forEach((input) => input.addEventListener("change", updateMode));
-  updateMode();
+  let searchTimer;
+  let resultOptions = [];
+  let activeResult = -1;
 
-  function showScan() {
-    if (!borrowerSelect.value) {
-      borrowerSelect.setCustomValidity("Choose your name first.");
-      borrowerSelect.reportValidity();
+  function currentAction() {
+    return document.querySelector("input[name='action']:checked").value;
+  }
+
+  function closeBorrowerResults() {
+    borrowerResults.hidden = true;
+    borrowerSearch.setAttribute("aria-expanded", "false");
+    borrowerSearch.removeAttribute("aria-activedescendant");
+    activeResult = -1;
+    resultOptions = [];
+  }
+
+  function clearBorrower() {
+    borrowerId.value = "";
+    borrowerSearch.value = "";
+    closeBorrowerResults();
+    borrowerSearchStatus.textContent = "Type part of your username or name.";
+  }
+
+  function formatBorrower(item) {
+    const identifier = item.username || item.name;
+    return identifier + " - " + item.name + (item.class_name ? " · " + item.class_name : "");
+  }
+
+  function selectBorrower(item) {
+    borrowerId.value = item.id;
+    borrowerSearch.value = formatBorrower(item);
+    borrowerSearch.setCustomValidity("");
+    borrowerSearchStatus.textContent = item.name + " selected.";
+    closeBorrowerResults();
+  }
+
+  function setActiveResult(index) {
+    if (!resultOptions.length) return;
+    activeResult = (index + resultOptions.length) % resultOptions.length;
+    resultOptions.forEach((option, optionIndex) => option.setAttribute("aria-selected", String(optionIndex === activeResult)));
+    const activeOption = resultOptions[activeResult];
+    borrowerSearch.setAttribute("aria-activedescendant", activeOption.id);
+    activeOption.scrollIntoView({block: "nearest"});
+  }
+
+  async function searchBorrowers() {
+    const query = borrowerSearch.value.trim();
+    borrowerId.value = "";
+    if (query.length < 2) {
+      closeBorrowerResults();
+      borrowerSearchStatus.textContent = "Type at least 2 letters.";
       return;
     }
-    borrowerSelect.setCustomValidity("");
-    const returning = document.querySelector("input[name='action']:checked").value === "checkin";
+    borrowerSearchStatus.textContent = "Searching...";
+    try {
+      const response = await fetch(borrowerSearchUrl + "?q=" + encodeURIComponent(query) + "&action=" + encodeURIComponent(currentAction()), {headers: {"Accept": "application/json"}});
+      const payload = await response.json();
+      borrowerResults.replaceChildren();
+      resultOptions = payload.results.map((item, index) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.id = "borrower-option-" + index;
+        option.className = "borrower-result";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        option.textContent = formatBorrower(item);
+        option.addEventListener("click", function () { selectBorrower(item); });
+        borrowerResults.append(option);
+        return option;
+      });
+      borrowerSearchStatus.textContent = resultOptions.length ? resultOptions.length + " matching borrower" + (resultOptions.length === 1 ? "." : "s.") : "No matching borrowers.";
+      borrowerResults.hidden = resultOptions.length === 0;
+      borrowerSearch.setAttribute("aria-expanded", String(resultOptions.length > 0));
+      activeResult = -1;
+    } catch (error) {
+      closeBorrowerResults();
+      borrowerSearchStatus.textContent = "Borrower search is unavailable. Try again.";
+    }
+  }
+
+  borrowerSearch.addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    borrowerId.value = "";
+    searchTimer = setTimeout(searchBorrowers, 250);
+  });
+  borrowerSearch.addEventListener("keydown", function (event) {
+    if (event.key === "ArrowDown") { event.preventDefault(); setActiveResult(activeResult + 1); }
+    if (event.key === "ArrowUp") { event.preventDefault(); setActiveResult(activeResult - 1); }
+    if (event.key === "Enter" && activeResult >= 0) { event.preventDefault(); resultOptions[activeResult].click(); }
+    if (event.key === "Escape") closeBorrowerResults();
+  });
+
+  function updateMode(clearSelection) {
+    borrowerLabelElement.textContent = "Choose your name";
+    if (clearSelection) clearBorrower();
+  }
+  actionInputs.forEach((input) => input.addEventListener("change", function () { updateMode(true); }));
+  updateMode(false);
+
+  function showScan() {
+    if (!borrowerId.value) {
+      borrowerSearch.setCustomValidity("Choose your name from the search results first.");
+      borrowerSearch.reportValidity();
+      return;
+    }
+    borrowerSearch.setCustomValidity("");
+    const returning = currentAction() === "checkin";
     const action = returning ? "Return" : "Check out";
-    sessionSummary.textContent = action + " · " + borrowerSelect.options[borrowerSelect.selectedIndex].text;
+    sessionSummary.textContent = action + " · " + borrowerSearch.value;
     identificationSwitch.hidden = returning;
     returnMethod.hidden = !returning;
     scanTitle.textContent = returning ? "Choose books to return" : "Choose the book";
@@ -175,7 +272,7 @@
     if (returning) {
       photoMethod.hidden = true;
       manualMethod.hidden = true;
-      renderReturnLoans();
+      loadReturnLoans();
     } else {
       selectMethod(manualMethodTab.getAttribute("aria-selected") === "true" ? "manual" : "photo");
     }
@@ -188,7 +285,7 @@
   changeSession.addEventListener("click", function () {
     scan.hidden = true;
     controls.hidden = false;
-    borrowerSelect.focus();
+    borrowerSearch.focus();
   });
   if (!scan.hidden) showScan();
 
@@ -204,10 +301,15 @@
   manualMethodTab.addEventListener("click", function () { selectMethod("manual"); });
   if (copySelect.value) selectMethod("manual");
 
-  function renderReturnLoans() {
+  async function loadReturnLoans() {
     const selectedValues = new Set(Array.from(document.querySelectorAll("input[name='return_copies']:checked")).map((input) => input.value));
-    const loans = borrowerLoans[borrowerSelect.value] || [];
     returnOptions.replaceChildren();
+    noReturnLoans.hidden = true;
+    identifyButton.disabled = true;
+    try {
+      const response = await fetch(borrowerLoansUrl.replace("00000000-0000-0000-0000-000000000000", borrowerId.value), {headers: {"Accept": "application/json"}});
+      const payload = await response.json();
+      const loans = payload.loans;
     loans.forEach((loan) => {
       const label = document.createElement("label");
       label.className = "return-loan-option";
@@ -225,10 +327,11 @@
     });
     noReturnLoans.hidden = loans.length !== 0;
     identifyButton.disabled = loans.length === 0;
+    } catch (error) {
+      noReturnLoans.textContent = "Borrowed books could not be loaded. Try again.";
+      noReturnLoans.hidden = false;
+    }
   }
-  borrowerSelect.addEventListener("change", function () {
-    if (!returnMethod.hidden) renderReturnLoans();
-  });
 
   function setStatus(message, state) {
     status.textContent = message;

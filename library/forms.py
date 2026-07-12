@@ -1,7 +1,9 @@
 from datetime import timedelta
+import uuid
 
 from django import forms
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Book, Borrower, Copy, SchoolProfile
@@ -16,9 +18,56 @@ def default_form_due_date():
     return timezone.localdate() + timedelta(days=days)
 
 
-class BookForm(forms.ModelForm):
+class BookValidationMixin:
+    def clean(self):
+        cleaned_data = super().clean()
+        for field_name, length in (("isbn13", 13), ("isbn10", 10)):
+            isbn = clean_isbn(cleaned_data.get(field_name))
+            cleaned_data[field_name] = isbn
+            if isbn and (len(isbn) != length or not is_valid_isbn(isbn)):
+                self.add_error(field_name, f"Enter a valid ISBN-{length}.")
+
+        isbn13 = cleaned_data.get("isbn13")
+        isbn10 = cleaned_data.get("isbn10")
+        isbn_query = Q()
+        if isbn13:
+            isbn_query |= Q(isbn13=isbn13)
+        if isbn10:
+            isbn_query |= Q(isbn10=isbn10)
+        if isbn_query:
+            matches = Book.objects.filter(isbn_query)
+            if self.instance.pk:
+                matches = matches.exclude(pk=self.instance.pk)
+            if matches.exists():
+                raise forms.ValidationError("This ISBN belongs to another cataloged book.")
+        return cleaned_data
+
+
+class BookForm(BookValidationMixin, forms.ModelForm):
+    isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
+    isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
     first_copy_shelf = forms.CharField(label="Shelf location", max_length=128, required=False)
     first_copy_condition = forms.ChoiceField(label="Condition", choices=Copy.Condition.choices, required=False)
+
+    class Meta:
+        model = Book
+        fields = [
+            "isbn13",
+            "isbn10",
+            "title",
+            "subtitle",
+            "authors",
+            "publisher",
+            "publication_year",
+            "language",
+            "description",
+            "cover_image",
+        ]
+
+
+class BookEditForm(BookValidationMixin, forms.ModelForm):
+    isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
+    isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
 
     class Meta:
         model = Book
@@ -40,6 +89,13 @@ class CopyForm(forms.ModelForm):
     class Meta:
         model = Copy
         fields = ["shelf_location", "condition", "status"]
+
+
+class CopyEditForm(CopyForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.active_loan:
+            self.fields.pop("status")
 
 
 class BorrowerForm(forms.ModelForm):
@@ -104,12 +160,6 @@ class PhotoIntakeForm(forms.Form):
         return isbn
 
 
-class BorrowerChoiceField(forms.ModelChoiceField):
-    def label_from_instance(self, borrower):
-        username = borrower.username or "no username"
-        return f"{username} - {borrower.full_name}"
-
-
 class CopyChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, copy):
         isbn = copy.book.isbn13 or copy.book.isbn10 or "no ISBN"
@@ -134,7 +184,7 @@ class PhotoCirculationForm(forms.Form):
         initial=Action.CHECKOUT,
         widget=forms.RadioSelect,
     )
-    borrower = BorrowerChoiceField(label="Borrower", queryset=Borrower.objects.none())
+    borrower = forms.UUIDField(label="Borrower", widget=forms.HiddenInput)
     book_photo = forms.FileField(
         label="Book QR or ISBN barcode photo",
         required=False,
@@ -152,13 +202,15 @@ class PhotoCirculationForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["borrower"].queryset = Borrower.objects.filter(active=True).order_by("username", "last_name", "first_name")
-        self.fields["borrower"].empty_label = "Select borrower"
         self.fields["manual_copy"].queryset = Copy.objects.exclude(status=Copy.Status.ARCHIVED).select_related("book").order_by("book__title", "copy_number")
         self.fields["manual_copy"].empty_label = "Select an exact book copy"
         return_copies = Copy.objects.filter(status=Copy.Status.CHECKED_OUT, loans__return_date__isnull=True)
         borrower_id = self.data.get("borrower") if self.is_bound else self.initial.get("borrower")
-        if borrower_id:
+        try:
+            borrower_id = uuid.UUID(str(borrower_id)) if borrower_id else None
+        except (TypeError, ValueError):
+            borrower_id = None
+        if borrower_id is not None:
             return_copies = return_copies.filter(loans__borrower_id=borrower_id)
         else:
             return_copies = return_copies.none()
@@ -166,9 +218,23 @@ class PhotoCirculationForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get("action") == self.Action.CHECKIN and not cleaned_data.get("return_copies"):
+        action = cleaned_data.get("action")
+        borrower_id = cleaned_data.get("borrower")
+        borrower = None
+        if borrower_id:
+            borrowers = Borrower.objects.all()
+            if action == self.Action.CHECKOUT:
+                borrowers = borrowers.filter(active=True)
+            elif action == self.Action.CHECKIN:
+                borrowers = borrowers.filter(loans__return_date__isnull=True).distinct()
+            borrower = borrowers.filter(pk=borrower_id).first()
+            if borrower is None:
+                self.add_error("borrower", "Choose a borrower from the search results.")
+            else:
+                cleaned_data["borrower"] = borrower
+        if action == self.Action.CHECKIN and not cleaned_data.get("return_copies"):
             raise forms.ValidationError("Select at least one borrowed book to return.")
-        if cleaned_data.get("action") == self.Action.CHECKOUT and not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
+        if action == self.Action.CHECKOUT and not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
             raise forms.ValidationError("Take a book photo or select the book manually.")
         return cleaned_data
 

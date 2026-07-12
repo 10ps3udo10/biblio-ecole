@@ -87,6 +87,7 @@ const config: Config = {
             {label: 'Quick Start', to: '/docs/getting-started/quickstart'},
             {label: 'Self-Service', to: '/docs/usage/self-service'},
             {label: 'Photo Intake', to: '/docs/usage/photo-intake'},
+            {label: 'Mac Mini Deployment', to: '/docs/operations/mac-mini-deployment'},
             {label: 'Troubleshooting', to: '/docs/operations/troubleshooting'},
           ],
         },

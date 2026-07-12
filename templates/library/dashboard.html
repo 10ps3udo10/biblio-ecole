@@ -8,7 +8,6 @@
 </section>
 {% endif %}
 <header class="dashboard-heading"><div><span class="eyebrow">Staff overview</span><h1>Overview</h1><p>{{ school_profile.display_name }} · {% now "l, F j" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}">Circulation desk</a></header>
-<nav class="quick-actions" aria-label="Quick actions"><span>Quick actions</span><a href="{% url 'photo_intake' %}">Photo intake</a><a href="{% url 'book_create' %}">Add by ISBN</a><a href="{% url 'borrower_create' %}">Add borrower</a><a href="{% url 'overdue_loans' %}">Overdue report</a></nav>
 <section class="dashboard-metrics">
   <article><span>Catalog titles</span><strong>{{ total_books }}</strong><small>{{ total_copies }} physical copies</small></article>
   <article><span>Available now</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% of inventory</small></article>

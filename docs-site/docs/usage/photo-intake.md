@@ -49,6 +49,9 @@ Stored API or manual covers live under `media/covers/`. Staff can remove one
 with **Delete stored photo** on the book detail page. Deleting the book record
 also deletes its stored cover file.
 
+Use **Edit book** on the book detail page to correct catalog metadata later.
+Shelf-School rejects an ISBN that already belongs to another book record.
+
 ## Existing ISBN
 
 If the ISBN already exists, photo intake adds another physical `Copy` to the

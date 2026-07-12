@@ -43,3 +43,7 @@ the public kiosk dropdown.
 The staff **Borrowers** page shows how many active borrowers currently have
 books out and flags overdue loans. Select a borrower to see their contact and
 class details, current loans with due dates, and recent loan history.
+
+Select **Edit borrower** to correct the username, name, class, email, or active
+status. An inactive borrower is excluded from checkout search but remains
+searchable for return while they still have a book on loan.

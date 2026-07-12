@@ -46,6 +46,10 @@ http://127.0.0.1:8001/admin/login/
 The Django development server is suitable for local testing. **Do not expose it
 directly to the public internet.**
 
+For a dedicated computer that only serves its own browser, continue with
+[Mac Mini Kiosk Deployment](../operations/mac-mini-deployment.md) to configure
+automatic startup and backups without Nginx or Caddy.
+
 ## Next steps
 
 1. Sign in as the administrator.

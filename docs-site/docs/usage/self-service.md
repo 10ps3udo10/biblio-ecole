@@ -13,8 +13,8 @@ to `media/`, attached to the book, or retained as circulation history.
 ## Check out a book
 
 1. Keep **Check out** selected.
-2. Find the borrower by username or name.
-3. Select the borrower.
+2. Type at least two letters from the borrower's username or name.
+3. Select the borrower from the small matching list.
 4. Confirm the due date.
 5. Take a close photograph of the copy QR label or ISBN barcode.
 6. Select **Identify book**.
@@ -31,7 +31,7 @@ another book can be processed immediately.
 ## Return a book
 
 1. Select **Check in / return**.
-2. Find and select the borrower returning the book.
+2. Search for and select the borrower returning the book.
 3. Select one or more books from that borrower's current loans.
 4. Select **Review return**.
 5. Check the selected titles and select **Confirm return**.
@@ -39,6 +39,10 @@ another book can be processed immediately.
 Only books currently loaned to the selected borrower appear. The list is also
 validated on the server, preventing a mistaken name selection from changing
 another student's record. **A return does not require a photograph.**
+
+The kiosk never downloads the complete borrower directory. It requests at most
+eight matches after two letters are entered, and fetches loans only for the
+selected borrower. Email addresses and borrower QR payloads are not exposed.
 
 ## Identifier behavior
 

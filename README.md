@@ -13,7 +13,7 @@ or returns a physical book.**
 [![Build](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrueda/shelf-school/actions/workflows/build-and-test.yml)
 [![Documentation Status](https://github.com/mrueda/shelf-school/actions/workflows/documentation.yml/badge.svg)](https://github.com/mrueda/shelf-school/actions/workflows/documentation.yml)
 [![Documentation](https://img.shields.io/badge/docs-online-0b5cad)](https://mrueda.github.io/shelf-school/)
-[![Version](https://img.shields.io/badge/version-0.1.0-16804a)](https://github.com/mrueda/shelf-school)
+[![Version](https://img.shields.io/badge/version-0.1.0--dev-d68b00)](VERSION)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](requirements.txt)
 [![Django](https://img.shields.io/badge/django-5.x-0c4b33)](https://www.djangoproject.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -27,6 +27,9 @@ borrower's current loans and allows one or several books to be returned together
 
 Students need no accounts or library cards. Staff sign in separately for
 cataloging, borrowers, reports, school settings, and backups.
+
+**Project status:** `0.1.0-dev`. Shelf-School is under active development and
+has not reached its first stable release.
 
 **Documentation:** <https://mrueda.github.io/shelf-school/>
 

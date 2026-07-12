@@ -28,6 +28,10 @@ unambiguous when the library owns several copies of one ISBN.
 
 Condition is recorded separately as new, good, worn, or damaged.
 
+Staff can select **Edit copy** to correct its shelf, condition, or status. While
+a copy is checked out, its status remains controlled by circulation, but shelf
+and condition corrections are still allowed.
+
 ## Delete one copy
 
 When a title has multiple physical copies, staff can open a copy and select

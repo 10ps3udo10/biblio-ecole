@@ -21,10 +21,12 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .forms import (
     BookForm,
+    BookEditForm,
     BorrowerCsvImportForm,
     BorrowerForm,
     CheckoutForm,
     CopyForm,
+    CopyEditForm,
     CsvImportForm,
     PhotoCirculationForm,
     PhotoIntakeForm,
@@ -121,21 +123,16 @@ def _perform_circulation(copy, borrower, action, due_date=None):
 
 
 def _circulation_context(form, **extra):
-    borrower_loans = {}
-    active_loans = Loan.objects.filter(return_date__isnull=True).select_related("copy__book", "borrower").order_by("copy__book__title")
-    for loan in active_loans:
-        borrower_loans.setdefault(str(loan.borrower_id), []).append(
-            {
-                "copy_id": str(loan.copy_id),
-                "title": loan.copy.book.title,
-                "copy_number": loan.copy.copy_number,
-                "due_date": loan.due_date.isoformat(),
-            }
-        )
+    borrower_id = form.data.get("borrower") if form.is_bound else form.initial.get("borrower")
+    try:
+        borrower_id = uuid.UUID(str(borrower_id)) if borrower_id else None
+    except (TypeError, ValueError):
+        borrower_id = None
+    selected_borrower = Borrower.objects.filter(pk=borrower_id).first() if borrower_id else None
     context = {
         "form": form,
-        "has_borrowers": Borrower.objects.filter(active=True).exists(),
-        "borrower_loans": borrower_loans,
+        "has_borrowers": Borrower.objects.filter(Q(active=True) | Q(loans__return_date__isnull=True)).exists(),
+        "selected_borrower": selected_borrower,
     }
     context.update(extra)
     return context
@@ -183,6 +180,19 @@ def dashboard(request):
 @login_required
 def book_list(request):
     query = request.GET.get("q", "").strip()
+    sort = request.GET.get("sort", "title")
+    direction = request.GET.get("direction", "asc")
+    sort_fields = {
+        "title": ("title",),
+        "author": ("authors",),
+        "isbn": ("isbn13", "isbn10"),
+        "availability": ("available_count",),
+        "copies": ("copy_count",),
+    }
+    if sort not in sort_fields:
+        sort = "title"
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
     books = Book.objects.annotate(
         copy_count=Count("copies"),
         available_count=Count("copies", filter=Q(copies__status=Copy.Status.AVAILABLE)),
@@ -198,14 +208,55 @@ def book_list(request):
             | Q(copies__shelf_location__icontains=query)
             | Q(copies__status__icontains=query)
         ).distinct()
-    return render(request, "library/book_list.html", {"books": books, "query": query})
+    prefix = "-" if direction == "desc" else ""
+    order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
+    if sort != "title":
+        order_by.append("title")
+    books = books.order_by(*order_by)
+    sort_headers = [
+        {
+            "key": key,
+            "label": label,
+            "active": sort == key,
+            "direction": direction if sort == key else "",
+            "next_direction": "desc" if sort == key and direction == "asc" else "asc",
+        }
+        for key, label in (
+            ("title", "Title"),
+            ("author", "Author"),
+            ("isbn", "ISBN"),
+            ("availability", "Availability"),
+            ("copies", "Copies"),
+        )
+    ]
+    return render(
+        request,
+        "library/book_list.html",
+        {"books": books, "query": query, "sort": sort, "direction": direction, "sort_headers": sort_headers},
+    )
 
 
 @login_required
 def book_detail(request, pk):
     book = get_object_or_404(Book, pk=pk)
+    copy_sort = request.GET.get("sort", "copy")
+    copy_direction = request.GET.get("direction", "asc")
+    copy_sort_fields = {
+        "copy": ("copy_number",),
+        "status": ("status",),
+        "shelf": ("shelf_location",),
+        "condition": ("condition",),
+    }
+    if copy_sort not in copy_sort_fields:
+        copy_sort = "copy"
+    if copy_direction not in {"asc", "desc"}:
+        copy_direction = "asc"
     loans = Loan.objects.filter(copy__book=book).select_related("copy", "borrower")[:20]
-    copies = list(book.copies.all())
+    prefix = "-" if copy_direction == "desc" else ""
+    copy_order = [f"{prefix}{field}" for field in copy_sort_fields[copy_sort]]
+    if copy_sort != "copy":
+        copy_order.append("copy_number")
+    copies = list(book.copies.order_by(*copy_order))
     active_copy_ids = set(Loan.objects.filter(copy__book=book, return_date__isnull=True).values_list("copy_id", flat=True))
     for copy in copies:
         copy.has_active_loan = copy.id in active_copy_ids
@@ -218,6 +269,16 @@ def book_detail(request, pk):
             "loans": loans,
             "has_active_loans": bool(active_copy_ids),
             "has_multiple_copies": len(copies) > 1,
+            "sort_headers": [
+                {
+                    "key": key,
+                    "label": label,
+                    "active": copy_sort == key,
+                    "direction": copy_direction if copy_sort == key else "",
+                    "next_direction": "desc" if copy_sort == key and copy_direction == "asc" else "asc",
+                }
+                for key, label in (("copy", "Copy"), ("status", "Status"), ("shelf", "Shelf"), ("condition", "Condition"))
+            ],
         },
     )
 
@@ -317,7 +378,21 @@ def book_create(request):
             return redirect(book)
     else:
         form = BookForm(initial={"first_copy_condition": Copy.Condition.GOOD})
-    return render(request, "library/book_form.html", {"form": form, "title": "Add book"})
+    return render(request, "library/book_form.html", {"form": form, "title": "Add book", "is_edit": False})
+
+
+@login_required
+def book_edit(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    if request.method == "POST":
+        form = BookEditForm(request.POST, request.FILES, instance=book)
+        if form.is_valid():
+            book = form.save()
+            messages.success(request, "Book details updated.")
+            return redirect(book)
+    else:
+        form = BookEditForm(instance=book)
+    return render(request, "library/book_form.html", {"form": form, "title": "Edit book", "is_edit": True})
 
 
 @login_required
@@ -401,6 +476,20 @@ def add_copy(request, book_pk):
 
 
 @login_required
+def copy_edit(request, pk):
+    copy = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
+    if request.method == "POST":
+        form = CopyEditForm(request.POST, instance=copy)
+        if form.is_valid():
+            copy = form.save()
+            messages.success(request, "Copy details updated.")
+            return redirect(copy)
+    else:
+        form = CopyEditForm(instance=copy)
+    return render(request, "library/copy_form.html", {"form": form, "book": copy.book, "copy": copy, "is_edit": True})
+
+
+@login_required
 def copy_detail(request, pk):
     copy = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
     loans = copy.loans.select_related("borrower").all()[:20]
@@ -439,6 +528,18 @@ def delete_copy(request, pk):
 @login_required
 def borrower_list(request):
     query = request.GET.get("q", "").strip()
+    sort = request.GET.get("sort", "borrower")
+    direction = request.GET.get("direction", "asc")
+    sort_fields = {
+        "borrower": ("last_name", "first_name"),
+        "class": ("class_name",),
+        "loans": ("active_loan_count",),
+        "status": ("active",),
+    }
+    if sort not in sort_fields:
+        sort = "borrower"
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
     borrowers = Borrower.objects.annotate(
         active_loan_count=Count("loans", filter=Q(loans__return_date__isnull=True)),
         overdue_loan_count=Count(
@@ -454,12 +555,35 @@ def borrower_list(request):
             | Q(class_name__icontains=query)
             | Q(email__icontains=query)
         )
+    prefix = "-" if direction == "desc" else ""
+    order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
+    if sort != "borrower":
+        order_by.extend(["last_name", "first_name"])
+    borrowers = borrowers.order_by(*order_by)
+    sort_headers = [
+        {
+            "key": key,
+            "label": label,
+            "active": sort == key,
+            "direction": direction if sort == key else "",
+            "next_direction": "desc" if sort == key and direction == "asc" else "asc",
+        }
+        for key, label in (
+            ("borrower", "Borrower"),
+            ("class", "Class"),
+            ("loans", "Current loans"),
+            ("status", "Status"),
+        )
+    ]
     return render(
         request,
         "library/borrower_list.html",
         {
             "borrowers": borrowers,
             "query": query,
+            "sort": sort,
+            "direction": direction,
+            "sort_headers": sort_headers,
             "total_borrowers": Borrower.objects.count(),
             "active_borrowers": Borrower.objects.filter(active=True).count(),
             "borrowers_with_loans": Borrower.objects.filter(loans__return_date__isnull=True).distinct().count(),
@@ -498,14 +622,88 @@ def borrower_create(request):
     return render(request, "library/borrower_form.html", {"form": form, "title": "Add borrower"})
 
 
+@login_required
+def borrower_edit(request, pk):
+    borrower = get_object_or_404(Borrower, pk=pk)
+    if request.method == "POST":
+        form = BorrowerForm(request.POST, instance=borrower)
+        if form.is_valid():
+            borrower = form.save()
+            messages.success(request, "Borrower details updated.")
+            return redirect(borrower)
+    else:
+        form = BorrowerForm(instance=borrower)
+    return render(request, "library/borrower_form.html", {"form": form, "title": "Edit borrower"})
+
+
+@require_GET
+def circulation_borrower_search(request):
+    query = request.GET.get("q", "").strip()
+    action = request.GET.get("action", PhotoCirculationForm.Action.CHECKOUT)
+    if len(query) < 2 or action not in PhotoCirculationForm.Action.values:
+        return JsonResponse({"results": []})
+
+    borrowers = Borrower.objects.all()
+    if action == PhotoCirculationForm.Action.CHECKOUT:
+        borrowers = borrowers.filter(active=True)
+    else:
+        borrowers = borrowers.filter(loans__return_date__isnull=True)
+    borrowers = (
+        borrowers.filter(
+            Q(username__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+        )
+        .distinct()
+        .order_by("last_name", "first_name")[:8]
+    )
+    return JsonResponse(
+        {
+            "results": [
+                {
+                    "id": str(borrower.id),
+                    "name": borrower.full_name,
+                    "username": borrower.username or "",
+                    "class_name": borrower.class_name,
+                }
+                for borrower in borrowers
+            ]
+        }
+    )
+
+
+@require_GET
+def circulation_borrower_loans(request, pk):
+    loans = Loan.objects.filter(
+        borrower_id=pk,
+        return_date__isnull=True,
+    ).select_related("copy__book").order_by("copy__book__title", "copy__copy_number")
+    return JsonResponse(
+        {
+            "loans": [
+                {
+                    "copy_id": str(loan.copy_id),
+                    "title": loan.copy.book.title,
+                    "copy_number": loan.copy.copy_number,
+                    "due_date": loan.due_date.isoformat(),
+                    "overdue": loan.is_overdue,
+                }
+                for loan in loans
+            ]
+        }
+    )
+
+
 def photo_circulation(request):
     if request.method == "POST":
         confirmation_token = request.POST.get("confirmation_token")
         if confirmation_token:
             try:
                 payload = signing.loads(confirmation_token, salt=CIRCULATION_SALT, max_age=600)
-                borrower = Borrower.objects.get(pk=payload["borrower_id"], active=True)
                 action = payload["action"]
+                borrower = Borrower.objects.get(pk=payload["borrower_id"])
+                if action == PhotoCirculationForm.Action.CHECKOUT and not borrower.active:
+                    raise ValueError("This borrower is no longer active.")
                 due_date = payload.get("due_date") or None
                 with transaction.atomic():
                     copy_ids = payload.get("copy_ids") or []
@@ -814,11 +1012,46 @@ def import_borrowers(request):
 
 @login_required
 def overdue_loans(request):
+    sort = request.GET.get("sort", "due")
+    direction = request.GET.get("direction", "asc")
+    sort_fields = {
+        "due": ("due_date",),
+        "book": ("copy__book__title",),
+        "copy": ("copy__copy_number",),
+        "borrower": ("borrower__last_name", "borrower__first_name"),
+        "username": ("borrower__username",),
+        "class": ("borrower__class_name",),
+    }
+    if sort not in sort_fields:
+        sort = "due"
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
+    prefix = "-" if direction == "desc" else ""
+    order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
+    if sort != "due":
+        order_by.append("due_date")
     loans = Loan.objects.filter(
         return_date__isnull=True,
         due_date__lt=timezone.localdate(),
-    ).select_related("copy__book", "borrower").order_by("due_date")
-    return render(request, "library/overdue_loans.html", {"loans": loans})
+    ).select_related("copy__book", "borrower").order_by(*order_by)
+    sort_headers = [
+        {
+            "key": key,
+            "label": label,
+            "active": sort == key,
+            "direction": direction if sort == key else "",
+            "next_direction": "desc" if sort == key and direction == "asc" else "asc",
+        }
+        for key, label in (
+            ("due", "Due"),
+            ("book", "Book"),
+            ("copy", "Copy"),
+            ("borrower", "Borrower"),
+            ("username", "Username"),
+            ("class", "Class"),
+        )
+    ]
+    return render(request, "library/overdue_loans.html", {"loans": loans, "sort_headers": sort_headers})
 
 
 @login_required

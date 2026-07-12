@@ -9,10 +9,10 @@
     <a class="button" href="{% url 'export_books_csv' %}">Export CSV</a>
   </div>
 </section>
-<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, author, ISBN, shelf, status"><button>Search</button></form>
+<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, author, ISBN, shelf, status"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button>Search</button></form>
 <div class="table-wrap">
   <table>
-    <thead><tr><th>Title</th><th>Author</th><th>ISBN</th><th>Availability</th><th>Copies</th></tr></thead>
+    <thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
     <tbody>
       {% for book in books %}
         <tr><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} available</td><td>{{ book.copy_count }}</td></tr>

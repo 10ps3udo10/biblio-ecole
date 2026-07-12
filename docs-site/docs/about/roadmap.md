@@ -3,7 +3,8 @@
 Near-term priorities:
 
 - Improve accessibility and camera feedback on the public kiosk.
-- Add safer deployment guidance for school networks.
+- Add a hardened HTTPS deployment profile for access from other devices on a
+  school network.
 - Add complete active-loan and circulation reports.
 - Improve copy-label batch printing.
 - Add optional class filtering for large borrower lists.

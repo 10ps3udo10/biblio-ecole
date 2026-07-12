@@ -4,6 +4,11 @@ Shelf-School is an open-source library system for small schools. Its primary
 screen is a public circulation kiosk where a student selects their name,
 chooses checkout or return, and photographs one book at a time.
 
+:::caution Development status
+Shelf-School is currently **`0.1.0-dev`** and has not reached its first stable
+release. Back up school data before upgrades.
+:::
+
 **Students do not need passwords, accounts, or library cards.** Staff use a single
 administrator session for cataloging, borrower management, reports, settings,
 and backups.
@@ -22,6 +27,8 @@ and backups.
 - Local QR and ISBN barcode decoding from photographs.
 - Free book metadata lookup through Open Library.
 - Separate records for titles, physical copies, borrowers, and loans.
+- Staff correction of book, copy, and borrower records.
+- Private borrower search without sending the full directory to the kiosk.
 - Printable QR labels for every physical copy.
 - School branding and configurable loan duration.
 - Borrower and book CSV import.

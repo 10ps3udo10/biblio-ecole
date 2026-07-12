@@ -116,6 +116,58 @@ def test_search_finds_books_by_shelf_status_and_author(logged_in_client):
 
 
 @pytest.mark.django_db
+def test_catalog_table_sorts_by_columns(logged_in_client):
+    first = Book.objects.create(title="Alpha", authors="Zulu", isbn13="9780316381994")
+    second = Book.objects.create(title="Beta", authors="Alpha", isbn13="9788408052524")
+    Copy.objects.create(book=first, copy_number=1)
+    Copy.objects.create(book=first, copy_number=2)
+    Copy.objects.create(book=second, copy_number=1)
+
+    by_author = logged_in_client.get(reverse("book_list"), {"sort": "author", "direction": "asc"})
+    by_copies = logged_in_client.get(reverse("book_list"), {"sort": "copies", "direction": "desc"})
+
+    assert [book.title for book in by_author.context["books"]] == ["Beta", "Alpha"]
+    assert [book.title for book in by_copies.context["books"]] == ["Alpha", "Beta"]
+    assert b'aria-sort="descending"' in by_copies.content
+
+
+@pytest.mark.django_db
+def test_borrower_table_sorts_by_name_class_loans_and_status(logged_in_client):
+    alpha = Borrower.objects.create(username="alpha", first_name="Amy", last_name="Zulu", class_name="1A")
+    beta = Borrower.objects.create(username="beta", first_name="Ben", last_name="Alpha", class_name="2B", active=False)
+    book = Book.objects.create(title="Borrowed title")
+    copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
+    Loan.objects.create(copy=copy, borrower=alpha)
+
+    by_name = logged_in_client.get(reverse("borrower_list"), {"sort": "borrower", "direction": "asc"})
+    by_loans = logged_in_client.get(reverse("borrower_list"), {"sort": "loans", "direction": "desc"})
+    by_status = logged_in_client.get(reverse("borrower_list"), {"sort": "status", "direction": "asc"})
+
+    assert [borrower.id for borrower in by_name.context["borrowers"]] == [beta.id, alpha.id]
+    assert [borrower.id for borrower in by_loans.context["borrowers"]] == [alpha.id, beta.id]
+    assert [borrower.id for borrower in by_status.context["borrowers"]] == [beta.id, alpha.id]
+
+
+@pytest.mark.django_db
+def test_overdue_and_copy_tables_sort_by_columns(logged_in_client):
+    from datetime import timedelta
+
+    book = Book.objects.create(title="Sortable copies")
+    first = Copy.objects.create(book=book, copy_number=1, shelf_location="Z9", status=Copy.Status.CHECKED_OUT)
+    second = Copy.objects.create(book=book, copy_number=2, shelf_location="A1", status=Copy.Status.CHECKED_OUT)
+    first_borrower = Borrower.objects.create(username="z-user", first_name="Zed", last_name="Zulu")
+    second_borrower = Borrower.objects.create(username="a-user", first_name="Amy", last_name="Alpha")
+    Loan.objects.create(copy=first, borrower=first_borrower, due_date=timezone.localdate() - timedelta(days=1))
+    Loan.objects.create(copy=second, borrower=second_borrower, due_date=timezone.localdate() - timedelta(days=2))
+
+    copies = logged_in_client.get(reverse("book_detail", args=[book.id]), {"sort": "shelf", "direction": "asc"})
+    overdue = logged_in_client.get(reverse("overdue_loans"), {"sort": "borrower", "direction": "desc"})
+
+    assert [copy.id for copy in copies.context["copies"]] == [second.id, first.id]
+    assert [loan.borrower_id for loan in overdue.context["loans"]] == [first_borrower.id, second_borrower.id]
+
+
+@pytest.mark.django_db
 def test_csv_import_and_export(logged_in_client):
     csv_file = SimpleUploadedFile(
         "books.csv",
@@ -325,6 +377,148 @@ def test_checked_out_book_cannot_be_deleted(logged_in_client):
 
 
 @pytest.mark.django_db
+def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
+    book = Book.objects.create(title="Original title", isbn13="9780316381994")
+    copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Old")
+    borrower = Borrower.objects.create(username="old-user", first_name="Old", last_name="Name")
+
+    response = logged_in_client.post(
+        reverse("book_edit", args=[book.id]),
+        {
+            "title": "Corrected title",
+            "isbn13": "9780316381994",
+            "isbn10": "",
+            "subtitle": "",
+            "authors": "Correct Author",
+            "publisher": "",
+            "publication_year": "",
+            "language": "",
+            "description": "",
+        },
+    )
+    assert response.status_code == 302
+    book.refresh_from_db()
+    assert book.title == "Corrected title"
+
+    response = logged_in_client.post(
+        reverse("copy_edit", args=[copy.id]),
+        {"shelf_location": "B4", "condition": Copy.Condition.WORN, "status": Copy.Status.AVAILABLE},
+    )
+    assert response.status_code == 302
+    copy.refresh_from_db()
+    assert copy.shelf_location == "B4"
+    assert copy.condition == Copy.Condition.WORN
+
+    response = logged_in_client.post(
+        reverse("borrower_edit", args=[borrower.id]),
+        {
+            "username": "correct-user",
+            "first_name": "Correct",
+            "last_name": "Name",
+            "class_name": "4A",
+            "email": "correct@example.org",
+        },
+    )
+    assert response.status_code == 302
+    borrower.refresh_from_db()
+    assert borrower.username == "correct-user"
+    assert borrower.full_name == "Correct Name"
+    assert borrower.active is False
+
+
+@pytest.mark.django_db
+def test_book_edit_rejects_isbn_used_by_another_book(logged_in_client):
+    Book.objects.create(title="Existing ISBN", isbn13="9780316381994")
+    book = Book.objects.create(title="Book to edit")
+
+    response = logged_in_client.post(
+        reverse("book_edit", args=[book.id]),
+        {
+            "title": "Book to edit",
+            "isbn13": "9780316381994",
+            "isbn10": "",
+            "subtitle": "",
+            "authors": "",
+            "publisher": "",
+            "publication_year": "",
+            "language": "",
+            "description": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"belongs to another cataloged book" in response.content
+    book.refresh_from_db()
+    assert book.isbn13 == ""
+
+
+@pytest.mark.django_db
+def test_manual_book_form_normalizes_dashed_isbn(logged_in_client):
+    response = logged_in_client.post(
+        reverse("book_create"),
+        {
+            "title": "Dashed ISBN",
+            "isbn13": "979-8324731472",
+            "isbn10": "",
+            "subtitle": "",
+            "authors": "",
+            "publisher": "",
+            "publication_year": "",
+            "language": "",
+            "description": "",
+            "first_copy_shelf": "",
+            "first_copy_condition": Copy.Condition.GOOD,
+        },
+    )
+
+    assert response.status_code == 302
+    assert Book.objects.get(title="Dashed ISBN").isbn13 == "9798324731472"
+
+
+@pytest.mark.django_db
+def test_manual_book_form_rejects_invalid_dashed_isbn(logged_in_client):
+    response = logged_in_client.post(
+        reverse("book_create"),
+        {
+            "title": "Invalid ISBN",
+            "isbn13": "979-8324731473",
+            "isbn10": "",
+            "subtitle": "",
+            "authors": "",
+            "publisher": "",
+            "publication_year": "",
+            "language": "",
+            "description": "",
+            "first_copy_shelf": "",
+            "first_copy_condition": Copy.Condition.GOOD,
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"Enter a valid ISBN-13" in response.content
+    assert not Book.objects.filter(title="Invalid ISBN").exists()
+
+
+@pytest.mark.django_db
+def test_checked_out_copy_edit_cannot_change_circulation_status(logged_in_client):
+    book = Book.objects.create(title="Checked out edit")
+    copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
+    borrower = Borrower.objects.create(username="status-reader", first_name="Status", last_name="Reader")
+    Loan.objects.create(copy=copy, borrower=borrower)
+
+    response = logged_in_client.post(
+        reverse("copy_edit", args=[copy.id]),
+        {"shelf_location": "New shelf", "condition": Copy.Condition.WORN, "status": Copy.Status.AVAILABLE},
+    )
+
+    assert response.status_code == 302
+    copy.refresh_from_db()
+    assert copy.shelf_location == "New shelf"
+    assert copy.condition == Copy.Condition.WORN
+    assert copy.status == Copy.Status.CHECKED_OUT
+
+
+@pytest.mark.django_db
 def test_staff_can_delete_one_of_multiple_copies_and_its_returned_history(logged_in_client):
     book = Book.objects.create(title="Several physical copies")
     first = Copy.objects.create(book=book, copy_number=1)
@@ -451,6 +645,85 @@ def test_photo_circulation_checkout_and_checkin_with_borrower_dropdown(logged_in
     loan = Loan.objects.get(copy=copy, borrower=borrower)
     assert copy.status == Copy.Status.AVAILABLE
     assert loan.return_date == timezone.localdate()
+
+
+@pytest.mark.django_db
+def test_public_circulation_does_not_embed_borrower_records(client):
+    borrower = Borrower.objects.create(
+        username="private-student",
+        first_name="Private",
+        last_name="Student",
+        email="private@example.org",
+    )
+
+    response = client.get(reverse("photo_circulation"))
+
+    assert response.status_code == 200
+    assert borrower.full_name.encode() not in response.content
+    assert borrower.email.encode() not in response.content
+    assert borrower.qr_code.encode() not in response.content
+    assert b'role="combobox"' in response.content
+
+
+@pytest.mark.django_db
+def test_borrower_search_is_limited_and_returns_only_public_identity_fields(client):
+    for index in range(10):
+        Borrower.objects.create(
+            username=f"reader-{index}",
+            first_name="Reader",
+            last_name=f"Student {index}",
+            email=f"reader-{index}@example.org",
+        )
+
+    too_short = client.get(reverse("circulation_borrower_search"), {"q": "r", "action": "checkout"})
+    response = client.get(reverse("circulation_borrower_search"), {"q": "reader", "action": "checkout"})
+
+    assert too_short.json() == {"results": []}
+    results = response.json()["results"]
+    assert len(results) == 8
+    assert set(results[0]) == {"id", "name", "username", "class_name"}
+    assert "email" not in response.content.decode()
+    assert "BORROWER:" not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_return_search_includes_inactive_borrower_with_active_loan(client):
+    book = Book.objects.create(title="Outstanding inactive loan")
+    copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
+    borrower = Borrower.objects.create(username="former-reader", first_name="Former", last_name="Reader", active=False)
+    Loan.objects.create(copy=copy, borrower=borrower)
+
+    checkout = client.get(reverse("circulation_borrower_search"), {"q": "former", "action": "checkout"})
+    checkin = client.get(reverse("circulation_borrower_search"), {"q": "former", "action": "checkin"})
+    loans = client.get(reverse("circulation_borrower_loans", args=[borrower.id]))
+
+    assert checkout.json() == {"results": []}
+    assert checkin.json()["results"][0]["id"] == str(borrower.id)
+    assert loans.json()["loans"] == [
+        {
+            "copy_id": str(copy.id),
+            "title": book.title,
+            "copy_number": 1,
+            "due_date": Loan.objects.get(copy=copy).due_date.isoformat(),
+            "overdue": False,
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_inactive_borrower_can_return_outstanding_loan(client):
+    book = Book.objects.create(title="Inactive return")
+    copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
+    borrower = Borrower.objects.create(username="inactive-return", first_name="Inactive", last_name="Reader", active=False)
+    Loan.objects.create(copy=copy, borrower=borrower)
+
+    response = client.post(
+        reverse("photo_circulation"),
+        {"action": "checkin", "borrower": str(borrower.id), "return_copies": [str(copy.id)]},
+    )
+
+    assert response.status_code == 200
+    assert response.context["confirmation"] is True
 
 
 @pytest.mark.django_db
