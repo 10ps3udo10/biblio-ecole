@@ -93,6 +93,6 @@ Repository: <https://github.com/mrueda/shelf-school>
 
 ## Copyright and License
 
-Copyright (C) 2026 Shelf-School contributors.
+Copyright (C) 2026 Manuel Rueda.
 
 Shelf-School is distributed under the MIT License. See [LICENSE](LICENSE).

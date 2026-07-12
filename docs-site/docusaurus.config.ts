@@ -107,7 +107,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: 'Copyright (C) 2026 Shelf-School contributors.',
+      copyright: 'Copyright (C) 2026 Manuel Rueda.',
     },
     prism: {
       theme: prismThemes.github,
