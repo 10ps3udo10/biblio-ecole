@@ -19,8 +19,9 @@ or returns a physical book.**
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Shelf-School provides a public self-service kiosk where students choose their
-name and select checkout or return. Checkout books are
-normally identified from a photograph of a Shelf-School QR label or ISBN. If a
+name and select checkout or return. Checkout books are identified one at a time
+from a photograph of a Shelf-School QR label or ISBN, then confirmed together
+as one checkout. If a
 photo cannot be read, partial title, author, ISBN, shelf, and copy-number search
 provides a manual fallback. For returns, Shelf-School shows only the selected
 borrower's current loans and allows one or several books to be returned together.
@@ -40,6 +41,7 @@ has not reached its first stable release.
 ## Highlights
 
 - Public checkout and return with a short, child-facing workflow.
+- Multi-book checkout and return with one final, atomic confirmation.
 - Local QR and ISBN decoding with `zxing-cpp`.
 - Free Open Library metadata lookup and exact-ISBN web-search fallback.
 - One QR label and loan history per physical copy.

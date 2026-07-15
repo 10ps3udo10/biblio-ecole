@@ -1,0 +1,22 @@
+{% extends "library/base.html" %}
+{% block title %}Change borrower - Shelf-School{% endblock %}
+{% block content %}
+<section class="form-panel loan-correction-panel">
+  <span class="eyebrow">Correct active loan</span>
+  <h1>Change borrower</h1>
+  <p class="muted">Use this when a book was checked out under the wrong name.</p>
+  <dl class="loan-correction-summary">
+    <div><dt>Book</dt><dd>{{ loan.copy.book.title }} · Copy #{{ loan.copy.copy_number }}</dd></div>
+    <div><dt>Current borrower</dt><dd>{{ loan.borrower.full_name }}{% if loan.borrower.username %} · {{ loan.borrower.username }}{% endif %}</dd></div>
+    <div><dt>Due date</dt><dd>{{ loan.due_date }}</dd></div>
+  </dl>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+      <button class="button primary"><i data-lucide="user-round-check" aria-hidden="true"></i>Change borrower</button>
+      <a class="button" href="{{ loan.copy.get_absolute_url }}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

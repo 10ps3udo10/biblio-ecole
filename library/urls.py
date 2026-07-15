@@ -20,6 +20,7 @@ urlpatterns = [
     path("copies/<uuid:pk>/", views.copy_detail, name="copy_detail"),
     path("copies/<uuid:pk>/edit/", views.copy_edit, name="copy_edit"),
     path("copies/<uuid:pk>/delete/", views.delete_copy, name="delete_copy"),
+    path("loans/<uuid:pk>/borrower/", views.correct_loan_borrower, name="correct_loan_borrower"),
     path("borrowers/", views.borrower_list, name="borrower_list"),
     path("borrowers/add/", views.borrower_create, name="borrower_create"),
     path("borrowers/import/", views.import_borrowers, name="import_borrowers"),

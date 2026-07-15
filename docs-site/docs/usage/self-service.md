@@ -20,14 +20,21 @@ to `media/`, attached to the book, or retained as circulation history.
 3. Select the borrower from the small matching list.
 4. Select **Continue**.
 5. Keep **Take photo** selected and photograph the copy QR label or ISBN barcode.
-6. Select **Identify book**.
-7. Review the identified title, copy, borrower, and due date.
-8. Select **Confirm checkout**.
+6. Select **Identify book** and review the checkout basket.
+7. To borrow more books, select **Add another book** and identify the next book
+   by photo or manual search.
+8. Remove any mistaken selection from the basket if needed.
+9. Review the books, borrower, and due date, then select **Confirm checkout**.
 
 ![Shelf-School book photograph step](/img/circulation-scan.png)
 
-Shelf-School returns to the kiosk with the same borrower and action selected so
-another book can be processed immediately.
+No loan is created while books are being added to the basket. At final
+confirmation, Shelf-School rechecks every copy and creates all loans in one
+database transaction. If one copy is no longer available, **none of the books
+are checked out**.
+
+Shelf-School then returns to the kiosk with the same borrower and action selected
+so another transaction can be started immediately.
 
 ![Shelf-School transaction confirmation screen](/img/transaction-confirmation.png)
 
@@ -60,8 +67,8 @@ selected borrower. Email addresses and borrower QR payloads are not exposed.
 
 ## Manual fallback
 
-For checkout, photo and manual lookup have equal weight on the book step. Select
-**Find manually** whenever it is faster or the camera cannot read a code.
+For checkout, photo and manual lookup have equal weight on every book step.
+Select **Find manually** whenever it is faster or the camera cannot read a code.
 The filter uses partial matching against title, author, ISBN, shelf, and copy
 number. Select one exact physical copy, then continue to the normal review and
 confirmation screen. Availability and borrower ownership are validated again

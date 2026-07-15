@@ -17,49 +17,41 @@
 
 {% if confirmation %}
 <section class="transaction-confirmation">
-  {% if copies %}
-  <div class="confirmation-book-list">
-    <span class="eyebrow">Books selected</span>
-    <h2>{{ copies|length }} book{{ copies|length|pluralize }} to return</h2>
-    {% for selected_copy in copies %}
-    <div class="confirmation-book-row">
-      <strong>{{ selected_copy.book.title }}</strong>
-      <span>Copy #{{ selected_copy.copy_number }}</span>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="confirmation-book">
-    {% if copy.book.cover_image %}<img src="{{ copy.book.cover_image.url }}" alt="Cover of {{ copy.book.title }}">{% else %}<div class="book-placeholder">Book</div>{% endif %}
-    <div>
-      <span class="eyebrow">Book identified</span>
-      <h2>{{ copy.book.title }}</h2>
-      <p>{{ copy.book.authors|default:"Author not recorded" }}</p>
-      <span class="copy-tag">Copy #{{ copy.copy_number }}</span>
-    </div>
-  </div>
-  {% endif %}
-  <dl class="transaction-summary">
-    <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
-    <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No username" }}<span>{{ borrower.full_name }}</span></dd></div>
-    {% if copies %}<div><dt>Books</dt><dd>{{ copies|length }}</dd></div>{% endif %}
-    {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
-  </dl>
-  <form method="post" class="confirmation-actions">
+  <form method="post" class="confirmation-form">
     {% csrf_token %}
     <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
-    <button class="button primary confirm-transaction"><i data-lucide="circle-check" aria-hidden="true"></i>Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
-    <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Cancel</a>
+    <div class="confirmation-book-list">
+    <span class="eyebrow">{% if action == "checkout" %}Checkout basket{% else %}Books selected{% endif %}</span>
+    <h2>{{ copies|length }} book{{ copies|length|pluralize }} {% if action == "checkout" %}ready to check out{% else %}to return{% endif %}</h2>
+    {% for selected_copy in copies %}
+    <div class="confirmation-book-row">
+      <span><strong>{{ selected_copy.book.title }}</strong><small>Copy #{{ selected_copy.copy_number }}</small></span>
+      {% if action == "checkout" %}<button class="remove-basket-book" name="remove_copy_id" value="{{ selected_copy.id }}" title="Remove {{ selected_copy.book.title }}" aria-label="Remove {{ selected_copy.book.title }}"><i data-lucide="x" aria-hidden="true"></i></button>{% endif %}
+    </div>
+    {% endfor %}
+    </div>
+    <dl class="transaction-summary">
+      <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
+      <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No username" }}<span>{{ borrower.full_name }}</span></dd></div>
+      <div><dt>Books</dt><dd>{{ copies|length }}</dd></div>
+      {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
+    </dl>
+    <div class="confirmation-actions">
+      <button class="button primary confirm-transaction" name="intent" value="confirm"><i data-lucide="circle-check" aria-hidden="true"></i>Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
+      {% if action == "checkout" %}<button class="button" name="intent" value="add_another"><i data-lucide="book-plus" aria-hidden="true"></i>Add another book</button>{% endif %}
+      <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Cancel</a>
+    </div>
   </form>
 </section>
 {% else %}
 {% if not has_borrowers %}
 <section class="empty-desk"><h2>Circulation is not ready</h2><p>A staff member must add at least one borrower before books can be checked out.</p></section>
 {% else %}
-<form class="circulation-desk" method="post" enctype="multipart/form-data">
+<form class="circulation-desk" method="post" enctype="multipart/form-data" data-basket-count="{{ basket_count|default:0 }}">
   {% csrf_token %}
+  {{ form.basket_token }}
   {{ form.non_field_errors }}
-  <section class="desk-controls" aria-label="Transaction details"{% if form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
+  <section class="desk-controls" aria-label="Transaction details"{% if resume_checkout or form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
     <div class="desk-section-heading">
       <span class="desk-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
       <div><span class="eyebrow">Step 1</span><h2>Start a transaction</h2></div>
@@ -84,8 +76,9 @@
     <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continue</button>
   </section>
 
-  <section class="desk-scan" aria-labelledby="scan-title"{% if not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors and not form.return_copies.errors %} hidden{% endif %}>
+  <section class="desk-scan" aria-labelledby="scan-title"{% if not resume_checkout and not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors and not form.return_copies.errors %} hidden{% endif %}>
     <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button"><i data-lucide="refresh-cw" aria-hidden="true"></i>Change</button></div>
+    {% if basket_copies %}<div class="checkout-basket-preview"><strong>{{ basket_count }} selected</strong><span>{% for selected_copy in basket_copies %}{{ selected_copy.book.title }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></div>{% endif %}
     <div class="desk-section-heading scan-heading">
       <span class="desk-section-icon"><i data-lucide="book-open" aria-hidden="true"></i></span>
       <div><span class="eyebrow">Step 2</span><h2 id="scan-title">Choose the book</h2></div>
@@ -164,6 +157,7 @@
   const identifyButtonLabel = document.getElementById("identify-book-label");
   const scanTitle = document.getElementById("scan-title");
   const progressSteps = Array.from(document.querySelectorAll("#desk-progress li"));
+  const basketCount = Number(document.querySelector(".circulation-desk").dataset.basketCount || 0);
   const borrowerSearchUrl = "{% url 'circulation_borrower_search' %}";
   const borrowerLoansUrl = "{% url 'circulation_borrower_loans' '00000000-0000-0000-0000-000000000000' %}";
   if (!fileInput || !status || !preview || !borrowerId || !borrowerSearch) return;
@@ -286,11 +280,11 @@
     borrowerSearch.setCustomValidity("");
     const returning = currentAction() === "checkin";
     const action = returning ? "Return" : "Check out";
-    sessionSummary.textContent = action + " · " + borrowerSearch.value;
+    sessionSummary.textContent = action + " · " + borrowerSearch.value + (basketCount ? " · " + basketCount + " selected" : "");
     identificationSwitch.hidden = returning;
     returnMethod.hidden = !returning;
-    scanTitle.textContent = returning ? "Choose books to return" : "Choose the book";
-    identifyButtonLabel.textContent = returning ? "Review return" : "Identify book";
+    scanTitle.textContent = returning ? "Choose books to return" : basketCount ? "Add another book" : "Choose the book";
+    identifyButtonLabel.textContent = returning ? "Review return" : basketCount ? "Add to checkout" : "Identify book";
     if (returning) {
       photoMethod.hidden = true;
       manualMethod.hidden = true;

@@ -28,6 +28,7 @@ from .forms import (
     CopyForm,
     CopyEditForm,
     CsvImportForm,
+    LoanBorrowerCorrectionForm,
     PhotoCirculationForm,
     PhotoIntakeForm,
     ReturnForm,
@@ -40,6 +41,7 @@ from .qr import svg_qr
 
 
 CIRCULATION_SALT = "shelf-school-circulation"
+MAX_CHECKOUT_BOOKS = 20
 
 
 def _uuid_from_code(value, prefix):
@@ -120,6 +122,66 @@ def _perform_circulation(copy, borrower, action, due_date=None):
     copy.status = Copy.Status.AVAILABLE
     copy.save(update_fields=["status"])
     return f"Checked in {copy.book.title} from {borrower.full_name}."
+
+
+def _circulation_payload(token):
+    payload = signing.loads(token, salt=CIRCULATION_SALT, max_age=600)
+    action = payload.get("action")
+    copy_ids = payload.get("copy_ids")
+    if action not in PhotoCirculationForm.Action.values:
+        raise ValueError("That circulation confirmation is invalid.")
+    if not isinstance(copy_ids, list) or not copy_ids or len(copy_ids) > MAX_CHECKOUT_BOOKS:
+        raise ValueError("That circulation confirmation is invalid.")
+    if len(copy_ids) != len(set(copy_ids)):
+        raise ValueError("The same book appears more than once.")
+    return payload
+
+
+def _ordered_copies(copy_ids, *, lock=False):
+    copies = Copy.objects.select_related("book")
+    if lock:
+        copies = copies.select_for_update()
+    by_id = {str(copy.id): copy for copy in copies.filter(pk__in=copy_ids)}
+    if len(by_id) != len(copy_ids):
+        raise ValueError("One of the selected books no longer exists.")
+    return [by_id[copy_id] for copy_id in copy_ids]
+
+
+def _checkout_confirmation(request, form, payload):
+    borrower = Borrower.objects.get(pk=payload["borrower_id"])
+    copies = _ordered_copies(payload["copy_ids"])
+    token = signing.dumps(payload, salt=CIRCULATION_SALT)
+    return render(
+        request,
+        "library/photo_circulation.html",
+        _circulation_context(
+            form,
+            confirmation=True,
+            confirmation_token=token,
+            copies=copies,
+            borrower=borrower,
+            action=PhotoCirculationForm.Action.CHECKOUT,
+            due_date=payload["due_date"],
+        ),
+    )
+
+
+def _checkout_scan(request, form, payload):
+    copies = _ordered_copies(payload["copy_ids"])
+    token = signing.dumps(payload, salt=CIRCULATION_SALT)
+    if not form.is_bound:
+        form.initial["basket_token"] = token
+    return render(
+        request,
+        "library/photo_circulation.html",
+        _circulation_context(
+            form,
+            resume_checkout=True,
+            basket_token=token,
+            basket_copies=copies,
+            basket_count=len(copies),
+        ),
+    )
 
 
 def _circulation_context(form, **extra):
@@ -506,6 +568,39 @@ def copy_detail(request, pk):
     )
 
 
+@staff_member_required
+def correct_loan_borrower(request, pk):
+    loan = get_object_or_404(
+        Loan.objects.select_related("copy__book", "borrower"),
+        pk=pk,
+        return_date__isnull=True,
+    )
+    if request.method == "POST":
+        form = LoanBorrowerCorrectionForm(request.POST, loan=loan)
+        if form.is_valid():
+            with transaction.atomic():
+                locked_loan = get_object_or_404(
+                    Loan.objects.select_for_update().select_related("copy__book", "borrower"),
+                    pk=loan.pk,
+                    return_date__isnull=True,
+                )
+                new_borrower = form.cleaned_data["borrower"]
+                if locked_loan.borrower_id == new_borrower.id:
+                    form.add_error("borrower", "Choose a different borrower.")
+                else:
+                    previous_name = locked_loan.borrower.full_name
+                    locked_loan.borrower = new_borrower
+                    locked_loan.save(update_fields=["borrower"])
+                    messages.success(
+                        request,
+                        f"Changed the borrower for {locked_loan.copy.book.title} from {previous_name} to {new_borrower.full_name}.",
+                    )
+                    return redirect(locked_loan.copy)
+    else:
+        form = LoanBorrowerCorrectionForm(loan=loan)
+    return render(request, "library/loan_borrower_form.html", {"form": form, "loan": loan})
+
+
 @login_required
 @require_POST
 def delete_copy(request, pk):
@@ -697,27 +792,76 @@ def circulation_borrower_loans(request, pk):
 def photo_circulation(request):
     if request.method == "POST":
         confirmation_token = request.POST.get("confirmation_token")
+        intent = request.POST.get("intent", "confirm")
+        if confirmation_token and intent == "add_another":
+            try:
+                payload = _circulation_payload(confirmation_token)
+                if payload["action"] != PhotoCirculationForm.Action.CHECKOUT:
+                    raise ValueError("Only checkout supports adding another book.")
+                borrower = Borrower.objects.get(pk=payload["borrower_id"], active=True)
+                if len(payload["copy_ids"]) >= MAX_CHECKOUT_BOOKS:
+                    raise ValueError(f"A checkout can contain at most {MAX_CHECKOUT_BOOKS} books.")
+                form = PhotoCirculationForm(
+                    initial={
+                        "action": payload["action"],
+                        "borrower": borrower.id,
+                        "due_date": payload["due_date"],
+                    }
+                )
+                return _checkout_scan(request, form, payload)
+            except signing.BadSignature:
+                messages.error(request, "That checkout basket expired. Start the checkout again.")
+            except (Borrower.DoesNotExist, KeyError, ValueError) as exc:
+                messages.error(request, str(exc) or "That checkout basket is no longer valid.")
+            return redirect("photo_circulation")
+
+        remove_copy_id = request.POST.get("remove_copy_id")
+        if confirmation_token and remove_copy_id:
+            try:
+                payload = _circulation_payload(confirmation_token)
+                if payload["action"] != PhotoCirculationForm.Action.CHECKOUT:
+                    raise ValueError("Books can only be removed from a checkout basket.")
+                borrower = Borrower.objects.get(pk=payload["borrower_id"], active=True)
+                if remove_copy_id not in payload["copy_ids"]:
+                    raise ValueError("That book is not in this checkout basket.")
+                payload["copy_ids"] = [copy_id for copy_id in payload["copy_ids"] if copy_id != remove_copy_id]
+                if not payload["copy_ids"]:
+                    messages.info(request, "The checkout basket is empty.")
+                    next_url = reverse("photo_circulation")
+                    return redirect(f"{next_url}?borrower={borrower.id}&action={payload['action']}")
+                form = PhotoCirculationForm(
+                    initial={
+                        "action": payload["action"],
+                        "borrower": borrower.id,
+                        "due_date": payload["due_date"],
+                    }
+                )
+                return _checkout_confirmation(request, form, payload)
+            except signing.BadSignature:
+                messages.error(request, "That checkout basket expired. Start the checkout again.")
+            except (Borrower.DoesNotExist, KeyError, ValueError) as exc:
+                messages.error(request, str(exc) or "That checkout basket is no longer valid.")
+            return redirect("photo_circulation")
+
         if confirmation_token:
             try:
-                payload = signing.loads(confirmation_token, salt=CIRCULATION_SALT, max_age=600)
+                payload = _circulation_payload(confirmation_token)
                 action = payload["action"]
                 borrower = Borrower.objects.get(pk=payload["borrower_id"])
                 if action == PhotoCirculationForm.Action.CHECKOUT and not borrower.active:
                     raise ValueError("This borrower is no longer active.")
                 due_date = payload.get("due_date") or None
                 with transaction.atomic():
-                    copy_ids = payload.get("copy_ids") or []
-                    if copy_ids:
-                        copies = list(Copy.objects.select_for_update().select_related("book").filter(pk__in=copy_ids))
-                        if len(copies) != len(copy_ids):
-                            raise ValueError("One of the selected books is no longer available.")
-                        for selected_copy in copies:
-                            _perform_circulation(selected_copy, borrower, action)
-                        copy = copies[0]
-                        success_message = f"Returned {len(copies)} book{'s' if len(copies) != 1 else ''} for {borrower.full_name}."
+                    copies = _ordered_copies(payload["copy_ids"], lock=True)
+                    for selected_copy in copies:
+                        _perform_circulation(selected_copy, borrower, action, due_date)
+                    if action == PhotoCirculationForm.Action.CHECKOUT:
+                        if len(copies) == 1:
+                            success_message = f"Checked out {copies[0].book.title} to {borrower.full_name}."
+                        else:
+                            success_message = f"Checked out {len(copies)} books to {borrower.full_name}."
                     else:
-                        copy = Copy.objects.select_for_update().select_related("book").get(pk=payload["copy_id"])
-                        success_message = _perform_circulation(copy, borrower, action, due_date)
+                        success_message = f"Returned {len(copies)} book{'s' if len(copies) != 1 else ''} for {borrower.full_name}."
             except signing.BadSignature:
                 messages.error(request, "That circulation confirmation expired. Please scan the book again.")
                 return redirect("photo_circulation")
@@ -760,16 +904,36 @@ def photo_circulation(request):
                         action=action,
                     ),
                 )
+            basket_payload = None
+            basket_token = form.cleaned_data.get("basket_token")
+            if action == PhotoCirculationForm.Action.CHECKOUT and basket_token:
+                try:
+                    basket_payload = _circulation_payload(basket_token)
+                    if basket_payload["action"] != action or basket_payload["borrower_id"] != str(borrower.id):
+                        raise ValueError("The checkout basket belongs to a different transaction.")
+                    if len(basket_payload["copy_ids"]) >= MAX_CHECKOUT_BOOKS:
+                        raise ValueError(f"A checkout can contain at most {MAX_CHECKOUT_BOOKS} books.")
+                except signing.BadSignature:
+                    form.add_error(None, "That checkout basket expired. Start the checkout again.")
+                    return render(request, "library/photo_circulation.html", _circulation_context(form))
+                except (KeyError, ValueError) as exc:
+                    form.add_error(None, str(exc))
+                    return render(request, "library/photo_circulation.html", _circulation_context(form))
+
             copy = form.cleaned_data.get("manual_copy")
             if copy is None:
                 try:
                     copy = _copy_from_photo(form.cleaned_data["book_photo"], action)
                 except ValueError as exc:
                     form.add_error("book_photo", str(exc))
+                    if basket_payload:
+                        return _checkout_scan(request, form, basket_payload)
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
 
             if action == PhotoCirculationForm.Action.CHECKOUT and copy.status != Copy.Status.AVAILABLE:
                 form.add_error("book_photo", "This copy is not available for check out.")
+                if basket_payload:
+                    return _checkout_scan(request, form, basket_payload)
                 return render(request, "library/photo_circulation.html", _circulation_context(form))
             loan = copy.active_loan
             if action == PhotoCirculationForm.Action.CHECKIN:
@@ -781,12 +945,26 @@ def photo_circulation(request):
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
 
             due_date = form.cleaned_data.get("due_date") or default_form_due_date()
-            token = signing.dumps(
-                {
-                    "copy_id": str(copy.id),
+            if action == PhotoCirculationForm.Action.CHECKOUT:
+                copy_ids = list(basket_payload["copy_ids"]) if basket_payload else []
+                if str(copy.id) in copy_ids:
+                    form.add_error("manual_copy" if form.cleaned_data.get("manual_copy") else "book_photo", "This book is already in the checkout basket.")
+                    return _checkout_scan(request, form, basket_payload)
+                copy_ids.append(str(copy.id))
+                payload = {
+                    "copy_ids": copy_ids,
                     "borrower_id": str(borrower.id),
                     "action": action,
-                    "due_date": due_date.isoformat() if action == PhotoCirculationForm.Action.CHECKOUT else "",
+                    "due_date": basket_payload["due_date"] if basket_payload else due_date.isoformat(),
+                }
+                return _checkout_confirmation(request, form, payload)
+
+            token = signing.dumps(
+                {
+                    "copy_ids": [str(copy.id)],
+                    "borrower_id": str(borrower.id),
+                    "action": action,
+                    "due_date": "",
                 },
                 salt=CIRCULATION_SALT,
             )

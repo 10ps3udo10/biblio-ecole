@@ -769,7 +769,153 @@ def test_circulation_accepts_exact_copy_from_manual_fallback(client):
 
     assert response.status_code == 200
     assert response.context["confirmation"] is True
-    assert response.context["copy"] == copy
+    assert response.context["copies"] == [copy]
+
+
+@pytest.mark.django_db
+def test_borrower_can_checkout_multiple_books_in_one_atomic_basket(client):
+    borrower = Borrower.objects.create(username="basket-reader", first_name="Basket", last_name="Reader")
+    first = Copy.objects.create(book=Book.objects.create(title="First basket book"), copy_number=1)
+    second = Copy.objects.create(book=Book.objects.create(title="Second basket book"), copy_number=1)
+
+    first_review = client.post(
+        reverse("photo_circulation"),
+        {"action": "checkout", "borrower": str(borrower.id), "manual_copy": str(first.id)},
+    )
+    add_another = client.post(
+        reverse("photo_circulation"),
+        {"confirmation_token": first_review.context["confirmation_token"], "intent": "add_another"},
+    )
+    second_review = client.post(
+        reverse("photo_circulation"),
+        {
+            "action": "checkout",
+            "borrower": str(borrower.id),
+            "manual_copy": str(second.id),
+            "basket_token": add_another.context["basket_token"],
+        },
+    )
+
+    assert add_another.context["resume_checkout"] is True
+    assert add_another.context["basket_copies"] == [first]
+    assert second_review.context["copies"] == [first, second]
+    assert Loan.objects.count() == 0
+
+    confirmed = client.post(
+        reverse("photo_circulation"),
+        {"confirmation_token": second_review.context["confirmation_token"], "intent": "confirm"},
+        follow=True,
+    )
+
+    assert b"Checked out 2 books to Basket Reader." in confirmed.content
+    assert Loan.objects.filter(borrower=borrower, copy__in=[first, second], return_date__isnull=True).count() == 2
+
+
+@pytest.mark.django_db
+def test_multi_book_checkout_rolls_back_if_one_copy_becomes_unavailable(client):
+    borrower = Borrower.objects.create(username="atomic-reader", first_name="Atomic", last_name="Reader")
+    other = Borrower.objects.create(username="other-reader", first_name="Other", last_name="Reader")
+    first = Copy.objects.create(book=Book.objects.create(title="Atomic first"), copy_number=1)
+    second = Copy.objects.create(book=Book.objects.create(title="Atomic second"), copy_number=1)
+    due_date = timezone.localdate() + timedelta(days=14)
+    from django.core import signing
+    from library.views import CIRCULATION_SALT
+
+    token = signing.dumps(
+        {
+            "copy_ids": [str(first.id), str(second.id)],
+            "borrower_id": str(borrower.id),
+            "action": "checkout",
+            "due_date": due_date.isoformat(),
+        },
+        salt=CIRCULATION_SALT,
+    )
+    Loan.objects.create(copy=second, borrower=other, due_date=due_date)
+    second.status = Copy.Status.CHECKED_OUT
+    second.save(update_fields=["status"])
+
+    response = client.post(reverse("photo_circulation"), {"confirmation_token": token}, follow=True)
+
+    assert b"no longer available" in response.content
+    assert not Loan.objects.filter(copy=first).exists()
+    first.refresh_from_db()
+    assert first.status == Copy.Status.AVAILABLE
+
+
+@pytest.mark.django_db
+def test_checkout_basket_rejects_duplicate_and_allows_removal(client):
+    borrower = Borrower.objects.create(username="edit-basket", first_name="Edit", last_name="Basket")
+    first = Copy.objects.create(book=Book.objects.create(title="Keep in basket"), copy_number=1)
+    second = Copy.objects.create(book=Book.objects.create(title="Remove from basket"), copy_number=1)
+
+    first_review = client.post(
+        reverse("photo_circulation"),
+        {"action": "checkout", "borrower": str(borrower.id), "manual_copy": str(first.id)},
+    )
+    scan = client.post(
+        reverse("photo_circulation"),
+        {"confirmation_token": first_review.context["confirmation_token"], "intent": "add_another"},
+    )
+    duplicate = client.post(
+        reverse("photo_circulation"),
+        {
+            "action": "checkout",
+            "borrower": str(borrower.id),
+            "manual_copy": str(first.id),
+            "basket_token": scan.context["basket_token"],
+        },
+    )
+    assert b"already in the checkout basket" in duplicate.content
+
+    second_review = client.post(
+        reverse("photo_circulation"),
+        {
+            "action": "checkout",
+            "borrower": str(borrower.id),
+            "manual_copy": str(second.id),
+            "basket_token": scan.context["basket_token"],
+        },
+    )
+    removed = client.post(
+        reverse("photo_circulation"),
+        {"confirmation_token": second_review.context["confirmation_token"], "remove_copy_id": str(second.id)},
+    )
+
+    assert removed.context["copies"] == [first]
+    assert b"Remove from basket" not in removed.content
+
+
+@pytest.mark.django_db
+def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
+    wrong = Borrower.objects.create(username="wrong", first_name="Wrong", last_name="Student")
+    correct = Borrower.objects.create(username="correct", first_name="Correct", last_name="Student", class_name="3B")
+    copy = Copy.objects.create(book=Book.objects.create(title="Mistaken borrower"), copy_number=1, status=Copy.Status.CHECKED_OUT)
+    loan = Loan.objects.create(copy=copy, borrower=wrong)
+
+    page = logged_in_client.get(reverse("correct_loan_borrower", args=[loan.id]))
+    response = logged_in_client.post(
+        reverse("correct_loan_borrower", args=[loan.id]),
+        {"borrower": str(correct.id)},
+        follow=True,
+    )
+
+    assert page.status_code == 200
+    assert b"wrong - Wrong Student" in page.content
+    assert b"correct - Correct Student - 3B" in page.content
+    assert b"Changed the borrower" in response.content
+    loan.refresh_from_db()
+    assert loan.borrower == correct
+
+
+@pytest.mark.django_db
+def test_returned_loan_cannot_be_reassigned(logged_in_client):
+    borrower = Borrower.objects.create(username="returned", first_name="Returned", last_name="Reader")
+    copy = Copy.objects.create(book=Book.objects.create(title="Already returned"), copy_number=1)
+    loan = Loan.objects.create(copy=copy, borrower=borrower, return_date=timezone.localdate())
+
+    response = logged_in_client.get(reverse("correct_loan_borrower", args=[loan.id]))
+
+    assert response.status_code == 404
 
 
 @pytest.mark.django_db

@@ -162,9 +162,13 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
 
     book = Book.objects.create(title="Dropdown Circulation")
     copy = Copy.objects.create(book=book, copy_number=1)
+    second_book = Book.objects.create(title="Second Circulation Book")
+    second_copy = Copy.objects.create(book=second_book, copy_number=1)
     borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez")
     qr_path = tmp_path / "copy-qr.png"
+    second_qr_path = tmp_path / "second-copy-qr.png"
     qrcode.make(copy.qr_code).save(qr_path)
+    qrcode.make(second_copy.qr_code).save(second_qr_path)
 
     page.goto(live_server.url)
     expect(page.get_by_role("heading", name="Borrow or return a book")).to_be_visible()
@@ -181,29 +185,41 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     expect(page.get_by_role("heading", name="Borrow or return a book")).to_be_visible()
     expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
     assert Loan.objects.count() == 0
+    page.get_by_role("button", name="Add another book").click()
+    expect(page.get_by_role("heading", name="Add another book")).to_be_visible()
+    expect(page.get_by_text("1 selected", exact=True)).to_be_visible()
+    page.locator("input[name='book_photo']").set_input_files(str(second_qr_path))
+    page.get_by_role("button", name="Add to checkout").click()
+    expect(page.get_by_text("Second Circulation Book", exact=True)).to_be_visible()
+    expect(page.get_by_text("2 books ready to check out")).to_be_visible()
     page.get_by_role("button", name="Confirm checkout").click()
-    expect(page.get_by_text("Checked out Dropdown Circulation to Mia Lopez.")).to_be_visible()
+    expect(page.get_by_text("Checked out 2 books to Mia Lopez.")).to_be_visible()
     expect(page.locator("input[name='borrower']")).to_have_value(str(borrower.id))
 
     copy.refresh_from_db()
+    second_copy.refresh_from_db()
     assert copy.status == Copy.Status.CHECKED_OUT
+    assert second_copy.status == Copy.Status.CHECKED_OUT
 
     page.locator("input[name='action'][value='checkin']").check()
     select_borrower(page, "mia", "mia - Mia Lopez", borrower.id, keyboard=True)
     page.get_by_role("button", name="Continue").click()
     expect(page.get_by_role("heading", name="Choose books to return")).to_be_visible()
     expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
-    expect(page.locator("input[name='return_copies']")).to_have_count(1)
-    page.locator("input[name='return_copies']").check()
+    expect(page.locator("input[name='return_copies']")).to_have_count(2)
+    page.locator("input[name='return_copies']").nth(0).check()
+    page.locator("input[name='return_copies']").nth(1).check()
     page.get_by_role("button", name="Review return").click()
     expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
     assert Loan.objects.get(copy=copy).return_date is None
     page.get_by_role("button", name="Confirm return").click()
-    expect(page.get_by_text("Returned 1 book for Mia Lopez.")).to_be_visible()
+    expect(page.get_by_text("Returned 2 books for Mia Lopez.")).to_be_visible()
 
     copy.refresh_from_db()
+    second_copy.refresh_from_db()
     loan = Loan.objects.get(copy=copy, borrower=borrower)
     assert copy.status == Copy.Status.AVAILABLE
+    assert second_copy.status == Copy.Status.AVAILABLE
     assert loan.return_date is not None
 
 
@@ -311,6 +327,35 @@ def test_admin_can_correct_book_copy_and_borrower_in_browser(page, live_server, 
     assert book.title == "Correct title"
     assert copy.shelf_location == "A2"
     assert borrower.first_name == "Student"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_can_move_active_loan_to_correct_borrower_in_browser(page, live_server, django_user_model):
+    django_user_model.objects.create_superuser(username="loan-editor", password="secret", email="")
+    wrong = Borrower.objects.create(username="wrong-child", first_name="Wrong", last_name="Child")
+    correct = Borrower.objects.create(username="right-child", first_name="Right", last_name="Child", class_name="4A")
+    copy = Copy.objects.create(
+        book=Book.objects.create(title="Borrowed under wrong name"),
+        copy_number=1,
+        status=Copy.Status.CHECKED_OUT,
+    )
+    loan = Loan.objects.create(copy=copy, borrower=wrong)
+
+    page.goto(f"{live_server.url}/admin/login/?next={copy.get_absolute_url()}")
+    page.locator("input[name='username']").fill("loan-editor")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+
+    expect(page.get_by_text("Wrong Child", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Change borrower").click()
+    expect(page.get_by_role("heading", name="Change borrower")).to_be_visible()
+    page.locator("select[name='borrower']").select_option(str(correct.id))
+    page.get_by_role("button", name="Change borrower").click()
+
+    expect(page.get_by_text("Changed the borrower for Borrowed under wrong name from Wrong Child to Right Child.")).to_be_visible()
+    expect(page.get_by_text("Right Child", exact=True)).to_be_visible()
+    loan.refresh_from_db()
+    assert loan.borrower == correct
 
 
 @pytest.mark.django_db(transaction=True)

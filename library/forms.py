@@ -107,6 +107,28 @@ class BorrowerForm(forms.ModelForm):
         return self.cleaned_data.get("username") or None
 
 
+class BorrowerChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, borrower):
+        identifier = borrower.username or "no username"
+        class_name = f" - {borrower.class_name}" if borrower.class_name else ""
+        return f"{identifier} - {borrower.full_name}{class_name}"
+
+
+class LoanBorrowerCorrectionForm(forms.Form):
+    borrower = BorrowerChoiceField(label="Correct borrower", queryset=Borrower.objects.none())
+
+    def __init__(self, *args, loan=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loan = loan
+        self.fields["borrower"].queryset = Borrower.objects.filter(active=True).order_by("last_name", "first_name")
+
+    def clean_borrower(self):
+        borrower = self.cleaned_data["borrower"]
+        if self.loan and borrower.pk == self.loan.borrower_id:
+            raise forms.ValidationError("Choose a different borrower.")
+        return borrower
+
+
 class SchoolProfileForm(forms.ModelForm):
     class Meta:
         model = SchoolProfile
@@ -185,6 +207,7 @@ class PhotoCirculationForm(forms.Form):
         widget=forms.RadioSelect,
     )
     borrower = forms.UUIDField(label="Borrower", widget=forms.HiddenInput)
+    basket_token = forms.CharField(required=False, widget=forms.HiddenInput)
     book_photo = forms.FileField(
         label="Book QR or ISBN barcode photo",
         required=False,

@@ -47,3 +47,15 @@ class details, current loans with due dates, and recent loan history.
 Select **Edit borrower** to correct the username, name, class, email, or active
 status. An inactive borrower is excluded from checkout search but remains
 searchable for return while they still have a book on loan.
+
+## Correct a loan assigned to the wrong borrower
+
+If a book was checked out under the wrong name, staff do not need to return and
+check out the book again:
+
+1. Open the physical copy from the catalog or borrower record.
+2. In **Current borrower**, select **Change borrower**.
+3. Choose the correct active borrower and confirm.
+
+This changes only the active loan. Returned loans and historical circulation
+records cannot be reassigned from this screen.
