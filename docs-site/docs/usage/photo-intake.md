@@ -12,7 +12,8 @@ before saving. Its catalog cover is downloaded when the book is created.
 
 1. Sign in as the administrator.
 2. Open **Photo intake**.
-3. Photograph the ISBN barcode closely and in focus.
+3. Photograph the back cover closely, with the ISBN barcode in focus and filling
+   most of the frame.
 4. Confirm the detected ISBN or enter it manually.
 5. Add a title manually only when no ISBN is available.
 6. Optionally set author, shelf, and condition.
@@ -48,6 +49,23 @@ added without changing this review step.
 Stored API or manual covers live under `media/covers/`. Staff can remove one
 with **Delete stored photo** on the book detail page. Deleting the book record
 also deletes its stored cover file.
+
+## Fetch covers after an import
+
+CSV import creates the catalog records first and does not wait for external
+cover requests. After importing:
+
+1. Open **Catalog**.
+2. Select one or more titles marked **Missing** in the Cover column. Titles
+   marked **ISBN needed** must be edited first.
+3. Select **Fetch missing covers**.
+
+Shelf-School uses each selected title's valid ISBN to request only its cover
+from Open Library. Existing covers are never replaced, and no bibliographic
+metadata is changed. Books without a valid ISBN display **ISBN needed** and
+cannot be selected for automatic cover fetching. The result reports downloaded
+and unavailable covers and any failures. A title remains usable when no cover
+is available.
 
 Use **Edit book** on the book detail page to correct catalog metadata later.
 Shelf-School rejects an ISBN that already belongs to another book record.

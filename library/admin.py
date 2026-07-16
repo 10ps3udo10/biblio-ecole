@@ -6,22 +6,22 @@ from .models import Book, Borrower, Copy, Loan, SchoolProfile
 class CopyInline(admin.TabularInline):
     model = Copy
     extra = 0
-    fields = ("copy_number", "shelf_location", "condition", "status", "qr_code")
+    fields = ("copy_number", "shelf_location", "condition", "status", "source_photo", "source_position", "qr_code")
     readonly_fields = ("qr_code",)
 
 
 @admin.register(Book)
 class BookAdmin(admin.ModelAdmin):
-    list_display = ("title", "authors", "isbn13", "publisher", "publication_year", "available_copies", "total_copies")
-    search_fields = ("title", "subtitle", "authors", "isbn10", "isbn13", "publisher")
-    list_filter = ("language", "publication_year")
+    list_display = ("title", "authors", "isbn13", "publisher", "needs_information", "available_copies", "total_copies")
+    search_fields = ("title", "subtitle", "authors", "isbn10", "isbn13", "publisher", "category", "topics")
+    list_filter = ("needs_information", "language", "category", "identification_confidence", "publication_year")
     inlines = [CopyInline]
 
 
 @admin.register(Copy)
 class CopyAdmin(admin.ModelAdmin):
     list_display = ("book", "copy_number", "shelf_location", "condition", "status")
-    search_fields = ("id", "qr_code", "book__title", "book__authors", "shelf_location")
+    search_fields = ("id", "qr_code", "book__title", "book__authors", "shelf_location", "source_photo")
     list_filter = ("status", "condition")
     readonly_fields = ("qr_code",)
 

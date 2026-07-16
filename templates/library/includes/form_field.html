@@ -1,0 +1,6 @@
+<p{% if field.field.widget.input_type == "checkbox" %} class="form-checkbox"{% endif %}>
+  {{ field.label_tag }}
+  {{ field }}
+  {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+  {{ field.errors }}
+</p>

@@ -69,10 +69,11 @@ selected borrower. Email addresses and borrower QR payloads are not exposed.
 
 For checkout, photo and manual lookup have equal weight on every book step.
 Select **Find manually** whenever it is faster or the camera cannot read a code.
-The filter uses partial matching against title, author, ISBN, shelf, and copy
-number. Select one exact physical copy, then continue to the normal review and
-confirmation screen. Availability and borrower ownership are validated again
-on the server.
+The filter uses partial matching against title, contributor, ISBN, shelf, and
+copy number. Only copies that are ready to borrow appear in the list, and
+missing metadata is omitted from each option. Select one exact physical copy,
+then continue to the normal review and confirmation screen. Availability and
+borrower ownership are validated again on the server.
 
 ![Shelf-School manual book fallback](/img/manual-fallback.png)
 

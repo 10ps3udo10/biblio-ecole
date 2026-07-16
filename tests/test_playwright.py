@@ -379,7 +379,7 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     page.locator("input[name='password']").fill("secret")
     page.locator("input[type='submit']").click()
 
-    page.get_by_role("columnheader", name="Author").get_by_role("link").click()
+    page.get_by_role("columnheader", name="Contributors").get_by_role("link").click()
     expect(page.locator("tbody tr").first).to_contain_text("Beta title")
 
     page.goto(f"{live_server.url}/borrowers/")
@@ -393,6 +393,69 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     page.goto(f"{live_server.url}{alpha.get_absolute_url()}")
     page.get_by_role("columnheader", name="Shelf").get_by_role("link").click()
     expect(page.locator("tbody tr").first).to_contain_text("A1")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_selects_books_and_fetches_missing_covers_in_browser(
+    page, live_server, django_user_model, tmp_path, settings, monkeypatch
+):
+    settings.MEDIA_ROOT = tmp_path
+    django_user_model.objects.create_superuser(username="covers", password="secret", email="")
+    first = Book.objects.create(title="First missing cover", isbn13="9780316381994")
+    second = Book.objects.create(title="Second missing cover", isbn13="9788408052524")
+    Copy.objects.create(book=first, copy_number=1)
+    Copy.objects.create(book=second, copy_number=1)
+    monkeypatch.setattr("library.views.download_cover_by_isbn", lambda isbn: (f"cover:{isbn}".encode(), "jpg"))
+
+    page.goto(f"{live_server.url}/admin/login/?next=/books/")
+    page.locator("input[name='username']").fill("covers")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+
+    fetch_button = page.get_by_role("button", name="Fetch missing covers")
+    expect(fetch_button).to_be_disabled()
+    page.get_by_role("checkbox", name="Select all books eligible for cover fetching").check()
+    expect(page.get_by_text("2 selected")).to_be_visible()
+    expect(fetch_button).to_be_enabled()
+    fetch_button.click()
+
+    expect(page.get_by_text("Cover fetch complete: 2 downloaded")).to_be_visible()
+    expect(page.get_by_text("Available", exact=True)).to_have_count(2)
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert first.cover_image
+    assert second.cover_image
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_imports_enriched_catalog_and_reviews_incomplete_book(
+    page, live_server, django_user_model, tmp_path
+):
+    django_user_model.objects.create_superuser(username="importer", password="secret", email="")
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text(
+        "Source photo,Photo position,Title,Subtitle,Contributors,ISBN,Publisher,Publication year,Language,"
+        "Pages,Format,Category,Topics,Description,Suggested Montessori level,Suggested age range,"
+        "Suggested reading level,Identification confidence,Review notes,Bibliographic source URL\n"
+        "photo.jpg,left,The Classroom,,A. Teacher,,,2024,en,,Picture book,School and community,"
+        "classroom; friendship,A classroom story,Children's House (3-6),4-7,Read-aloud,high,"
+        "Confirm ISBN,\n",
+        encoding="utf-8",
+    )
+
+    page.goto(f"{live_server.url}/admin/login/?next=/books/import/")
+    page.locator("input[name='username']").fill("importer")
+    page.locator("input[name='password']").fill("secret")
+    page.locator("input[type='submit']").click()
+    page.locator("input[type='file']").set_input_files(catalog)
+    page.get_by_role("button", name="Import books").click()
+
+    expect(page.get_by_text("Catalog import complete: 1 physical book")).to_be_visible()
+    expect(page.get_by_text("Needs information", exact=True)).to_be_visible()
+    page.get_by_role("link", name="The Classroom").click()
+    expect(page.get_by_role("heading", name="Topics")).to_be_visible()
+    expect(page.get_by_text("classroom; friendship")).to_be_visible()
+    expect(page.get_by_text("Children's House (3-6)")).to_be_visible()
 
 
 @pytest.mark.django_db(transaction=True)

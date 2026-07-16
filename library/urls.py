@@ -11,6 +11,7 @@ urlpatterns = [
     path("books/photo-intake/", views.photo_intake, name="photo_intake"),
     path("books/isbn-metadata/", views.isbn_metadata, name="isbn_metadata"),
     path("books/import/", views.import_books, name="import_books"),
+    path("books/covers/fetch/", views.fetch_book_covers, name="fetch_book_covers"),
     path("books/export.csv", views.export_books_csv, name="export_books_csv"),
     path("books/<uuid:pk>/", views.book_detail, name="book_detail"),
     path("books/<uuid:pk>/edit/", views.book_edit, name="book_edit"),

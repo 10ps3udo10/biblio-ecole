@@ -46,6 +46,7 @@ class BookValidationMixin:
 class BookForm(BookValidationMixin, forms.ModelForm):
     isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
     isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
+    bibliographic_source_url = forms.URLField(label="Bibliographic source URL", required=False, assume_scheme="https")
     first_copy_shelf = forms.CharField(label="Shelf location", max_length=128, required=False)
     first_copy_condition = forms.ChoiceField(label="Condition", choices=Copy.Condition.choices, required=False)
 
@@ -60,14 +61,27 @@ class BookForm(BookValidationMixin, forms.ModelForm):
             "publisher",
             "publication_year",
             "language",
+            "page_count",
+            "format",
+            "category",
+            "topics",
             "description",
+            "montessori_levels",
+            "suggested_age_range",
+            "suggested_reading_level",
+            "identification_confidence",
+            "review_notes",
+            "bibliographic_source_url",
+            "needs_information",
             "cover_image",
         ]
+        labels = {"authors": "Contributors"}
 
 
 class BookEditForm(BookValidationMixin, forms.ModelForm):
     isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
     isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
+    bibliographic_source_url = forms.URLField(label="Bibliographic source URL", required=False, assume_scheme="https")
 
     class Meta:
         model = Book
@@ -80,9 +94,21 @@ class BookEditForm(BookValidationMixin, forms.ModelForm):
             "publisher",
             "publication_year",
             "language",
+            "page_count",
+            "format",
+            "category",
+            "topics",
             "description",
+            "montessori_levels",
+            "suggested_age_range",
+            "suggested_reading_level",
+            "identification_confidence",
+            "review_notes",
+            "bibliographic_source_url",
+            "needs_information",
             "cover_image",
         ]
+        labels = {"authors": "Contributors"}
 
 
 class CopyForm(forms.ModelForm):
@@ -184,10 +210,16 @@ class PhotoIntakeForm(forms.Form):
 
 class CopyChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, copy):
-        isbn = copy.book.isbn13 or copy.book.isbn10 or "no ISBN"
-        authors = copy.book.authors or "author not recorded"
-        shelf = copy.shelf_location or "no shelf"
-        return f"{copy.book.title} - {authors} - copy #{copy.copy_number} - {isbn} - {shelf} - {copy.get_status_display()}"
+        details = [copy.book.title]
+        if copy.book.authors:
+            details.append(copy.book.authors)
+        details.append(f"Copy #{copy.copy_number}")
+        isbn = copy.book.isbn13 or copy.book.isbn10
+        if isbn:
+            details.append(f"ISBN {isbn}")
+        if copy.shelf_location:
+            details.append(f"Shelf {copy.shelf_location}")
+        return " - ".join(details)
 
 
 class CopyMultipleChoiceField(forms.ModelMultipleChoiceField):
@@ -225,7 +257,7 @@ class PhotoCirculationForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["manual_copy"].queryset = Copy.objects.exclude(status=Copy.Status.ARCHIVED).select_related("book").order_by("book__title", "copy_number")
+        self.fields["manual_copy"].queryset = Copy.objects.filter(status=Copy.Status.AVAILABLE).select_related("book").order_by("book__title", "copy_number")
         self.fields["manual_copy"].empty_label = "Select an exact book copy"
         return_copies = Copy.objects.filter(status=Copy.Status.CHECKED_OUT, loans__return_date__isnull=True)
         borrower_id = self.data.get("borrower") if self.is_bound else self.initial.get("borrower")
@@ -264,6 +296,10 @@ class PhotoCirculationForm(forms.Form):
 
 class CsvImportForm(forms.Form):
     csv_file = forms.FileField(label="CSV file")
+
+
+class FetchCoversForm(forms.Form):
+    books = forms.ModelMultipleChoiceField(queryset=Book.objects.all())
 
 
 class BorrowerCsvImportForm(forms.Form):

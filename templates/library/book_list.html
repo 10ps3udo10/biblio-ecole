@@ -7,17 +7,44 @@
     <a class="button primary" href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Add from photo</a><a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Add manually</a>
     <a class="button" href="{% url 'import_books' %}"><i data-lucide="upload" aria-hidden="true"></i>Import CSV</a>
     <a class="button" href="{% url 'export_books_csv' %}"><i data-lucide="download" aria-hidden="true"></i>Export CSV</a>
+    <span class="bulk-cover-action"><button class="button" id="fetch-covers" type="submit" form="cover-fetch-form"><i data-lucide="images" aria-hidden="true"></i>Fetch missing covers</button><small id="cover-selection-count" aria-live="polite">0 selected</small></span>
   </div>
 </section>
-<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, author, ISBN, shelf, status"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button><i data-lucide="search" aria-hidden="true"></i>Search</button></form>
-<div class="table-wrap">
-  <table>
-    <thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
-    <tbody>
-      {% for book in books %}
-        <tr><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} available</td><td>{{ book.copy_count }}</td></tr>
-      {% empty %}<tr><td colspan="5">No books found.</td></tr>{% endfor %}
-    </tbody>
-  </table>
-</div>
+<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, contributor, topic, level, ISBN, or shelf"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button><i data-lucide="search" aria-hidden="true"></i>Search</button></form>
+<form id="cover-fetch-form" method="post" action="{% url 'fetch_book_covers' %}">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="select-cell" scope="col"><input class="table-select" id="select-all-covers" type="checkbox" aria-label="Select all books eligible for cover fetching"></th>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for book in books %}
+          <tr><td class="select-cell">{% if book.cover_fetch_eligible %}<input class="table-select cover-book-select" type="checkbox" name="books" value="{{ book.pk }}" aria-label="Select {{ book.title }}">{% endif %}</td><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} available</td><td>{{ book.copy_count }}</td><td><span class="cover-status {% if book.cover_image %}available{% else %}missing{% endif %}"><i data-lucide="{% if book.cover_image %}image{% elif book.cover_fetch_eligible %}image-off{% else %}barcode{% endif %}" aria-hidden="true"></i>{% if book.cover_image %}Available{% elif book.cover_fetch_eligible %}Missing{% else %}ISBN needed{% endif %}</span></td><td><span class="catalog-status {% if book.needs_information %}incomplete{% else %}complete{% endif %}">{% if book.needs_information %}Needs information{% else %}Complete{% endif %}</span></td></tr>
+        {% empty %}<tr><td colspan="8">No books found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+<script>
+  (function () {
+    const selectAll = document.getElementById("select-all-covers");
+    const choices = Array.from(document.querySelectorAll(".cover-book-select"));
+    const button = document.getElementById("fetch-covers");
+    const count = document.getElementById("cover-selection-count");
+    if (!selectAll || !button || !count) return;
+    function updateSelection() {
+      const selected = choices.filter((choice) => choice.checked).length;
+      button.disabled = selected === 0;
+      count.textContent = selected + " selected";
+      selectAll.disabled = choices.length === 0;
+      selectAll.checked = choices.length > 0 && selected === choices.length;
+      selectAll.indeterminate = selected > 0 && selected < choices.length;
+    }
+    selectAll.addEventListener("change", function () {
+      choices.forEach((choice) => { choice.checked = selectAll.checked; });
+      updateSelection();
+    });
+    choices.forEach((choice) => choice.addEventListener("change", updateSelection));
+    updateSelection();
+  }());
+</script>
 {% endblock %}

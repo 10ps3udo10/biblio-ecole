@@ -5,6 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 
+from library.forms import PhotoCirculationForm
 from library.models import Book, Borrower, Copy, Loan, SchoolProfile
 from library.photo_intake import is_valid_isbn
 
@@ -118,7 +119,13 @@ def test_search_finds_books_by_shelf_status_and_author(logged_in_client):
 
 @pytest.mark.django_db
 def test_catalog_table_sorts_by_columns(logged_in_client):
-    first = Book.objects.create(title="Alpha", authors="Zulu", isbn13="9780316381994")
+    first = Book.objects.create(
+        title="Alpha",
+        authors="Zulu",
+        isbn13="9780316381994",
+        cover_image="covers/alpha.jpg",
+        needs_information=True,
+    )
     second = Book.objects.create(title="Beta", authors="Alpha", isbn13="9788408052524")
     Copy.objects.create(book=first, copy_number=1)
     Copy.objects.create(book=first, copy_number=2)
@@ -126,10 +133,79 @@ def test_catalog_table_sorts_by_columns(logged_in_client):
 
     by_author = logged_in_client.get(reverse("book_list"), {"sort": "author", "direction": "asc"})
     by_copies = logged_in_client.get(reverse("book_list"), {"sort": "copies", "direction": "desc"})
+    by_cover = logged_in_client.get(reverse("book_list"), {"sort": "cover", "direction": "desc"})
+    by_status = logged_in_client.get(reverse("book_list"), {"sort": "catalog_status", "direction": "desc"})
 
     assert [book.title for book in by_author.context["books"]] == ["Beta", "Alpha"]
     assert [book.title for book in by_copies.context["books"]] == ["Alpha", "Beta"]
+    assert [book.title for book in by_cover.context["books"]] == ["Alpha", "Beta"]
+    assert [book.title for book in by_status.context["books"]] == ["Alpha", "Beta"]
     assert b'aria-sort="descending"' in by_copies.content
+
+
+@pytest.mark.django_db
+def test_catalog_cover_fetch_selection_requires_a_valid_isbn(logged_in_client):
+    eligible = Book.objects.create(title="Eligible cover", isbn13="9780316381994")
+    no_isbn = Book.objects.create(title="ISBN still needed")
+
+    response = logged_in_client.get(reverse("book_list"))
+    eligibility = {book.pk: book.cover_fetch_eligible for book in response.context["books"]}
+
+    assert eligibility == {eligible.pk: True, no_isbn.pk: False}
+    assert b"ISBN needed" in response.content
+    assert response.content.count(b'class="table-select cover-book-select"') == 1
+
+
+@pytest.mark.django_db
+def test_staff_fetches_only_missing_covers_for_selected_books(logged_in_client, tmp_path, settings, monkeypatch):
+    settings.MEDIA_ROOT = tmp_path
+    downloadable = Book.objects.create(
+        title="Download cover",
+        authors="Original Author",
+        isbn13="9780316381994",
+    )
+    unavailable = Book.objects.create(title="Unavailable cover", isbn13="9788408052524")
+    without_isbn = Book.objects.create(title="No ISBN")
+    existing = Book.objects.create(
+        title="Existing cover",
+        isbn13="9780261103344",
+        cover_image=SimpleUploadedFile("existing.jpg", b"existing cover", content_type="image/jpeg"),
+    )
+    calls = []
+
+    def fake_download(isbn):
+        calls.append(isbn)
+        return (b"downloaded cover", "jpg") if isbn == downloadable.isbn13 else None
+
+    monkeypatch.setattr("library.views.download_cover_by_isbn", fake_download)
+    response = logged_in_client.post(
+        reverse("fetch_book_covers"),
+        {
+            "books": [downloadable.pk, unavailable.pk, without_isbn.pk, existing.pk],
+            "next": "/books/?sort=cover&direction=asc",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert response.request["QUERY_STRING"] == "sort=cover&direction=asc"
+    assert calls == [downloadable.isbn13, unavailable.isbn13]
+    downloadable.refresh_from_db()
+    existing.refresh_from_db()
+    assert downloadable.authors == "Original Author"
+    with downloadable.cover_image.open("rb") as cover:
+        assert cover.read() == b"downloaded cover"
+    with existing.cover_image.open("rb") as cover:
+        assert cover.read() == b"existing cover"
+    assert b"1 downloaded, 1 unavailable, 1 without a valid ISBN, 1 already present" in response.content
+
+
+@pytest.mark.django_db
+def test_cover_fetch_requires_a_selected_book(logged_in_client):
+    response = logged_in_client.post(reverse("fetch_book_covers"), follow=True)
+
+    assert response.status_code == 200
+    assert b"Select at least one book with a missing cover." in response.content
 
 
 @pytest.mark.django_db
@@ -170,22 +246,60 @@ def test_overdue_and_copy_tables_sort_by_columns(logged_in_client):
 
 @pytest.mark.django_db
 def test_csv_import_and_export(logged_in_client):
+    header = (
+        "Source photo,Photo position,Title,Subtitle,Contributors,ISBN,Publisher,Publication year,Language,"
+        "Pages,Format,Category,Topics,Description,Suggested Montessori level,Suggested age range,"
+        "Suggested reading level,Identification confidence,Review notes,Bibliographic source URL\n"
+    )
     csv_file = SimpleUploadedFile(
         "books.csv",
-        b"Title,Author,ISBN,Publisher,Year,Language,Copies,Shelf\n"
-        b"Frindle,Andrew Clements,9780689818769,Simon,1996,en,2,B3\n",
+        (
+            header
+            + "photo-1.jpg,left,Frindle,,Andrew Clements,9780689818769,Simon,1996,en,105,Paperback,"
+            "Fiction and imagination,school; words,A school story,Lower Elementary (6-9),7-10,"
+            "Independent reader,high,,https://openlibrary.org/isbn/9780689818769\n"
+            + "photo-1.jpg,right,Frindle,,Andrew Clements,9780689818769,Simon,1996,en,105,Paperback,"
+            "Fiction and imagination,school; words,A school story,Lower Elementary (6-9),7-10,"
+            "Independent reader,high,,https://openlibrary.org/isbn/9780689818769\n"
+            + "photo-2.jpg,top right,,,,,,Catalan,,Picture book,Fiction and imagination,adventure,"
+            "An unidentified illustrated book,Children's House (3-6),4-7,Read-aloud,low,"
+            "Inspect the physical book,\n"
+        ).encode("utf-8"),
         content_type="text/csv",
     )
 
     response = logged_in_client.post(reverse("import_books"), {"csv_file": csv_file})
 
     assert response.status_code == 302
+    assert Book.objects.count() == 2
+    assert Copy.objects.count() == 3
     book = Book.objects.get(title="Frindle")
     assert book.copies.count() == 2
+    assert book.page_count == 105
+    assert book.category == "Fiction and imagination"
+    assert book.topics == "school; words"
+    assert book.montessori_levels == "Lower Elementary (6-9)"
+    assert book.needs_information is False
+    assert book.copies.order_by("copy_number").first().source_position == "left"
+    unidentified = Book.objects.exclude(pk=book.pk).get()
+    assert unidentified.title == "Unidentified book (photo-2.jpg, top right)"
+    assert unidentified.needs_information is True
 
     export_response = logged_in_client.get(reverse("export_books_csv"))
     assert export_response.status_code == 200
     assert b"Frindle" in export_response.content
+    assert export_response.content.count(b"photo-1.jpg") == 2
+    assert export_response.content.startswith(b"Source photo,Photo position,Title")
+
+    repeated_file = SimpleUploadedFile(
+        "books.csv",
+        (header + "photo-1.jpg,left,Frindle,,Andrew Clements,9780689818769,Simon,1996,en,,,,,,,,,,,\n").encode(),
+        content_type="text/csv",
+    )
+    repeated = logged_in_client.post(reverse("import_books"), {"csv_file": repeated_file})
+
+    assert repeated.status_code == 302
+    assert Copy.objects.count() == 3
 
 
 @pytest.mark.django_db
@@ -770,6 +884,21 @@ def test_circulation_accepts_exact_copy_from_manual_fallback(client):
     assert response.status_code == 200
     assert response.context["confirmation"] is True
     assert response.context["copies"] == [copy]
+
+
+@pytest.mark.django_db
+def test_manual_checkout_choices_show_only_useful_metadata_for_available_copies():
+    book = Book.objects.create(title="Clean option", authors="Named Contributor", isbn13="9780316381994")
+    available = Copy.objects.create(book=book, copy_number=1)
+    Copy.objects.create(book=book, copy_number=2, shelf_location="Blue-4", status=Copy.Status.CHECKED_OUT)
+
+    choices = list(PhotoCirculationForm().fields["manual_copy"].choices)
+
+    assert [value for value, _label in choices] == ["", available.id]
+    label = choices[1][1]
+    assert label == "Clean option - Named Contributor - Copy #1 - ISBN 9780316381994"
+    assert "no shelf" not in label.lower()
+    assert "available" not in label.lower()
 
 
 @pytest.mark.django_db

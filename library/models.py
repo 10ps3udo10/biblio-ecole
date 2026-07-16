@@ -49,6 +49,11 @@ def default_due_date():
 
 
 class Book(models.Model):
+    class IdentificationConfidence(models.TextChoices):
+        HIGH = "high", "High"
+        MEDIUM = "medium", "Medium"
+        LOW = "low", "Low"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True)
@@ -58,9 +63,23 @@ class Book(models.Model):
     publisher = models.CharField(max_length=255, blank=True)
     publication_year = models.PositiveIntegerField(null=True, blank=True)
     language = models.CharField(max_length=64, blank=True)
+    page_count = models.PositiveIntegerField("Pages", null=True, blank=True)
+    format = models.CharField(max_length=120, blank=True)
+    category = models.CharField(max_length=160, blank=True)
+    topics = models.TextField(blank=True)
     description = models.TextField(blank=True)
+    montessori_levels = models.CharField("Suggested Montessori level", max_length=255, blank=True)
+    suggested_age_range = models.CharField(max_length=40, blank=True)
+    suggested_reading_level = models.CharField(max_length=160, blank=True)
+    identification_confidence = models.CharField(
+        max_length=16,
+        choices=IdentificationConfidence.choices,
+        blank=True,
+    )
+    review_notes = models.TextField(blank=True)
+    bibliographic_source_url = models.URLField(blank=True)
+    needs_information = models.BooleanField(default=False)
     cover_image = models.FileField(upload_to="covers/", blank=True)
-    ai_confidence = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -108,6 +127,8 @@ class Copy(models.Model):
     shelf_location = models.CharField(max_length=128, blank=True)
     condition = models.CharField(max_length=32, choices=Condition.choices, default=Condition.GOOD)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.AVAILABLE)
+    source_photo = models.CharField(max_length=255, blank=True)
+    source_position = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ["book__title", "copy_number"]

@@ -22,7 +22,7 @@ Shelf-School provides a public self-service kiosk where students choose their
 name and select checkout or return. Checkout books are identified one at a time
 from a photograph of a Shelf-School QR label or ISBN, then confirmed together
 as one checkout. If a
-photo cannot be read, partial title, author, ISBN, shelf, and copy-number search
+photo cannot be read, partial title, contributor, topic, ISBN, shelf, and copy-number search
 provides a manual fallback. For returns, Shelf-School shows only the selected
 borrower's current loans and allows one or several books to be returned together.
 
@@ -45,6 +45,8 @@ has not reached its first stable release.
 - Local QR and ISBN decoding with `zxing-cpp`.
 - Free Open Library metadata lookup and exact-ISBN web-search fallback.
 - One QR label and loan history per physical copy.
+- Enriched one-row-per-copy catalog import with review status and source traceability.
+- Selectable bulk cover retrieval after confirmed ISBNs are added.
 - Photo intake, borrower CSV import, overdue reports, and SQLite backup.
 - No paid AI service or student authentication required.
 - Pytest and Playwright browser coverage.

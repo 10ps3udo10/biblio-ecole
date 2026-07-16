@@ -1,4 +1,5 @@
 import csv
+import logging
 import uuid
 from datetime import timedelta
 from io import StringIO, TextIOWrapper
@@ -16,6 +17,7 @@ from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
 
@@ -28,6 +30,7 @@ from .forms import (
     CopyForm,
     CopyEditForm,
     CsvImportForm,
+    FetchCoversForm,
     LoanBorrowerCorrectionForm,
     PhotoCirculationForm,
     PhotoIntakeForm,
@@ -35,6 +38,7 @@ from .forms import (
     SchoolProfileForm,
     default_form_due_date,
 )
+from .catalog_import import import_catalog_rows
 from .models import Book, Borrower, Copy, Loan, SchoolProfile
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
 from .qr import svg_qr
@@ -42,6 +46,7 @@ from .qr import svg_qr
 
 CIRCULATION_SALT = "shelf-school-circulation"
 MAX_CHECKOUT_BOOKS = 20
+logger = logging.getLogger(__name__)
 
 
 def _uuid_from_code(value, prefix):
@@ -250,6 +255,8 @@ def book_list(request):
         "isbn": ("isbn13", "isbn10"),
         "availability": ("available_count",),
         "copies": ("copy_count",),
+        "cover": ("cover_image",),
+        "catalog_status": ("needs_information",),
     }
     if sort not in sort_fields:
         sort = "title"
@@ -267,6 +274,11 @@ def book_list(request):
             | Q(isbn10__icontains=query)
             | Q(isbn13__icontains=query)
             | Q(publisher__icontains=query)
+            | Q(category__icontains=query)
+            | Q(topics__icontains=query)
+            | Q(montessori_levels__icontains=query)
+            | Q(suggested_age_range__icontains=query)
+            | Q(suggested_reading_level__icontains=query)
             | Q(copies__shelf_location__icontains=query)
             | Q(copies__status__icontains=query)
         ).distinct()
@@ -274,7 +286,9 @@ def book_list(request):
     order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
     if sort != "title":
         order_by.append("title")
-    books = books.order_by(*order_by)
+    books = list(books.order_by(*order_by))
+    for book in books:
+        book.cover_fetch_eligible = not book.cover_image and is_valid_isbn(book.isbn13 or book.isbn10)
     sort_headers = [
         {
             "key": key,
@@ -285,10 +299,12 @@ def book_list(request):
         }
         for key, label in (
             ("title", "Title"),
-            ("author", "Author"),
+            ("author", "Contributors"),
             ("isbn", "ISBN"),
             ("availability", "Availability"),
             ("copies", "Copies"),
+            ("cover", "Cover"),
+            ("catalog_status", "Catalog status"),
         )
     ]
     return render(
@@ -296,6 +312,54 @@ def book_list(request):
         "library/book_list.html",
         {"books": books, "query": query, "sort": sort, "direction": direction, "sort_headers": sort_headers},
     )
+
+
+@login_required
+@require_POST
+def fetch_book_covers(request):
+    form = FetchCoversForm(request.POST)
+    next_url = request.POST.get("next", "")
+    redirect_to = next_url if url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ) else reverse("book_list")
+    if not form.is_valid():
+        messages.error(request, "Select at least one book with a missing cover.")
+        return redirect(redirect_to)
+
+    counts = {"downloaded": 0, "unavailable": 0, "without_isbn": 0, "existing": 0, "failed": 0}
+    for book in form.cleaned_data["books"].order_by("title"):
+        if book.cover_image:
+            counts["existing"] += 1
+            continue
+        isbn = book.isbn13 or book.isbn10
+        if not is_valid_isbn(isbn):
+            counts["without_isbn"] += 1
+            continue
+        try:
+            downloaded = download_cover_by_isbn(isbn)
+            if not downloaded:
+                counts["unavailable"] += 1
+                continue
+            content, extension = downloaded
+            book.cover_image.save(f"{clean_isbn(isbn)}.{extension}", ContentFile(content), save=False)
+            book.save(update_fields=["cover_image", "updated_at"])
+            counts["downloaded"] += 1
+        except Exception:
+            logger.exception("Could not fetch a cover for book %s", book.pk)
+            counts["failed"] += 1
+
+    summary = [
+        f'{counts["downloaded"]} downloaded',
+        f'{counts["unavailable"]} unavailable',
+        f'{counts["without_isbn"]} without a valid ISBN',
+        f'{counts["existing"]} already present',
+    ]
+    if counts["failed"]:
+        summary.append(f'{counts["failed"]} failed')
+    messages.success(request, f'Cover fetch complete: {", ".join(summary)}.')
+    return redirect(redirect_to)
 
 
 @login_required
@@ -427,6 +491,7 @@ def book_create(request):
         if form.is_valid():
             book = form.save(commit=False)
             isbn = book.isbn13 or book.isbn10
+            book.needs_information = book.needs_information or not (isbn and book.authors and book.language)
             if not book.cover_image:
                 _attach_intake_cover(book, isbn, None)
             book.save()
@@ -504,6 +569,7 @@ def photo_intake(request):
                 publication_year=metadata.get("publication_year"),
                 language=metadata.get("language", ""),
                 description=metadata.get("description", ""),
+                needs_information=not (isbn and authors and metadata.get("language")),
             )
             _attach_intake_cover(book, isbn, photo)
             book.save()
@@ -1063,36 +1129,24 @@ def import_books(request):
     if request.method == "POST":
         form = CsvImportForm(request.POST, request.FILES)
         if form.is_valid():
-            wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
-            imported = 0
-            for row in csv.DictReader(wrapper):
-                title = (row.get("Title") or "").strip()
-                if not title:
-                    continue
-                copies_count = int((row.get("Copies") or "1").strip() or "1")
-                isbn = (row.get("ISBN") or "").replace("-", "").strip()
-                book = None
-                if isbn:
-                    book = Book.objects.filter(Q(isbn13=isbn) | Q(isbn10=isbn)).first()
-                if book is None:
-                    book = Book.objects.create(
-                        title=title,
-                        authors=(row.get("Author") or "").strip(),
-                        isbn13=isbn if len(isbn) == 13 else "",
-                        isbn10=isbn if len(isbn) == 10 else "",
-                        publisher=(row.get("Publisher") or "").strip(),
-                        publication_year=int(row["Year"]) if (row.get("Year") or "").strip().isdigit() else None,
-                        language=(row.get("Language") or "").strip(),
-                    )
-                    imported += 1
-                for _ in range(max(copies_count, 1)):
-                    Copy.objects.create(
-                        book=book,
-                        copy_number=_next_copy_number(book),
-                        shelf_location=(row.get("Shelf") or "").strip(),
-                    )
-            messages.success(request, f"Imported {imported} new books.")
-            return redirect("book_list")
+            try:
+                wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
+                reader = csv.DictReader(wrapper)
+                if not reader.fieldnames or "Title" not in reader.fieldnames:
+                    raise ValueError("CSV must include a Title column.")
+                result = import_catalog_rows(reader)
+            except (UnicodeDecodeError, csv.Error, ValueError) as exc:
+                form.add_error("csv_file", str(exc))
+            else:
+                physical_label = "physical book" if result.copies_created == 1 else "physical books"
+                title_label = "title" if result.titles_created == 1 else "titles"
+                messages.success(
+                    request,
+                    f"Catalog import complete: {result.copies_created} {physical_label}, "
+                    f"{result.titles_created} {title_label} created, {result.titles_matched} duplicate copies matched, "
+                    f"{result.placeholder_titles} unidentified title, {result.existing_rows_skipped} existing rows skipped.",
+                )
+                return redirect("book_list")
     else:
         form = CsvImportForm()
     return render(request, "library/import_books.html", {"form": form})
@@ -1102,19 +1156,23 @@ def import_books(request):
 def export_books_csv(request):
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Title", "Author", "ISBN", "Publisher", "Year", "Language", "Copies", "Shelf"])
-    for book in Book.objects.prefetch_related("copies"):
-        shelves = ", ".join(sorted({copy.shelf_location for copy in book.copies.all() if copy.shelf_location}))
+    writer.writerow(
+        [
+            "Source photo", "Photo position", "Title", "Subtitle", "Contributors", "ISBN", "Publisher",
+            "Publication year", "Language", "Pages", "Format", "Category", "Topics", "Description",
+            "Suggested Montessori level", "Suggested age range", "Suggested reading level",
+            "Identification confidence", "Review notes", "Bibliographic source URL",
+        ]
+    )
+    for copy in Copy.objects.select_related("book").order_by("book__title", "copy_number"):
+        book = copy.book
         writer.writerow(
             [
-                book.title,
-                book.authors,
-                book.isbn13 or book.isbn10,
-                book.publisher,
-                book.publication_year or "",
-                book.language,
-                book.copies.count(),
-                shelves,
+                copy.source_photo, copy.source_position, book.title, book.subtitle, book.authors,
+                book.isbn13 or book.isbn10, book.publisher, book.publication_year or "", book.language,
+                book.page_count or "", book.format, book.category, book.topics, book.description,
+                book.montessori_levels, book.suggested_age_range, book.suggested_reading_level,
+                book.identification_confidence, book.review_notes, book.bibliographic_source_url,
             ]
         )
     response = HttpResponse(output.getvalue(), content_type="text/csv")

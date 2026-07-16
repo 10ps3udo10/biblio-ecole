@@ -105,11 +105,11 @@
       <p class="photo-privacy"><i data-lucide="shield-check" aria-hidden="true"></i>The photo is read once and never saved.</p>
     </div>
     <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab" hidden>
-      <label class="control-label" for="copy-filter">Search title, author, ISBN, shelf, or copy number</label>
+      <label class="control-label" for="copy-filter">Search title, contributor, ISBN, shelf, or copy number</label>
       <input id="copy-filter" type="search" placeholder="Start typing to filter books" autocomplete="off">
       {{ form.manual_copy }}
       {{ form.manual_copy.errors }}
-      <p>Select the exact physical copy. Its availability is checked before confirmation.</p>
+      <p>Only books ready to borrow are shown. Select the exact physical copy.</p>
     </div>
     <div id="return-method" class="return-book-list" hidden>
       <p class="return-guidance">Select one or more books this borrower is returning.</p>

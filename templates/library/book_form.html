@@ -5,7 +5,35 @@
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="book-form-heading"><div><h1>{{ title }}</h1>{% if is_edit %}<p class="muted">Correct the catalog details for this title.</p>{% else %}<p class="muted">Start with an ISBN to fill available details and cover automatically.</p>{% endif %}</div><button class="button primary" id="save-book"><i data-lucide="save" aria-hidden="true"></i>Save book</button></div>
-    {{ form.as_p }}
+    {{ form.non_field_errors }}
+    {% include "library/includes/form_field.html" with field=form.isbn13 %}
+    {% include "library/includes/form_field.html" with field=form.isbn10 %}
+    {% include "library/includes/form_field.html" with field=form.title %}
+    {% include "library/includes/form_field.html" with field=form.subtitle %}
+    {% include "library/includes/form_field.html" with field=form.authors %}
+    {% include "library/includes/form_field.html" with field=form.publisher %}
+    {% include "library/includes/form_field.html" with field=form.publication_year %}
+    {% include "library/includes/form_field.html" with field=form.language %}
+    {% if form.first_copy_shelf %}{% include "library/includes/form_field.html" with field=form.first_copy_shelf %}{% endif %}
+    {% if form.first_copy_condition %}{% include "library/includes/form_field.html" with field=form.first_copy_condition %}{% endif %}
+    {% include "library/includes/form_field.html" with field=form.cover_image %}
+    <details class="optional-metadata"{% if is_edit %} open{% endif %}>
+      <summary>More details</summary>
+      <div>
+        {% include "library/includes/form_field.html" with field=form.page_count %}
+        {% include "library/includes/form_field.html" with field=form.format %}
+        {% include "library/includes/form_field.html" with field=form.category %}
+        {% include "library/includes/form_field.html" with field=form.topics %}
+        {% include "library/includes/form_field.html" with field=form.description %}
+        {% include "library/includes/form_field.html" with field=form.montessori_levels %}
+        {% include "library/includes/form_field.html" with field=form.suggested_age_range %}
+        {% include "library/includes/form_field.html" with field=form.suggested_reading_level %}
+        {% include "library/includes/form_field.html" with field=form.identification_confidence %}
+        {% include "library/includes/form_field.html" with field=form.review_notes %}
+        {% include "library/includes/form_field.html" with field=form.bibliographic_source_url %}
+        {% include "library/includes/form_field.html" with field=form.needs_information %}
+      </div>
+    </details>
     <p class="isbn-entry-status" id="isbn-entry-status" aria-live="polite"></p>
     <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a>
   </form>
