@@ -16,7 +16,7 @@ header labels this entry point **Staff login**.
 ## Core workflow
 
 <div className="workflow">
-  <div><strong>Identify the borrower</strong>Select a username or name from the school list.</div>
+  <div><strong>Identify the borrower</strong>Select a Borrower ID or name from the school list.</div>
   <div><strong>Identify the copy</strong>Photograph its Shelf-School QR or ISBN barcode.</div>
   <div><strong>Confirm the loan</strong>Review the book, borrower, action, and due date.</div>
 </div>

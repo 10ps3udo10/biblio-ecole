@@ -3,7 +3,7 @@
 {% block content %}
 <section class="form-panel">
   <h1>Import borrowers</h1>
-  <p class="muted">Upload a UTF-8 CSV with columns: Username, First name, Last name, Class, Email, Active. Existing usernames are updated.</p>
+  <p class="muted">Upload a UTF-8 CSV with columns: Borrower ID, First name, Last name, Class, Email, Active. Existing borrower IDs are updated.</p>
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}

@@ -61,13 +61,14 @@ def test_settings_explains_staff_borrower_boundary(client, django_user_model):
     response = client.get(reverse("school_settings"))
 
     assert b"Staff accounts and borrowers serve different purposes" in response.content
-    assert b"Matching names, usernames, or email addresses do not link or merge them" in response.content
+    assert b"Every staff account includes a linked borrower profile" in response.content
+    assert b"borrower ID, name, and email stay synchronized" in response.content
     assert b"Manage staff accounts" in response.content
     assert b"Open Advanced (Django Admin)" in response.content
 
 
 @pytest.mark.django_db
-def test_system_administrator_creates_staff_without_changing_matching_borrower(client, django_user_model):
+def test_system_administrator_links_and_synchronizes_matching_borrower(client, django_user_model):
     django_user_model.objects.create_superuser(username="system-owner", password="secret", email="")
     borrower = Borrower.objects.create(username="lrueda", first_name="Leo", last_name="Rueda")
     assert client.login(username="system-owner", password="secret")
@@ -90,8 +91,11 @@ def test_system_administrator_creates_staff_without_changing_matching_borrower(c
     assert response.status_code == 200
     assert account.is_staff is True
     assert account.is_superuser is False
-    assert borrower.full_name == "Leo Rueda"
-    assert b"Staff account lrueda created" in response.content
+    assert borrower.staff_account == account
+    assert borrower.username == account.username == "lrueda"
+    assert borrower.full_name == account.get_full_name() == "Luis Rueda"
+    assert borrower.email == account.email == "lrueda@example.org"
+    assert b"Staff account lrueda created and linked to the existing borrower" in response.content
 
 
 @pytest.mark.django_db
@@ -275,6 +279,7 @@ def test_cover_fetch_requires_a_selected_book(logged_in_client):
 
 @pytest.mark.django_db
 def test_borrower_table_sorts_by_name_class_loans_and_status(logged_in_client):
+    staff_borrower = Borrower.objects.get(username="librarian")
     alpha = Borrower.objects.create(username="alpha", first_name="Amy", last_name="Zulu", class_name="1A")
     beta = Borrower.objects.create(username="beta", first_name="Ben", last_name="Alpha", class_name="2B", active=False)
     book = Book.objects.create(title="Borrowed title")
@@ -285,9 +290,9 @@ def test_borrower_table_sorts_by_name_class_loans_and_status(logged_in_client):
     by_loans = logged_in_client.get(reverse("borrower_list"), {"sort": "loans", "direction": "desc"})
     by_status = logged_in_client.get(reverse("borrower_list"), {"sort": "status", "direction": "asc"})
 
-    assert [borrower.id for borrower in by_name.context["borrowers"]] == [beta.id, alpha.id]
-    assert [borrower.id for borrower in by_loans.context["borrowers"]] == [alpha.id, beta.id]
-    assert [borrower.id for borrower in by_status.context["borrowers"]] == [beta.id, alpha.id]
+    assert [borrower.id for borrower in by_name.context["borrowers"]] == [staff_borrower.id, beta.id, alpha.id]
+    assert [borrower.id for borrower in by_loans.context["borrowers"]] == [alpha.id, staff_borrower.id, beta.id]
+    assert [borrower.id for borrower in by_status.context["borrowers"]] == [beta.id, staff_borrower.id, alpha.id]
 
 
 @pytest.mark.django_db
@@ -861,7 +866,7 @@ def test_borrower_search_is_limited_and_returns_only_public_identity_fields(clie
     assert too_short.json() == {"results": []}
     results = response.json()["results"]
     assert len(results) == 8
-    assert set(results[0]) == {"id", "name", "username", "class_name"}
+    assert set(results[0]) == {"id", "name", "identifier", "class_name"}
     assert "email" not in response.content.decode()
     assert "BORROWER:" not in response.content.decode()
 
@@ -1207,8 +1212,9 @@ def test_staff_can_import_and_update_borrowers(logged_in_client):
     Borrower.objects.create(username="mrueda", first_name="Old", last_name="Name")
     csv_file = SimpleUploadedFile(
         "borrowers.csv",
-        b"Username,First name,Last name,Class,Email,Active\n"
+        b"Borrower ID,First name,Last name,Class,Email,Active\n"
         b"mrueda,Manuel,Rueda,Staff,mrueda@example.org,yes\n"
+        b"librarian,Changed,Name,Library,changed@example.org,yes\n"
         b"ana,Ana,Garcia,4A,ana@example.org,true\n",
         content_type="text/csv",
     )
@@ -1216,9 +1222,13 @@ def test_staff_can_import_and_update_borrowers(logged_in_client):
     response = logged_in_client.post(reverse("import_borrowers"), {"csv_file": csv_file})
 
     assert response.status_code == 302
-    assert Borrower.objects.count() == 2
+    assert Borrower.objects.count() == 3
     assert Borrower.objects.get(username="mrueda").first_name == "Manuel"
     assert Borrower.objects.get(username="ana").class_name == "4A"
+    staff_borrower = Borrower.objects.get(username="librarian")
+    assert staff_borrower.full_name == "librarian"
+    assert staff_borrower.email == ""
+    assert staff_borrower.class_name == "Library"
 
 
 @pytest.mark.django_db

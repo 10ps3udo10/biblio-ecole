@@ -834,7 +834,7 @@ def circulation_borrower_search(request):
                 {
                     "id": str(borrower.id),
                     "name": borrower.full_name,
-                    "username": borrower.username or "",
+                    "identifier": borrower.username or "",
                     "class_name": borrower.class_name,
                 }
                 for borrower in borrowers
@@ -1227,8 +1227,12 @@ def staff_account_create(request):
     _require_system_administrator(request)
     form = StaffAccountCreationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
+        existing_borrower = Borrower.objects.filter(username=form.cleaned_data["username"]).first()
         account = form.save()
-        messages.success(request, f"Staff account {account.username} created.")
+        if existing_borrower:
+            messages.success(request, f"Staff account {account.username} created and linked to the existing borrower.")
+        else:
+            messages.success(request, f"Staff account {account.username} and borrower profile created.")
         return redirect("staff_account_list")
     return render(request, "library/staff_account_form.html", {"form": form, "title": "Add staff account"})
 
@@ -1274,23 +1278,23 @@ def import_borrowers(request):
         if form.is_valid():
             wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
             reader = csv.DictReader(wrapper)
-            required = {"Username", "First name", "Last name"}
+            required = {"Borrower ID", "First name", "Last name"}
             if not required.issubset(set(reader.fieldnames or [])):
-                form.add_error("csv_file", "CSV must include Username, First name, and Last name columns.")
+                form.add_error("csv_file", "CSV must include Borrower ID, First name, and Last name columns.")
             else:
                 created = 0
                 updated = 0
                 skipped = 0
                 for row in reader:
-                    username = (row.get("Username") or "").strip()
+                    identifier = (row.get("Borrower ID") or "").strip()
                     first_name = (row.get("First name") or "").strip()
                     last_name = (row.get("Last name") or "").strip()
-                    if not username or not (first_name or last_name):
+                    if not identifier or not (first_name or last_name):
                         skipped += 1
                         continue
                     active_value = (row.get("Active") or "yes").strip().lower()
                     _borrower, was_created = Borrower.objects.update_or_create(
-                        username=username,
+                        username=identifier,
                         defaults={
                             "first_name": first_name,
                             "last_name": last_name,
@@ -1345,7 +1349,7 @@ def overdue_loans(request):
             ("book", "Book"),
             ("copy", "Copy"),
             ("borrower", "Borrower"),
-            ("username", "Username"),
+            ("username", "Borrower ID"),
             ("class", "Class"),
         )
     ]
@@ -1356,7 +1360,7 @@ def overdue_loans(request):
 def overdue_loans_csv(request):
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Book", "Copy", "Borrower username", "Borrower", "Class", "Checked out", "Due date"])
+    writer.writerow(["Book", "Copy", "Borrower ID", "Borrower", "Class", "Checked out", "Due date"])
     loans = Loan.objects.filter(
         return_date__isnull=True,
         due_date__lt=timezone.localdate(),

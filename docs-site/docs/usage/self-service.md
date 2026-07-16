@@ -16,7 +16,7 @@ to `media/`, attached to the book, or retained as circulation history.
 ## Check out a book
 
 1. Keep **Check out** selected.
-2. Type at least two letters from the borrower's username or name.
+2. Type at least two letters from the borrower's ID or name.
 3. Select the borrower from the small matching list.
 4. Select **Continue**.
 5. Keep **Take photo** selected and photograph the copy QR label or ISBN barcode.

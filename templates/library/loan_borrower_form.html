@@ -7,7 +7,7 @@
   <p class="muted">Use this when a book was checked out under the wrong name.</p>
   <dl class="loan-correction-summary">
     <div><dt>Book</dt><dd>{{ loan.copy.book.title }} · Copy #{{ loan.copy.copy_number }}</dd></div>
-    <div><dt>Current borrower</dt><dd>{{ loan.borrower.full_name }}{% if loan.borrower.username %} · {{ loan.borrower.username }}{% endif %}</dd></div>
+    <div><dt>Current borrower</dt><dd>{{ loan.borrower.full_name }}{% if loan.borrower.username %} · Borrower ID {{ loan.borrower.username }}{% endif %}</dd></div>
     <div><dt>Due date</dt><dd>{{ loan.due_date }}</dd></div>
   </dl>
   <form method="post">

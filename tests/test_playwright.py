@@ -387,7 +387,7 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     expect(page.locator("tbody tr").first).to_contain_text("Ben Alpha")
 
     page.goto(f"{live_server.url}/loans/overdue/")
-    page.get_by_role("columnheader", name="Borrower").get_by_role("link").click()
+    page.get_by_role("columnheader", name="Borrower", exact=True).get_by_role("link").click()
     expect(page.locator("tbody tr").first).to_contain_text("Ben Alpha")
 
     page.goto(f"{live_server.url}{alpha.get_absolute_url()}")
@@ -483,7 +483,7 @@ def test_admin_can_complete_school_setup_in_browser(page, live_server, django_us
 
 
 @pytest.mark.django_db(transaction=True)
-def test_system_admin_adds_staff_without_changing_matching_borrower_in_browser(
+def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     page, live_server, django_user_model
 ):
     django_user_model.objects.create_superuser(username="owner", password="secret", email="")
@@ -506,10 +506,15 @@ def test_system_admin_adds_staff_without_changing_matching_borrower_in_browser(
     page.locator("input[name='password2']").fill("library-test-password-42")
     page.get_by_role("button", name="Save staff account").click()
 
-    expect(page.get_by_text("Staff account lrueda created.")).to_be_visible()
-    expect(page.get_by_role("row", name="Luis Rueda lrueda · lrueda@example.org Staff Active Never Edit Reset password")).to_be_visible()
+    expect(page.get_by_text("Staff account lrueda created and linked to the existing borrower.")).to_be_visible()
+    staff_row = page.get_by_role("row").filter(has_text="lrueda@example.org")
+    expect(staff_row).to_contain_text("Luis Rueda")
+    expect(staff_row.get_by_role("link", name="Luis Rueda")).to_be_visible()
     account = django_user_model.objects.get(username="lrueda")
     borrower.refresh_from_db()
     assert account.is_staff is True
     assert account.is_superuser is False
-    assert borrower.full_name == "Leo Rueda"
+    assert borrower.staff_account == account
+    assert borrower.username == account.username == "lrueda"
+    assert borrower.full_name == account.get_full_name() == "Luis Rueda"
+    assert borrower.email == account.email == "lrueda@example.org"

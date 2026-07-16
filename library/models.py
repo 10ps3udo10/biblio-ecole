@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
@@ -158,13 +159,20 @@ class Copy(models.Model):
 
 class Borrower(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    username = models.CharField(max_length=80, unique=True, null=True, blank=True)
+    username = models.CharField("Borrower ID", max_length=80, unique=True, null=True, blank=True)
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
     class_name = models.CharField("Class", max_length=120, blank=True, db_column="class")
     email = models.EmailField(blank=True)
     qr_code = models.CharField(max_length=128, blank=True)
     active = models.BooleanField(default=True)
+    staff_account = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="borrower_profile",
+    )
 
     class Meta:
         ordering = ["last_name", "first_name"]
@@ -178,6 +186,11 @@ class Borrower(models.Model):
         return self.full_name
 
     def save(self, *args, **kwargs):
+        if self.staff_account_id:
+            self.username = self.staff_account.username
+            self.first_name = self.staff_account.first_name
+            self.last_name = self.staff_account.last_name
+            self.email = self.staff_account.email
         if not self.qr_code:
             self.qr_code = self.qr_payload
         super().save(*args, **kwargs)

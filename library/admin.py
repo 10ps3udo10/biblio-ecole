@@ -28,7 +28,7 @@ class CopyAdmin(admin.ModelAdmin):
 
 @admin.register(Borrower)
 class BorrowerAdmin(admin.ModelAdmin):
-    list_display = ("username", "full_name", "class_name", "email", "active")
+    list_display = ("username", "full_name", "class_name", "email", "staff_account", "active")
     search_fields = ("username", "first_name", "last_name", "class_name", "email", "id", "qr_code")
     list_filter = ("active", "class_name")
     readonly_fields = ("qr_code",)

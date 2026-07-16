@@ -41,7 +41,8 @@ has not reached its first stable release.
 ## Highlights
 
 - Public checkout and return with a short, child-facing workflow.
-- Native staff login and account management, separate from borrowers.
+- Native staff login and account management with linked borrower profiles.
+- Automatic borrower profiles linked to every staff account.
 - Multi-book checkout and return with one final, atomic confirmation.
 - Local QR and ISBN decoding with `zxing-cpp`.
 - Free Open Library metadata lookup and exact-ISBN web-search fallback.
@@ -73,7 +74,8 @@ login** in its header or open <http://127.0.0.1:8001/staff/login/> directly.
 
 Shelf-School staff accounts use Django authentication internally. The separate
 **Advanced (Django Admin)** link in Settings is only for exceptional technical
-permission and database maintenance. Borrowers never sign in.
+permission and database maintenance. Every staff account has a synchronized
+borrower profile, but borrowers never sign in.
 
 ## Development
 

@@ -32,7 +32,7 @@
     </div>
     <dl class="transaction-summary">
       <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
-      <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No username" }}<span>{{ borrower.full_name }}</span></dd></div>
+      <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No borrower ID" }}<span>{{ borrower.full_name }}</span></dd></div>
       <div><dt>Books</dt><dd>{{ copies|length }}</dd></div>
       {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
     </dl>
@@ -70,7 +70,7 @@
         <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.username|default:selected_borrower.full_name }} - {{ selected_borrower.full_name }}{% endif %}">
         <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
       </div>
-      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your username or name.</p>
+      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your borrower ID or name.</p>
       {{ form.borrower.errors }}
     </div>
     <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continue</button>
@@ -192,11 +192,11 @@
     borrowerId.value = "";
     borrowerSearch.value = "";
     closeBorrowerResults();
-    borrowerSearchStatus.textContent = "Type part of your username or name.";
+    borrowerSearchStatus.textContent = "Type part of your borrower ID or name.";
   }
 
   function formatBorrower(item) {
-    const identifier = item.username || item.name;
+    const identifier = item.identifier || item.name;
     return identifier + " - " + item.name + (item.class_name ? " · " + item.class_name : "");
   }
 

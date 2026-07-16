@@ -21,9 +21,13 @@ class StaffAuthenticationForm(AuthenticationForm):
 
 
 class StaffAccountCreationForm(UserCreationForm):
+    first_name = forms.CharField(label="First name", max_length=150)
+    last_name = forms.CharField(label="Last name", max_length=150)
+
     class Meta(UserCreationForm.Meta):
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email")
+        labels = {"username": "Borrower ID / login"}
 
     def save(self, commit=True):
         account = super().save(commit=False)
@@ -34,9 +38,13 @@ class StaffAccountCreationForm(UserCreationForm):
 
 
 class StaffAccountEditForm(forms.ModelForm):
+    first_name = forms.CharField(label="First name", max_length=150)
+    last_name = forms.CharField(label="Last name", max_length=150)
+
     class Meta:
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email", "is_active")
+        labels = {"username": "Borrower ID / login"}
 
     def __init__(self, *args, operator=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -49,6 +57,16 @@ class StaffAccountEditForm(forms.ModelForm):
         if not is_active and self.instance.is_superuser:
             raise ValidationError("System administrator accounts cannot be deactivated here.")
         return is_active
+
+    def clean_username(self):
+        username = self.cleaned_data["username"]
+        linked_borrower_id = getattr(getattr(self.instance, "borrower_profile", None), "pk", None)
+        matches = Borrower.objects.filter(username=username)
+        if linked_borrower_id:
+            matches = matches.exclude(pk=linked_borrower_id)
+        if matches.exists():
+            raise ValidationError("This identifier belongs to another borrower.")
+        return username
 
 
 def default_form_due_date():
@@ -169,6 +187,14 @@ class BorrowerForm(forms.ModelForm):
     class Meta:
         model = Borrower
         fields = ["username", "first_name", "last_name", "class_name", "email", "active"]
+        labels = {"username": "Borrower ID"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.staff_account_id:
+            for field_name in ("username", "first_name", "last_name", "email"):
+                self.fields[field_name].disabled = True
+                self.fields[field_name].help_text = "Managed from the linked staff account."
 
     def clean_username(self):
         return self.cleaned_data.get("username") or None
@@ -176,7 +202,7 @@ class BorrowerForm(forms.ModelForm):
 
 class BorrowerChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, borrower):
-        identifier = borrower.username or "no username"
+        identifier = borrower.username or "no borrower ID"
         class_name = f" - {borrower.class_name}" if borrower.class_name else ""
         return f"{identifier} - {borrower.full_name}{class_name}"
 

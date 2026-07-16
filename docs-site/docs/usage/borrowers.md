@@ -6,7 +6,7 @@ access to Shelf-School administration.
 
 Each borrower stores:
 
-- Username or school identifier.
+- Borrower ID or school identifier.
 - First and last name.
 - Class.
 - Email address.
@@ -22,19 +22,23 @@ Sign in, open **Borrowers**, and select **Add borrower**.
 The borrower import accepts UTF-8 CSV files with these columns:
 
 ```text
-Username,First name,Last name,Class,Email,Active
+Borrower ID,First name,Last name,Class,Email,Active
 ```
 
 Example:
 
 ```csv
-Username,First name,Last name,Class,Email,Active
+Borrower ID,First name,Last name,Class,Email,Active
 ana,Ana,Garcia,4A,ana@example.org,yes
 leo,Leo,Martinez,4A,leo@example.org,true
 ```
 
-Username is the update key. Importing an existing username updates that
+Borrower ID is the update key. Importing an existing Borrower ID updates that
 borrower rather than creating a duplicate.
+
+For a staff borrower, the staff account controls the Borrower ID, name, and
+email. A CSV import can still update class and active status without separating
+the linked identities.
 
 **Inactive borrowers remain in historical loan records** but are removed from
 the public kiosk dropdown.
@@ -45,9 +49,11 @@ The staff **Borrowers** page shows how many active borrowers currently have
 books out and flags overdue loans. Select a borrower to see their contact and
 class details, current loans with due dates, and recent loan history.
 
-Select **Edit borrower** to correct the username, name, class, email, or active
-status. An inactive borrower is excluded from checkout search but remains
-searchable for return while they still have a book on loan.
+Select **Edit borrower** to correct the Borrower ID, name, class, email, or
+active status. For a linked staff borrower, edit identity details under
+**Settings > Manage staff accounts**. An inactive borrower is excluded from
+checkout search but remains searchable for return while they still have a book
+on loan.
 
 ## Correct a loan assigned to the wrong borrower
 
