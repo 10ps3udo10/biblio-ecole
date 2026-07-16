@@ -2,12 +2,53 @@ from datetime import timedelta
 import uuid
 
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
 from .models import Book, Borrower, Copy, SchoolProfile
 from .photo_intake import clean_isbn, is_valid_isbn
+
+
+class StaffAuthenticationForm(AuthenticationForm):
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if not user.is_staff:
+            raise ValidationError("This account does not have Shelf-School staff access.", code="not_staff")
+
+
+class StaffAccountCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ("username", "first_name", "last_name", "email")
+
+    def save(self, commit=True):
+        account = super().save(commit=False)
+        account.is_staff = True
+        if commit:
+            account.save()
+        return account
+
+
+class StaffAccountEditForm(forms.ModelForm):
+    class Meta:
+        model = get_user_model()
+        fields = ("username", "first_name", "last_name", "email", "is_active")
+
+    def __init__(self, *args, operator=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.operator = operator
+
+    def clean_is_active(self):
+        is_active = self.cleaned_data["is_active"]
+        if not is_active and self.instance == self.operator:
+            raise ValidationError("You cannot deactivate your own account.")
+        if not is_active and self.instance.is_superuser:
+            raise ValidationError("System administrator accounts cannot be deactivated here.")
+        return is_active
 
 
 def default_form_due_date():

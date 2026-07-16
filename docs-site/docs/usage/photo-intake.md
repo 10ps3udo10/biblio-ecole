@@ -10,7 +10,7 @@ before saving. Its catalog cover is downloaded when the book is created.
 
 ## Add a title and first copy
 
-1. Sign in as the administrator.
+1. Sign in with a staff account.
 2. Open **Photo intake**.
 3. Photograph the back cover closely, with the ISBN barcode in focus and filling
    most of the frame.

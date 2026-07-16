@@ -3,7 +3,22 @@
 {% block content %}
 <section class="hero compact">
   <div><h1>School settings</h1><p class="muted">Configure this installation for one school.</p></div>
-  <div class="actions"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a><a class="button" href="{% url 'admin:auth_user_changelist' %}"><i data-lucide="users" aria-hidden="true"></i>Manage users</a><a class="button" href="{% url 'admin:index' %}"><i data-lucide="wrench" aria-hidden="true"></i>Django admin</a></div>
+  <div class="actions"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a></div>
+</section>
+<section class="people-access" aria-labelledby="people-access-title">
+  <div class="section-heading"><span class="section-heading-icon"><i data-lucide="users-round" aria-hidden="true"></i></span><div><h2 id="people-access-title">People and access</h2><p>Staff accounts and borrowers serve different purposes.</p></div></div>
+  <div class="people-access-row">
+    <i data-lucide="user-cog" aria-hidden="true"></i>
+    <div><h3>Staff accounts</h3><p>Adults who sign in to catalog books, manage borrowers, review loans, and change settings.</p></div>
+    {% if request.user.is_superuser %}<a class="button" href="{% url 'staff_account_list' %}">Manage staff accounts</a>{% endif %}
+  </div>
+  <div class="people-access-row">
+    <i data-lucide="contact" aria-hidden="true"></i>
+    <div><h3>Borrowers</h3><p>Students or teachers who receive books. They do not sign in and do not need passwords.</p></div>
+    <a class="button" href="{% url 'borrower_list' %}">Manage borrowers</a>
+  </div>
+  <p class="identity-boundary"><strong>If someone is both staff and a borrower, keep both records.</strong> Matching names, usernames, or email addresses do not link or merge them.</p>
+  {% if request.user.is_superuser %}<p class="django-admin-link"><i data-lucide="wrench" aria-hidden="true"></i><span><strong>Advanced</strong><small>Django Admin for technical database and permission management.</small></span><a href="{% url 'admin:index' %}">Open Advanced (Django Admin)</a></p>{% endif %}
 </section>
 <section class="form-panel settings-panel">
   <form method="post" enctype="multipart/form-data">

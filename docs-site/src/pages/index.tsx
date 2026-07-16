@@ -7,7 +7,7 @@ const featureLinks = [
   {
     label: 'Start here',
     title: 'Set up a school',
-    text: 'Install Shelf-School, create the administrator, configure the library, and add the first borrowers.',
+    text: 'Install Shelf-School, create the first staff account, configure the library, and add the first borrowers.',
     to: '/docs/getting-started/quickstart',
   },
   {

@@ -1,10 +1,10 @@
 # Self-Service Circulation
 
-The public kiosk at `/` is the center of Shelf-School. **It does not require the
-administrator to remain signed in.**
+The public kiosk at `/` is the center of Shelf-School. **It does not require a
+staff member to remain signed in.**
 
-The header identifies Shelf-School and the configured school. **Admin login**
-opens the staff sign-in; students do not use it.
+The header identifies Shelf-School and the configured school. **Staff login**
+is only for adults who operate the library; borrowers do not use it.
 
 ![Public Shelf-School circulation desk](/img/circulation-desk.png)
 

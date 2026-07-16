@@ -8,8 +8,11 @@ from urllib.parse import quote_plus
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import SetPasswordForm
 from django.core import signing
+from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Count, Max, Q
@@ -36,6 +39,8 @@ from .forms import (
     PhotoIntakeForm,
     ReturnForm,
     SchoolProfileForm,
+    StaffAccountCreationForm,
+    StaffAccountEditForm,
     default_form_due_date,
 )
 from .catalog_import import import_catalog_rows
@@ -47,6 +52,11 @@ from .qr import svg_qr
 CIRCULATION_SALT = "shelf-school-circulation"
 MAX_CHECKOUT_BOOKS = 20
 logger = logging.getLogger(__name__)
+
+
+def _require_system_administrator(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Only a system administrator can manage staff accounts.")
 
 
 def _uuid_from_code(value, prefix):
@@ -634,7 +644,7 @@ def copy_detail(request, pk):
     )
 
 
-@staff_member_required
+@staff_member_required(login_url="staff_login")
 def correct_loan_borrower(request, pk):
     loan = get_object_or_404(
         Loan.objects.select_related("copy__book", "borrower"),
@@ -1180,7 +1190,7 @@ def export_books_csv(request):
     return response
 
 
-@staff_member_required
+@staff_member_required(login_url="staff_login")
 def backup_sqlite(request):
     database = settings.DATABASES["default"]
     if database["ENGINE"] != "django.db.backends.sqlite3":
@@ -1189,7 +1199,7 @@ def backup_sqlite(request):
     return FileResponse(open(path, "rb"), as_attachment=True, filename="library-db.sqlite3")
 
 
-@staff_member_required
+@staff_member_required(login_url="staff_login")
 def school_settings(request):
     profile = SchoolProfile.current()
     if request.method == "POST":
@@ -1205,7 +1215,59 @@ def school_settings(request):
     return render(request, "library/school_settings.html", {"form": form})
 
 
-@staff_member_required
+@staff_member_required(login_url="staff_login")
+def staff_account_list(request):
+    _require_system_administrator(request)
+    accounts = get_user_model().objects.filter(is_staff=True).order_by("username")
+    return render(request, "library/staff_account_list.html", {"accounts": accounts})
+
+
+@staff_member_required(login_url="staff_login")
+def staff_account_create(request):
+    _require_system_administrator(request)
+    form = StaffAccountCreationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        account = form.save()
+        messages.success(request, f"Staff account {account.username} created.")
+        return redirect("staff_account_list")
+    return render(request, "library/staff_account_form.html", {"form": form, "title": "Add staff account"})
+
+
+@staff_member_required(login_url="staff_login")
+def staff_account_edit(request, pk):
+    _require_system_administrator(request)
+    account = get_object_or_404(get_user_model(), pk=pk, is_staff=True)
+    form = StaffAccountEditForm(request.POST or None, instance=account, operator=request.user)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Staff account {account.username} updated.")
+        return redirect("staff_account_list")
+    return render(
+        request,
+        "library/staff_account_form.html",
+        {"form": form, "title": "Edit staff account", "account": account},
+    )
+
+
+@staff_member_required(login_url="staff_login")
+def staff_account_password(request, pk):
+    _require_system_administrator(request)
+    account = get_object_or_404(get_user_model(), pk=pk, is_staff=True)
+    form = SetPasswordForm(account, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        if account == request.user:
+            update_session_auth_hash(request, account)
+        messages.success(request, f"Password updated for {account.username}.")
+        return redirect("staff_account_list")
+    return render(
+        request,
+        "library/staff_account_form.html",
+        {"form": form, "title": "Reset staff password", "account": account, "is_password_form": True},
+    )
+
+
+@staff_member_required(login_url="staff_login")
 def import_borrowers(request):
     if request.method == "POST":
         form = BorrowerCsvImportForm(request.POST, request.FILES)

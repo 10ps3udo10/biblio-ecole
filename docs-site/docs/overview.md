@@ -9,10 +9,9 @@ Shelf-School is currently **`0.1.0-dev`** and has not reached its first stable
 release. Back up school data before upgrades.
 :::
 
-**Students do not need passwords, accounts, or library cards.** Staff use a single
-administrator session for cataloging, borrower management, reports, settings,
-and backups. The public header labels the staff entry point **Admin login** so it
-is not confused with a student login.
+**Students do not need passwords, accounts, or library cards.** Staff sign in
+for cataloging, borrower management, reports, settings, and backups. The public
+header labels this entry point **Staff login**.
 
 ## Core workflow
 
@@ -35,10 +34,11 @@ is not confused with a student login.
 - Private borrower search without sending the full directory to the kiosk.
 - Printable QR labels for every physical copy.
 - School branding and configurable loan duration.
+- Native staff login, account management, and password reset.
 - Borrower and book CSV import.
 - Optional topics, reading guidance, Montessori levels, and catalog-review status.
 - Overdue reports, CSV export, and SQLite backup download.
-- Django administration for maintenance.
+- Explicitly separated **Advanced (Django Admin)** access for technical maintenance.
 - Pytest and Playwright browser coverage.
 
 ## Important boundary

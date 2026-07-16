@@ -27,9 +27,9 @@ Browser camera or uploaded image
 ## Trust boundaries
 
 The root circulation route is intentionally public for a supervised school
-kiosk. Catalog, borrowers, reports, backups, settings, and Django administration
-require authentication. Named recent activity is not rendered for signed-out
-users.
+kiosk. Catalog, borrowers, reports, backups, and settings require a Shelf-School
+staff login. **Advanced (Django Admin)** has a separate technical entry point.
+Named recent activity is not rendered for signed-out users.
 
 Photo identification does not mutate circulation state. It creates a signed,
 short-lived confirmation token containing copy, borrower, action, and due date.

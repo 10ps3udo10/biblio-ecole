@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
         {type: 'doc', id: 'usage/photo-intake', label: 'Photo Intake'},
         {type: 'doc', id: 'usage/catalog-import', label: 'Catalog Import'},
         {type: 'doc', id: 'usage/borrowers', label: 'Borrowers'},
+        {type: 'doc', id: 'usage/staff-accounts', label: 'Staff Accounts'},
         {type: 'doc', id: 'usage/copies-and-labels', label: 'Copies and Labels'},
       ],
     },

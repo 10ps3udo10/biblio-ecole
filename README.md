@@ -41,6 +41,7 @@ has not reached its first stable release.
 ## Highlights
 
 - Public checkout and return with a short, child-facing workflow.
+- Native staff login and account management, separate from borrowers.
 - Multi-book checkout and return with one final, atomic confirmation.
 - Local QR and ISBN decoding with `zxing-cpp`.
 - Free Open Library metadata lookup and exact-ISBN web-search fallback.
@@ -67,8 +68,12 @@ python manage.py createsuperuser
 python manage.py runserver 127.0.0.1:8001
 ```
 
-Open the public kiosk at <http://127.0.0.1:8001/>. Staff can select **Admin
-login** in its header or open <http://127.0.0.1:8001/admin/login/> directly.
+Open the public kiosk at <http://127.0.0.1:8001/>. Staff can select **Staff
+login** in its header or open <http://127.0.0.1:8001/staff/login/> directly.
+
+Shelf-School staff accounts use Django authentication internally. The separate
+**Advanced (Django Admin)** link in Settings is only for exceptional technical
+permission and database maintenance. Borrowers never sign in.
 
 ## Development
 

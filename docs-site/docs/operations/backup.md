@@ -12,7 +12,7 @@ loan history. **The media directory contains uploaded covers and branding.**
 
 ## Download the database
 
-Sign in as an administrator, open **Settings**, and select **Download database
+Sign in with a staff administrator account, open **Settings**, and select **Download database
 backup**. The backup endpoint is unavailable to signed-out kiosk users.
 
 ## Complete backup

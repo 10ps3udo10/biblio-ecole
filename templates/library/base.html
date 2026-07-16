@@ -33,10 +33,10 @@
         <summary class="staff-user" aria-label="Signed in as {{ request.user.get_full_name|default:request.user.username }}"><span class="staff-user-mark" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>{{ request.user.get_full_name|default:request.user.username }}</summary>
         <div>
           {% if request.user.is_staff %}<a href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>Settings</a>{% endif %}
-          <form class="nav-logout" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}"><i data-lucide="log-out" aria-hidden="true"></i>Sign out</button></form>
+          <form class="nav-logout" method="post" action="{% url 'staff_logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}"><i data-lucide="log-out" aria-hidden="true"></i>Sign out</button></form>
         </div>
       </details>
-    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'admin:login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Admin login</a></nav>{% endif %}
+    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'staff_login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Staff login</a></nav>{% endif %}
   </header>
   <main class="page">
     {% if messages %}

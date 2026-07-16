@@ -26,10 +26,10 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="R1")
     borrower = Borrower.objects.create(first_name="Mia", last_name="Lopez", class_name="3B")
 
-    page.goto(f"{live_server.url}/admin/login/?next=/dashboard/")
+    page.goto(f"{live_server.url}/staff/login/?next=/dashboard/")
     page.locator("input[name='username']").fill("librarian")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
     expect(page.get_by_role("heading", name="Overview")).to_be_visible()
     expect(page.get_by_label("Signed in as librarian")).to_be_visible()
     expect(page.get_by_role("img", name="Checkouts and returns during the last seven days")).to_be_visible()
@@ -89,10 +89,10 @@ def test_librarian_can_track_book_from_photo_in_browser(page, live_server, djang
     image_path = tmp_path / "cover.jpg"
     image_path.write_bytes(b"fake image bytes")
 
-    page.goto(f"{live_server.url}/admin/login/?next=/books/photo-intake/")
+    page.goto(f"{live_server.url}/staff/login/?next=/books/photo-intake/")
     page.locator("input[name='username']").fill("photo")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     expect(page.get_by_role("heading", name="Photo intake")).to_be_visible()
     expect(page.locator(".photo-capture")).to_be_visible()
@@ -132,10 +132,10 @@ def test_librarian_can_prefill_manual_book_from_isbn(page, live_server, django_u
     )
     django_user_model.objects.create_superuser(username="isbn", password="secret", email="")
 
-    page.goto(f"{live_server.url}/admin/login/?next=/books/add/")
+    page.goto(f"{live_server.url}/staff/login/?next=/books/add/")
     page.locator("input[name='username']").fill("isbn")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
     expect(page.locator("html")).to_have_attribute("data-book-entry-ready", "true")
     page.locator("input[name='isbn13']").fill("978-84-0805252-4")
 
@@ -174,7 +174,7 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     expect(page.get_by_role("heading", name="Borrow or return a book")).to_be_visible()
     expect(page.get_by_role("navigation", name="Utility navigation")).to_be_visible()
     expect(page.get_by_role("link", name="Docs")).to_have_attribute("href", "https://mrueda.github.io/shelf-school/")
-    expect(page.get_by_role("link", name="Admin login")).to_have_attribute("href", "/admin/login/?next=/dashboard/")
+    expect(page.get_by_role("link", name="Staff login")).to_have_attribute("href", "/staff/login/?next=/dashboard/")
 
     select_borrower(page, "mia", "mia - Mia Lopez", borrower.id)
     page.locator("input[name='action'][value='checkout']").check()
@@ -254,10 +254,10 @@ def test_admin_borrower_view_highlights_current_and_overdue_loans(page, live_ser
     copy = Copy.objects.create(book=Book.objects.create(title="Overdue classroom book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=copy, borrower=borrower, due_date=timezone.localdate() - timedelta(days=2))
 
-    page.goto(f"{live_server.url}/admin/login/?next=/borrowers/")
+    page.goto(f"{live_server.url}/staff/login/?next=/borrowers/")
     page.locator("input[name='username']").fill("borrowers")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     expect(page.get_by_role("heading", name="Borrowers")).to_be_visible()
     expect(page.get_by_text("With books out")).to_be_visible()
@@ -276,10 +276,10 @@ def test_admin_can_delete_one_physical_copy_in_browser(page, live_server, django
     first = Copy.objects.create(book=book, copy_number=1)
     second = Copy.objects.create(book=book, copy_number=2)
 
-    page.goto(f"{live_server.url}/admin/login/?next={second.get_absolute_url()}")
+    page.goto(f"{live_server.url}/staff/login/?next={second.get_absolute_url()}")
     page.locator("input[name='username']").fill("copies")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     expect(page.get_by_role("heading", name="Duplicate classroom title #2")).to_be_visible()
     page.on("dialog", lambda dialog: dialog.accept())
@@ -298,10 +298,10 @@ def test_admin_can_correct_book_copy_and_borrower_in_browser(page, live_server, 
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Wrong")
     borrower = Borrower.objects.create(username="student", first_name="Studnt", last_name="Name")
 
-    page.goto(f"{live_server.url}/admin/login/?next={book.get_absolute_url()}")
+    page.goto(f"{live_server.url}/staff/login/?next={book.get_absolute_url()}")
     page.locator("input[name='username']").fill("editor")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     page.get_by_role("link", name="Edit book").click()
     page.locator("input[name='title']").fill("Correct title")
@@ -341,10 +341,10 @@ def test_admin_can_move_active_loan_to_correct_borrower_in_browser(page, live_se
     )
     loan = Loan.objects.create(copy=copy, borrower=wrong)
 
-    page.goto(f"{live_server.url}/admin/login/?next={copy.get_absolute_url()}")
+    page.goto(f"{live_server.url}/staff/login/?next={copy.get_absolute_url()}")
     page.locator("input[name='username']").fill("loan-editor")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     expect(page.get_by_text("Wrong Child", exact=True)).to_be_visible()
     page.get_by_role("link", name="Change borrower").click()
@@ -374,10 +374,10 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     Loan.objects.create(copy=alpha_copy, borrower=alpha_borrower, due_date=timezone.localdate() - timedelta(days=1))
     Loan.objects.create(copy=beta_copy, borrower=beta_borrower, due_date=timezone.localdate() - timedelta(days=2))
 
-    page.goto(f"{live_server.url}/admin/login/?next=/books/")
+    page.goto(f"{live_server.url}/staff/login/?next=/books/")
     page.locator("input[name='username']").fill("sorter")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     page.get_by_role("columnheader", name="Contributors").get_by_role("link").click()
     expect(page.locator("tbody tr").first).to_contain_text("Beta title")
@@ -407,10 +407,10 @@ def test_admin_selects_books_and_fetches_missing_covers_in_browser(
     Copy.objects.create(book=second, copy_number=1)
     monkeypatch.setattr("library.views.download_cover_by_isbn", lambda isbn: (f"cover:{isbn}".encode(), "jpg"))
 
-    page.goto(f"{live_server.url}/admin/login/?next=/books/")
+    page.goto(f"{live_server.url}/staff/login/?next=/books/")
     page.locator("input[name='username']").fill("covers")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     fetch_button = page.get_by_role("button", name="Fetch missing covers")
     expect(fetch_button).to_be_disabled()
@@ -443,10 +443,10 @@ def test_admin_imports_enriched_catalog_and_reviews_incomplete_book(
         encoding="utf-8",
     )
 
-    page.goto(f"{live_server.url}/admin/login/?next=/books/import/")
+    page.goto(f"{live_server.url}/staff/login/?next=/books/import/")
     page.locator("input[name='username']").fill("importer")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
     page.locator("input[type='file']").set_input_files(catalog)
     page.get_by_role("button", name="Import books").click()
 
@@ -463,10 +463,10 @@ def test_admin_can_complete_school_setup_in_browser(page, live_server, django_us
     from library.models import SchoolProfile
 
     django_user_model.objects.create_superuser(username="setup", password="secret", email="")
-    page.goto(f"{live_server.url}/admin/login/?next=/dashboard/")
+    page.goto(f"{live_server.url}/staff/login/?next=/dashboard/")
     page.locator("input[name='username']").fill("setup")
     page.locator("input[name='password']").fill("secret")
-    page.locator("input[type='submit']").click()
+    page.get_by_role("button", name="Sign in").click()
 
     expect(page.get_by_text("Finish setting up Shelf-School")).to_be_visible()
     page.get_by_role("link", name="School settings").click()
@@ -480,3 +480,36 @@ def test_admin_can_complete_school_setup_in_browser(page, live_server, django_us
     profile = SchoolProfile.current()
     assert profile.setup_completed is True
     assert profile.default_loan_days == 21
+
+
+@pytest.mark.django_db(transaction=True)
+def test_system_admin_adds_staff_without_changing_matching_borrower_in_browser(
+    page, live_server, django_user_model
+):
+    django_user_model.objects.create_superuser(username="owner", password="secret", email="")
+    borrower = Borrower.objects.create(username="lrueda", first_name="Leo", last_name="Rueda")
+
+    page.goto(f"{live_server.url}/staff/login/?next=/settings/")
+    page.locator("input[name='username']").fill("owner")
+    page.locator("input[name='password']").fill("secret")
+    page.get_by_role("button", name="Sign in").click()
+
+    expect(page.get_by_role("link", name="Open Advanced (Django Admin)")).to_be_visible()
+    page.get_by_role("link", name="Manage staff accounts").click()
+    expect(page.get_by_role("heading", name="Staff accounts")).to_be_visible()
+    page.get_by_role("link", name="Add staff account").click()
+    page.locator("input[name='username']").fill("lrueda")
+    page.locator("input[name='first_name']").fill("Luis")
+    page.locator("input[name='last_name']").fill("Rueda")
+    page.locator("input[name='email']").fill("lrueda@example.org")
+    page.locator("input[name='password1']").fill("library-test-password-42")
+    page.locator("input[name='password2']").fill("library-test-password-42")
+    page.get_by_role("button", name="Save staff account").click()
+
+    expect(page.get_by_text("Staff account lrueda created.")).to_be_visible()
+    expect(page.get_by_role("row", name="Luis Rueda lrueda · lrueda@example.org Staff Active Never Edit Reset password")).to_be_visible()
+    account = django_user_model.objects.get(username="lrueda")
+    borrower.refresh_from_db()
+    assert account.is_staff is True
+    assert account.is_superuser is False
+    assert borrower.full_name == "Leo Rueda"

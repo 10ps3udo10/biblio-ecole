@@ -1,7 +1,8 @@
 # Borrowers
 
-Borrowers are students or teachers who may hold books. **They are not Django
-login accounts.**
+Borrowers are students or teachers who may hold books. **They are not staff
+login accounts.** Creating a borrower does not create a password or grant
+access to Shelf-School administration.
 
 Each borrower stores:
 

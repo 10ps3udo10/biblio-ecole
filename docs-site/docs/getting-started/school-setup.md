@@ -1,6 +1,6 @@
 # School Setup
 
-Staff settings are available at `/settings/` after administrator login.
+Staff settings are available at `/settings/` after staff login.
 
 ![Shelf-School school settings screen](/img/school-settings.png)
 
@@ -15,15 +15,24 @@ Configure:
 **The current design supports one school per installation.** Separate schools
 should run separate Shelf-School installations and databases.
 
-## Accounts and borrowers
+## Staff accounts and borrowers
 
-The administrator account operates Shelf-School and Django administration.
-Borrowers are separate records representing students or teachers who receive
-books. **Borrowers do not log in and do not need passwords.**
+Staff accounts belong to adults who sign in and operate Shelf-School. Borrowers
+are separate records representing students or teachers who receive books.
+**Borrowers do not log in and do not need passwords.**
 
-A single administrator is enough for a local deployment. Additional Django staff
-accounts are only necessary when several adults maintain the catalog or school
-configuration.
+Creating a staff account never creates, updates, or links a borrower. If a
+teacher is both a staff operator and a borrower, keep one record in each area.
+The records remain independent even when their names, usernames, or email
+addresses match.
+
+One staff administrator is enough for a local deployment. When several adults
+maintain the library, open **Settings > Manage staff accounts** to create their
+Shelf-School logins. **Advanced (Django Admin)** is the underlying technical
+interface and is not needed for normal library work.
+
+See [Staff Accounts](../usage/staff-accounts.md) for account creation, password
+reset, and role details.
 
 ## First operational check
 
@@ -31,6 +40,6 @@ Before opening the kiosk to students:
 
 1. Add a test borrower.
 2. Catalog a book and print its physical copy QR label.
-3. Sign out of administration.
+3. Sign out of the staff account.
 4. Check out and return the book from `/`.
 5. Sign back in and verify the loan history.

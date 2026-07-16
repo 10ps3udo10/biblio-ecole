@@ -18,11 +18,11 @@ def logged_in_client(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_unauthenticated_user_uses_single_admin_login(client):
+def test_unauthenticated_user_uses_staff_login(client):
     response = client.get(reverse("dashboard"))
 
     assert response.status_code == 302
-    assert response.url.startswith("/admin/login/")
+    assert response.url.startswith("/staff/login/")
 
 
 @pytest.mark.django_db
@@ -33,10 +33,75 @@ def test_public_circulation_desk_does_not_require_admin_login(client):
 
     assert response.status_code == 200
     assert b"Borrow or return a book" in response.content
-    assert b'href="/admin/login/?next=/dashboard/"' in response.content
-    assert b"Admin login" in response.content
+    assert b'href="/staff/login/?next=/dashboard/"' in response.content
+    assert b"Staff login" in response.content
     assert b"The photo is read once and never saved" in response.content
     assert b"https://mrueda.github.io/shelf-school/" in response.content
+
+
+@pytest.mark.django_db
+def test_staff_login_is_separate_from_django_admin_and_rejects_nonstaff(client, django_user_model):
+    django_user_model.objects.create_user(username="borrower-only", password="secret")
+
+    page = client.get(reverse("staff_login"))
+    rejected = client.post(reverse("staff_login"), {"username": "borrower-only", "password": "secret"})
+    django_admin = client.get(reverse("admin:login"))
+
+    assert b"Staff login" in page.content
+    assert b"Borrowers do not sign in" in page.content
+    assert b"does not have Shelf-School staff access" in rejected.content
+    assert b"Django Admin - Shelf-School" in django_admin.content
+
+
+@pytest.mark.django_db
+def test_settings_explains_staff_borrower_boundary(client, django_user_model):
+    django_user_model.objects.create_superuser(username="system-owner", password="secret", email="")
+    assert client.login(username="system-owner", password="secret")
+
+    response = client.get(reverse("school_settings"))
+
+    assert b"Staff accounts and borrowers serve different purposes" in response.content
+    assert b"Matching names, usernames, or email addresses do not link or merge them" in response.content
+    assert b"Manage staff accounts" in response.content
+    assert b"Open Advanced (Django Admin)" in response.content
+
+
+@pytest.mark.django_db
+def test_system_administrator_creates_staff_without_changing_matching_borrower(client, django_user_model):
+    django_user_model.objects.create_superuser(username="system-owner", password="secret", email="")
+    borrower = Borrower.objects.create(username="lrueda", first_name="Leo", last_name="Rueda")
+    assert client.login(username="system-owner", password="secret")
+
+    response = client.post(
+        reverse("staff_account_create"),
+        {
+            "username": "lrueda",
+            "first_name": "Luis",
+            "last_name": "Rueda",
+            "email": "lrueda@example.org",
+            "password1": "library-test-password-42",
+            "password2": "library-test-password-42",
+        },
+        follow=True,
+    )
+
+    account = django_user_model.objects.get(username="lrueda")
+    borrower.refresh_from_db()
+    assert response.status_code == 200
+    assert account.is_staff is True
+    assert account.is_superuser is False
+    assert borrower.full_name == "Leo Rueda"
+    assert b"Staff account lrueda created" in response.content
+
+
+@pytest.mark.django_db
+def test_regular_staff_cannot_manage_staff_accounts(client, django_user_model):
+    django_user_model.objects.create_user(username="staff", password="secret", is_staff=True)
+    assert client.login(username="staff", password="secret")
+
+    response = client.get(reverse("staff_account_list"))
+
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db

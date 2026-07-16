@@ -36,5 +36,9 @@ urlpatterns = [
     path("loans/overdue/", views.overdue_loans, name="overdue_loans"),
     path("loans/overdue.csv", views.overdue_loans_csv, name="overdue_loans_csv"),
     path("settings/", views.school_settings, name="school_settings"),
+    path("staff/accounts/", views.staff_account_list, name="staff_account_list"),
+    path("staff/accounts/add/", views.staff_account_create, name="staff_account_create"),
+    path("staff/accounts/<int:pk>/edit/", views.staff_account_edit, name="staff_account_edit"),
+    path("staff/accounts/<int:pk>/password/", views.staff_account_password, name="staff_account_password"),
     path("backup/sqlite/", views.backup_sqlite, name="backup_sqlite"),
 ]
