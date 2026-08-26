@@ -27,7 +27,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Operations',
       items: [
-        {type: 'doc', id: 'operations/mac-mini-deployment', label: 'Mac Mini Deployment'},
+        {type: 'doc', id: 'operations/mac-mini-deployment', label: 'Mac Deployment'},
         {type: 'doc', id: 'operations/backup', label: 'Backup'},
         {type: 'doc', id: 'operations/troubleshooting', label: 'Troubleshooting'},
       ],

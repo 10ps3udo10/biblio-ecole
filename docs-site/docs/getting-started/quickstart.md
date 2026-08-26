@@ -28,33 +28,35 @@ python manage.py createsuperuser
 Start Shelf-School:
 
 ```bash
-python manage.py runserver 127.0.0.1:8001
+python manage.py runserver 127.0.0.1:8427
 ```
 
 Open the public circulation kiosk:
 
 ```text
-http://127.0.0.1:8001/
+http://127.0.0.1:8427/
 ```
 
 Open the staff sign-in directly, or select **Staff login** in the public
 header:
 
 ```text
-http://127.0.0.1:8001/staff/login/
+http://127.0.0.1:8427/staff/login/
 ```
 
-The Django development server is suitable for local testing. **Do not expose it
-directly to the public internet.**
+The Django development server is suitable for local testing and a small pilot
+on a trusted private school network. **Do not expose it directly to the public
+internet.**
 
 Shelf-School uses Django accounts internally, but staff accounts are managed in
 Shelf-School. A system administrator can follow the clearly marked **Advanced
 (Django Admin)** link in Settings for exceptional technical permission or
 database maintenance.
 
-For a dedicated computer that only serves its own browser, continue with
-[Mac Mini Kiosk Deployment](../operations/mac-mini-deployment.md) to configure
-automatic startup and backups without Nginx or Caddy.
+For a dedicated Mac serving either its own browser or devices on trusted school
+Wi-Fi, continue with [Mac Deployment](../operations/mac-mini-deployment.md) to
+configure data transfer, private-LAN access, automatic startup, and backups
+without Nginx or Caddy.
 
 ## Next steps
 

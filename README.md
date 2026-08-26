@@ -66,16 +66,22 @@ python -m pip install -r requirements.txt
 python -m playwright install chromium
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py runserver 127.0.0.1:8001
+python manage.py runserver 127.0.0.1:8427
 ```
 
-Open the public kiosk at <http://127.0.0.1:8001/>. Staff can select **Staff
-login** in its header or open <http://127.0.0.1:8001/staff/login/> directly.
+Open the public kiosk at <http://127.0.0.1:8427/>. Staff can select **Staff
+login** in its header or open <http://127.0.0.1:8427/staff/login/> directly.
 
 Shelf-School staff accounts use Django authentication internally. The separate
 **Advanced (Django Admin)** link in Settings is only for exceptional technical
 permission and database maintenance. Every staff account has a synchronized
 borrower profile, but borrowers never sign in.
+
+For a dedicated Mac, including transfer of an existing `db.sqlite3`, covers,
+branding, staff accounts, and loan history, follow the
+[Mac deployment guide](https://mrueda.github.io/shelf-school/docs/operations/mac-mini-deployment).
+It covers both Mac-only and trusted private-Wi-Fi access without Nginx or Caddy.
+Create a fresh macOS `.venv`; do not copy a Linux virtual environment.
 
 ## Development
 

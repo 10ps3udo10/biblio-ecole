@@ -33,10 +33,10 @@ detail or borrower detail page.
 
 ## Development server will not start
 
-If port `8001` is occupied, choose another port:
+If port `8427` is occupied, choose another port:
 
 ```bash
-python manage.py runserver 127.0.0.1:8002
+python manage.py runserver 127.0.0.1:8428
 ```
 
 Apply migrations and run checks:
