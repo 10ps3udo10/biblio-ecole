@@ -60,7 +60,9 @@ python manage.py createsuperuser
 python manage.py check
 ```
 
-To preserve an existing Shelf-School library, follow the next section instead.
+To preserve an existing Shelf-School library, follow the next section. It is
+safe to do so even if the three commands above have already been run; there is
+no need to reinstall Shelf-School or recreate the virtual environment.
 
 ## Move an existing library to the Mac
 
@@ -76,11 +78,39 @@ The database stores the records. `media/` stores downloaded or uploaded covers
 and school branding. Circulation and ISBN-reading photos are not stored, so
 there are no circulation-photo files to transfer.
 
-### 1. Create the transfer archive
+The transferred `db.sqlite3` replaces the empty database created during setup.
+If `createsuperuser` was already run on the Mac, that temporary account is
+replaced too; the staff accounts from the transferred library become active.
 
-On the existing computer, stop Shelf-School before copying it. For a manually
-started server, return to its terminal and press `Control-C`. Then run from the
-repository root:
+### Quick transfer
+
+Use this mode when both computers and the transfer drive or shared folder are
+under your control:
+
+1. Stop Shelf-School on both computers. For a manually started server, return
+   to its terminal and press `Control-C`.
+2. Copy `db.sqlite3` and the complete `media/` directory from the old computer.
+3. Place them in `/Users/library/shelf-school` on the Mac, replacing the
+   temporary versions there.
+4. From that directory, run:
+
+```bash
+source .venv/bin/activate
+python manage.py migrate
+python manage.py check
+```
+
+That is a complete migration. There is no need to reinstall Shelf-School or
+create another virtual environment.
+
+### Recommended verified transfer
+
+Use this mode for the school's final transfer or whenever the old computer
+contains the only current copy of the library. It adds a database integrity
+check, a single transfer archive, and a checksum that detects a damaged or
+incomplete copy.
+
+On the existing computer, stop Shelf-School. Then run from the repository root:
 
 ```bash
 sqlite3 db.sqlite3 "PRAGMA integrity_check;"
@@ -94,13 +124,16 @@ archive to the Mac with an external drive, a secure network copy, or a Parallels
 shared folder. Do not start circulating books on the old computer after making
 the final archive.
 
-### 2. Restore it on the Mac
-
-Restore the archive into the freshly cloned repository **before** running the
-first migration. Adjust the archive path as needed:
+On the Mac, preserve the temporary database and media, verify and extract the
+archive, and update the transferred database. Adjust the archive path as
+needed:
 
 ```bash
 cd /Users/library/shelf-school
+backup="$HOME/shelf-school-empty-install-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup"
+if [ -f db.sqlite3 ]; then mv db.sqlite3 "$backup"/; fi
+if [ -d media ]; then mv media "$backup"/; fi
 shasum -a 256 ~/Downloads/shelf-school-data-YYYYMMDD.tar.gz
 tar -xzf ~/Downloads/shelf-school-data-YYYYMMDD.tar.gz
 source .venv/bin/activate
@@ -108,15 +141,21 @@ python manage.py migrate
 python manage.py check
 ```
 
-Compare the Mac checksum with the one recorded on the existing computer. Do not
-run `createsuperuser`: staff accounts and their password hashes are already in
-the transferred database. If an administrator password must be reset, use:
+Compare the Mac checksum with the one recorded on the existing computer. Keep
+the archive unchanged until the Mac has been tested. If restoration fails,
+stop Shelf-School, move the restored `db.sqlite3` and `media/` aside, extract
+the archive again, and repeat the migration and checks.
+
+With either transfer mode, do not run `createsuperuser` again unless the
+transferred library has no usable staff administrator: staff accounts and their
+password hashes are already in the database. To reset an administrator
+password, use:
 
 ```bash
 python manage.py changepassword USERNAME
 ```
 
-### 3. Compare the records
+### Validate the transferred library
 
 Run this command on both computers and confirm that the counts match:
 
@@ -127,10 +166,6 @@ python manage.py shell -c "from django.contrib.auth import get_user_model; from 
 Start the Mac copy and verify the school logo, several book covers, staff login,
 one existing borrower, and one loan-history page. Complete a test checkout and
 return before treating the Mac as the active installation.
-
-Keep the transfer archive unchanged until the Mac has been tested. If the
-restore fails, stop Shelf-School, move the restored `db.sqlite3` and `media/`
-aside, extract the archive again, and repeat the migration and checks.
 
 ## Test the installation
 
@@ -196,6 +231,23 @@ python -c "import secrets; print(secrets.token_urlsafe(50))"
 
 Keep the result private. The next section stores it in a user-owned service
 file. Do not add that file to Git or publish the secret in an issue.
+
+<details className="alert alert--info">
+<summary><strong>Why does Shelf-School need this secret?</strong></summary>
+
+`DJANGO_SECRET_KEY` is the installation's private cryptographic signing key. It
+protects staff login sessions and signs short-lived circulation confirmations,
+preventing checkout or return details from being altered in the browser. It is
+not an administrator password, a paid API key, or a key for encrypting the
+database, photos, or account passwords.
+
+Generate it once and keep the same value across restarts and upgrades. Changing
+it signs staff out and invalidates pending circulation confirmations, but does
+not remove books, borrowers, loans, or passwords. If the database is moved to a
+new Mac, using a new secret is acceptable; everyone will simply need to sign in
+again. Keep a secure backup of the deployed value and never commit it to Git.
+
+</details>
 
 ## Start automatically with launchd
 

@@ -2,13 +2,58 @@
 
 ## Requirements
 
+- Git.
 - Python 3.10 or newer.
 - A camera-equipped phone, tablet, or computer for photo workflows.
 - Node.js 20 or newer only when building this documentation site.
 
 ## Install
 
-From the repository root:
+Shelf-School is currently installed from its GitHub source code. It is **not yet
+available as a `pip install shelf-school` package**. Using Git also makes future
+updates possible with `git pull`.
+
+:::caution macOS: check Git and Python first
+Open **Terminal** and check Git:
+
+```bash
+git --version
+```
+
+On a fresh Mac, this command may open Apple's developer-tools installation
+dialog. Complete that installation, then run `git --version` again.
+
+Check the Python selected by the terminal **before creating `.venv`**:
+
+```bash
+python3 --version
+```
+
+Shelf-School requires Python 3.10 or newer. Some Macs still resolve `python3`
+to Python 3.8. In that case, install an
+[official macOS Python package](https://www.python.org/downloads/macos/). The
+`universal2` installer supports both Intel and Apple silicon Macs. Then create
+the environment with the installed versioned command; for example, the tested
+Intel installation using Python 3.12.10 required:
+
+```bash
+python3.12 -m venv .venv
+```
+
+Once `.venv` is activated, the remaining `python` commands use that selected
+interpreter. If `.venv` was already created with Python 3.8, move it aside and
+create it again with the newer command.
+:::
+
+Clone Shelf-School and enter its directory:
+
+```bash
+git clone https://github.com/mrueda/shelf-school.git
+cd shelf-school
+```
+
+Create the virtual environment and install the dependencies. Replace `python3`
+with the verified versioned command, such as `python3.12`, when necessary:
 
 ```bash
 python3 -m venv .venv
