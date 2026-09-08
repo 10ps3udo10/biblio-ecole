@@ -229,8 +229,8 @@ Generate a secret once:
 python -c "import secrets; print(secrets.token_urlsafe(50))"
 ```
 
-Keep the result private. The next section stores it in a user-owned service
-file. Do not add that file to Git or publish the secret in an issue.
+Keep the result private. The next section stores it in a protected system
+service file. Do not add that file to Git or publish the secret in an issue.
 
 <details className="alert alert--info">
 <summary><strong>Why does Shelf-School need this secret?</strong></summary>
@@ -251,13 +251,31 @@ again. Keep a secure backup of the deployed value and never commit it to Git.
 
 ## Start automatically with launchd
 
-Apple uses `launchd` to manage background processes. A LaunchAgent starts after
-the dedicated kiosk user logs in and restarts Shelf-School if it exits.
+Apple uses `launchd` to manage background processes. How Shelf-School is
+started determines when it is available:
 
-Create `~/Library/LaunchAgents/org.shelfschool.kiosk.plist` with the following
-content. Replace `PASTE_PRIVATE_SECRET_HERE`, `Library-Mac.local`, and
-`192.168.1.25`; adjust `/Users/library` if the macOS account has a different
-home directory.
+| Method | Starts | Stops |
+| --- | --- | --- |
+| Terminal command | When a person runs it | Terminal closes or that user logs out |
+| LaunchAgent | When its macOS user logs in | That user logs out |
+| **LaunchDaemon** | **When the Mac boots** | **Mac shuts down or the service is stopped** |
+
+For a dedicated library Mac, use the **LaunchDaemon** below. It keeps
+Shelf-School available over Wi-Fi while macOS users log in and out. Although
+`root` installs and manages the service, Shelf-School itself runs as the
+dedicated, non-administrator `library` user.
+
+:::note When a LaunchAgent is enough
+A LaunchAgent is simpler if the Mac automatically signs in to one dedicated
+kiosk account and Shelf-School only needs to run during that login session. A
+LaunchDaemon is the appropriate choice when the app must work before login and
+survive user logout.
+:::
+
+Create `~/org.shelfschool.server.plist` with the following content. Replace
+`PASTE_PRIVATE_SECRET_HERE`, `Library-Mac.local`, and `192.168.1.25`. Replace
+`library` and `/Users/library` if the macOS account that owns the installation
+has a different short name or home directory.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -265,7 +283,9 @@ home directory.
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>org.shelfschool.kiosk</string>
+  <string>org.shelfschool.server</string>
+  <key>UserName</key>
+  <string>library</string>
   <key>ProgramArguments</key>
   <array>
     <string>/Users/library/shelf-school/.venv/bin/python</string>
@@ -301,30 +321,42 @@ This configuration enables private-LAN access. For a Mac-only kiosk, use
 `127.0.0.1:8427` in `ProgramArguments` and
 `localhost,127.0.0.1` in `DJANGO_ALLOWED_HOSTS` instead.
 
-Protect and validate the file, then load it:
+Install the file as a protected system service, validate it, and load it:
 
 ```bash
-chmod 600 ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
-plutil -lint ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
-launchctl kickstart -k "gui/$(id -u)/org.shelfschool.kiosk"
+chmod 600 ~/org.shelfschool.server.plist
+sudo cp ~/org.shelfschool.server.plist /Library/LaunchDaemons/
+sudo chown root:wheel /Library/LaunchDaemons/org.shelfschool.server.plist
+sudo chmod 600 /Library/LaunchDaemons/org.shelfschool.server.plist
+sudo plutil -lint /Library/LaunchDaemons/org.shelfschool.server.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/org.shelfschool.server.plist
+sudo launchctl kickstart -k system/org.shelfschool.server
+rm ~/org.shelfschool.server.plist
 ```
 
-Recent macOS versions may ask the user to approve the background service. After
-loading it, verify the local and private-LAN URLs, then restart the Mac once to
-confirm that Shelf-School returns after login.
+After loading it, verify the local and private-LAN URLs. Restart the Mac, but do
+not log in immediately; confirm from another device that Shelf-School is
+already available. Then log in and log out once and confirm that it remains
+available.
+
+:::warning Keep the Mac awake
+`launchd` restarts Shelf-School if its process exits, but it cannot serve other
+devices while the Mac is asleep. In **System Settings > Energy Saver**, enable
+the option that prevents automatic sleeping while the display is off. The
+display may still turn off normally.
+:::
 
 ## Check status and logs
 
 ```bash
-launchctl print "gui/$(id -u)/org.shelfschool.kiosk"
-tail -f ~/Library/Logs/shelf-school-error.log
+sudo launchctl print system/org.shelfschool.server
+tail -f /Users/library/Library/Logs/shelf-school-error.log
 ```
 
 To stop the service:
 
 ```bash
-launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
+sudo launchctl bootout system /Library/LaunchDaemons/org.shelfschool.server.plist
 ```
 
 Load it again with the `bootstrap` command above.
@@ -347,7 +379,7 @@ complete policy.
 Choose a time when nobody is circulating books:
 
 ```bash
-launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
+sudo launchctl bootout system /Library/LaunchDaemons/org.shelfschool.server.plist
 cd /Users/library/shelf-school
 cp db.sqlite3 "db.sqlite3.backup-$(date +%Y%m%d)"
 source .venv/bin/activate
@@ -355,7 +387,7 @@ git pull --ff-only
 python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py check
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/org.shelfschool.kiosk.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/org.shelfschool.server.plist
 ```
 
 Open the kiosk and perform a test checkout after every upgrade.
