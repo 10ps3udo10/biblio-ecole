@@ -1,6 +1,12 @@
 # School Setup
 
-Staff settings are available at `/settings/` after staff login.
+Open **Library > School settings** after staff login (`/settings/`). These
+settings apply to the school. Personal appearance and password settings live in
+your name menu under [My Account](../usage/my-account.md).
+
+The Library menu groups Overview, Catalog, Borrowers, and Overdue, with School
+settings separated below. To catalog a book from a photo, open
+**Catalog > Add from photo**.
 
 ![Shelf-School school settings screen](/img/school-settings.png)
 
@@ -35,7 +41,7 @@ School roles are **Employee / Student**. A student can have Staff access and an
 employee can borrow without credentials.
 
 One staff administrator is enough for a local deployment. When several people
-maintain the library, open **Settings > Manage staff accounts** to create their
+maintain the library, a system administrator can open **Library > School settings > Manage staff accounts** to create their
 Shelf-School logins. **Advanced (Django Admin)** is the underlying technical
 interface and is not needed for normal library work.
 

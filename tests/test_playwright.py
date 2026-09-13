@@ -8,6 +8,97 @@ pytestmark = pytest.mark.playwright
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 1440])
+def test_account_start_page_and_table_density(page, live_server, django_user_model, width):
+    django_user_model.objects.create_user(username="preferences-reader", password="secret", is_staff=True)
+    Book.objects.create(title="Personal preferences", authors="Library author")
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.goto(f"{live_server.url}/staff/login/?next=/account/")
+    page.locator("input[name=username]").fill("preferences-reader")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    page.get_by_label("Start page after login:", exact=True).select_option("book_list")
+    page.get_by_text("Compact", exact=True).click()
+    page.get_by_role("button", name="Save preferences", exact=True).click()
+    expect(page.get_by_label("Start page after login:", exact=True)).to_have_value("book_list")
+    expect(page.locator("input[value=compact]")).to_be_checked()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-account-preferences-{width}.png", full_page=True)
+    page.goto(live_server.url + "/books/")
+    cell = page.locator("tbody td").first
+    assert cell.evaluate("el => getComputedStyle(el).paddingTop") == "6px"
+    compact_height = page.locator("tbody tr").first.bounding_box()["height"]
+    page.screenshot(path=f"/tmp/shelf-school-compact-table-{width}.png", full_page=True)
+    page.emulate_media(media="print")
+    assert cell.evaluate("el => getComputedStyle(el).paddingTop") == "12px"
+    page.emulate_media(media="screen")
+    page.get_by_label("Signed in as preferences-reader", exact=True).click()
+    page.get_by_role("button", name="Sign out", exact=True).click()
+    expect(page.locator("html")).to_have_attribute("data-table-density", "comfortable")
+    page.get_by_role("link", name="Staff login", exact=True).click()
+    page.locator("input[name=username]").fill("preferences-reader")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    expect(page).to_have_url(live_server.url + "/books/")
+    expect(page.locator("html")).to_have_attribute("data-table-density", "compact")
+    page.goto(live_server.url + "/account/")
+    page.get_by_text("Comfortable", exact=True).click()
+    page.get_by_role("button", name="Save preferences", exact=True).click()
+    page.goto(live_server.url + "/books/")
+    assert page.locator("tbody tr").first.bounding_box()["height"] > compact_height
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 1440])
+def test_personal_theme_persistence_system_and_public_reset(page, live_server, django_user_model, width):
+    from django.urls import reverse
+    from library.models import UserPreference
+    user = django_user_model.objects.create_user(username="theme-reader", password="secret", is_staff=True)
+    book = Book.objects.create(title="Theme test book", authors="School writer", needs_information=True)
+    copy = Copy.objects.create(book=book, copy_number=1)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.emulate_media(color_scheme="light")
+    page.goto(f"{live_server.url}/staff/login/?next=/account/")
+    page.locator("input[name=username]").fill(user.username)
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    page.get_by_text("Dark", exact=True).click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    page.get_by_role("button", name="Save appearance", exact=True).click()
+    assert UserPreference.objects.get(user=user).theme == "dark"
+    page.reload()
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    assert page.locator("body").evaluate("(el) => getComputedStyle(el).backgroundColor") == "rgb(41, 43, 46)"
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-my-account-dark-{width}.png", full_page=True)
+    for path, name in [("/books/", "catalog"), ("/settings/", "settings"), ("/dashboard/", "overview"), ("/", "circulation")]:
+        page.goto(live_server.url + path)
+        expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=f"/tmp/shelf-school-{name}-dark-{width}.png", full_page=True)
+    page.goto(live_server.url + reverse("label", args=["copy", copy.pk]))
+    assert page.locator(".label").evaluate("(el) => getComputedStyle(el).backgroundColor") == "rgb(255, 255, 255)"
+    page.emulate_media(media="print")
+    assert page.locator("body").evaluate("(el) => getComputedStyle(el).backgroundColor") == "rgb(255, 255, 255)"
+    page.emulate_media(media="screen")
+    page.goto(live_server.url + "/account/")
+    page.get_by_text("System", exact=True).click()
+    page.get_by_role("button", name="Save appearance", exact=True).click()
+    page.emulate_media(color_scheme="dark")
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    page.emulate_media(color_scheme="light")
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    page.get_by_text("Light", exact=True).click()
+    page.get_by_role("button", name="Save appearance", exact=True).click()
+    page.emulate_media(color_scheme="dark")
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    page.get_by_label("Signed in as theme-reader", exact=True).click()
+    page.get_by_role("button", name="Sign out", exact=True).click()
+    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+
+
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("kind", ["books", "borrowers"])
 @pytest.mark.parametrize("width", [390, 1440])
 def test_csv_import_reference_and_template_download(page, live_server, django_user_model, kind, width):
@@ -278,11 +369,15 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
             assert icon_box
             assert abs((item_box["y"] + item_box["height"] / 2) - (icon_box["y"] + icon_box["height"] / 2)) < 1
     page.get_by_text("Library", exact=True).click()
+    library_menu = page.locator("nav details").filter(has=page.locator("summary", has_text="Library"))
+    expect(library_menu.get_by_role("link")).to_have_text(["Overview", "Catalog", "Borrowers", "Overdue", "School settings"])
+    expect(library_menu.get_by_role("separator")).to_be_visible()
     expect(page.get_by_role("link", name="Catalog", exact=True)).to_be_visible()
     expect(page.get_by_role("link", name="Borrowers", exact=True)).to_be_visible()
     expect(page.get_by_role("link", name="Overdue", exact=True)).to_be_visible()
+    expect(page.get_by_role("navigation").get_by_role("link", name="School settings", exact=True)).to_be_visible()
     page.get_by_label("Signed in as librarian").click()
-    expect(page.get_by_role("link", name="Settings", exact=True)).to_be_visible()
+    expect(page.get_by_role("link", name="My account", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
 
     page.goto(f"{live_server.url}/checkout/")
@@ -404,7 +499,7 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     expect(page.get_by_role("heading", name="Borrow or return a book")).to_be_visible()
     expect(page.get_by_role("navigation", name="Utility navigation")).to_be_visible()
     expect(page.get_by_role("link", name="Docs")).to_have_attribute("href", "https://mrueda.github.io/shelf-school/")
-    expect(page.get_by_role("link", name="Staff login")).to_have_attribute("href", "/staff/login/?next=/dashboard/")
+    expect(page.get_by_role("link", name="Staff login")).to_have_attribute("href", "/staff/login/")
 
     select_borrower(page, "mia", "mia - Mia Lopez", borrower.id)
     page.locator("input[name='action'][value='checkout']").check()

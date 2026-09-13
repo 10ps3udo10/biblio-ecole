@@ -33,7 +33,7 @@ the staff account.
 
 Only the system administrator can manage staff accounts.
 
-1. Sign in and open **Settings**.
+1. Sign in and open **Library > School settings**.
 2. Select **Manage staff accounts**.
 3. Select **Add staff account**.
 4. Enter the person's name, Borrower ID, email address, and initial password.
@@ -46,7 +46,7 @@ and history. The new account does not become a system administrator.
 
 ## Maintain access
 
-Open **Settings > Manage staff accounts** to:
+Open **Library > School settings > Manage staff accounts** to:
 
 - Edit a Borrower ID, name, or email address for both linked records.
 - Deactivate an account without deleting its history.

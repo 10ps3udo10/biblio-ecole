@@ -13,7 +13,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model, update_session_auth_hash
-from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.forms import SetPasswordForm, PasswordChangeForm
 from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
@@ -49,10 +49,12 @@ from .forms import (
     StaffAccountEditForm,
     EmployeePositionForm,
     SchoolClassForm,
+    UserPreferenceForm,
+    UserWorkflowForm,
     default_form_due_date,
 )
 from .catalog_import import import_catalog_rows
-from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass
+from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass, UserPreference
 from .csv_templates import csv_columns
 from .borrower_import import import_borrower_rows
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
@@ -1333,6 +1335,39 @@ def school_classes(request, pk=None):
         "form": form, "school_class": school_class,
         "classes": SchoolClass.objects.annotate(assigned=Count("borrowers")).order_by(sort, "pk"),
     })
+
+
+@staff_member_required(login_url="staff_login")
+def my_account(request):
+    preference = UserPreference.objects.filter(user=request.user).first() or UserPreference(user=request.user)
+    appearance = UserPreferenceForm(instance=preference)
+    workflow = UserWorkflowForm(instance=preference)
+    password = PasswordChangeForm(request.user)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "appearance":
+            appearance = UserPreferenceForm(request.POST, instance=preference)
+            if appearance.is_valid():
+                appearance.save()
+                messages.success(request, "Appearance saved.")
+                return redirect("my_account")
+        elif action == "workflow":
+            workflow = UserWorkflowForm(request.POST, instance=preference)
+            if workflow.is_valid():
+                workflow.save()
+                messages.success(request, "Preferences saved.")
+                return redirect("my_account")
+        elif action == "password":
+            password = PasswordChangeForm(request.user, request.POST)
+            if password.is_valid():
+                user = password.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Password changed.")
+                return redirect("my_account")
+        else:
+            return HttpResponse("Unknown account action.", status=400)
+    password.fields["old_password"].widget.attrs.pop("autofocus", None)
+    return render(request, "library/my_account.html", {"appearance_form": appearance, "workflow_form": workflow, "password_form": password})
 
 
 @staff_member_required(login_url="staff_login")

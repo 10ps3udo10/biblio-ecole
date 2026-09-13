@@ -9,8 +9,23 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Book, Borrower, Copy, SchoolProfile, EmployeePosition, SchoolClass
+from .models import Book, Borrower, Copy, SchoolProfile, EmployeePosition, SchoolClass, UserPreference
 from .photo_intake import clean_isbn, is_valid_isbn
+
+
+class UserPreferenceForm(forms.ModelForm):
+    class Meta:
+        model = UserPreference
+        fields = ["theme"]
+        widgets = {"theme": forms.RadioSelect}
+
+
+class UserWorkflowForm(forms.ModelForm):
+    class Meta:
+        model = UserPreference
+        fields = ["start_page", "table_density"]
+        labels = {"start_page": "Start page after login", "table_density": "Table spacing"}
+        widgets = {"table_density": forms.RadioSelect}
 
 
 class StaffAuthenticationForm(AuthenticationForm):

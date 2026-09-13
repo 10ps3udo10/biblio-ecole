@@ -52,6 +52,15 @@ git clone https://github.com/mrueda/shelf-school.git
 cd shelf-school
 ```
 
+:::tip Short setup on macOS or Linux with Make
+Run `make setup PYTHON=python3.12`, then `make start`. Choose the installed
+Python command if different. Setup prepares the environment, migrates the
+database, and prompts for an initial administrator only when needed.
+You can skip the manual installation commands below.
+For an existing database or automatic Mac startup, use the
+[Mac deployment guide](../operations/mac-mini-deployment.md).
+:::
+
 Create the virtual environment and install the dependencies. Replace `python3`
 with the verified versioned command, such as `python3.12`, when necessary:
 

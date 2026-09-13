@@ -8,6 +8,27 @@ from django.urls import reverse
 from django.utils import timezone
 
 
+class UserPreference(models.Model):
+    class Theme(models.TextChoices):
+        SYSTEM = "system", "System"
+        LIGHT = "light", "Light"
+        DARK = "dark", "Dark"
+
+    class StartPage(models.TextChoices):
+        OVERVIEW = "dashboard", "Overview"
+        CIRCULATION = "photo_circulation", "Circulation"
+        CATALOG = "book_list", "Catalog"
+
+    class TableDensity(models.TextChoices):
+        COMFORTABLE = "comfortable", "Comfortable"
+        COMPACT = "compact", "Compact"
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_preferences")
+    theme = models.CharField(max_length=6, choices=Theme.choices, default=Theme.SYSTEM)
+    start_page = models.CharField(max_length=20, choices=StartPage.choices, default=StartPage.OVERVIEW)
+    table_density = models.CharField(max_length=12, choices=TableDensity.choices, default=TableDensity.COMFORTABLE)
+
+
 class SchoolProfile(models.Model):
     school_name = models.CharField(max_length=255, default="School Library")
     short_name = models.CharField(max_length=80, blank=True)

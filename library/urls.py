@@ -4,6 +4,7 @@ from . import views
 
 
 urlpatterns = [
+    path("account/", views.my_account, name="my_account"),
     path("imports/<str:kind>/template.csv", views.download_csv_template, name="download_csv_template"),
     path("", views.photo_circulation, name="photo_circulation"),
     path("catalog/", views.public_catalog, name="public_catalog"),

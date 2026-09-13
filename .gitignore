@@ -5,6 +5,7 @@ __pycache__/
 db.sqlite3
 media/
 backups/
+.shelf-school-secret
 *.sqlite3
 playwright-report/
 test-results/

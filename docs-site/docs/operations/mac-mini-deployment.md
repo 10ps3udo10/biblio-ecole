@@ -1,197 +1,156 @@
 # Mac Deployment
 
-This guide is for a dedicated Mac running Shelf-School in either of these modes:
+## Quick path
 
-- **This Mac only:** the kiosk opens only in a browser on the library Mac.
-- **Private school network:** computers, phones, and tablets on the trusted
-  school Wi-Fi can open the circulation desk.
+After Git, Make, and a compatible Python are installed, open Terminal as the
+macOS user that will own the library:
 
-:::info No reverse proxy required
-Neither mode requires Nginx or Caddy for a small, supervised school deployment.
-Use `127.0.0.1` for this Mac only or `0.0.0.0` for the private school network.
-:::
+```bash
+git clone https://github.com/mrueda/shelf-school.git
+cd shelf-school
+make setup PYTHON=python3.12
+make start
+```
+
+Open **http://localhost:8427/**. Keep Terminal open; press **Control-C** to stop.
+
+**Moving an existing library?** Copy its `db.sqlite3` and `media/` into the
+cloned folder **before** running `make setup`. Existing accounts and passwords
+are preserved, so there is no need to create another administrator.
+
+Setup creates or reuses `.venv`, installs dependencies, applies database
+migrations, checks Django, and asks for the first system administrator only when
+none is active. It creates a private signing key automatically. It does not
+install a browser, start a service, download book covers, or schedule backups.
 
 :::warning Deployment boundary
-This pragmatic setup uses Django's lightweight server, which Django does not
-classify as production-ready. LAN access is reasonable for a small pilot on a
-trusted, private Wi-Fi, but **never expose port 8427 through the router or to the
-public internet**. Use dedicated Shelf-School passwords because this HTTP setup
-does not encrypt staff credentials with HTTPS.
+These commands use Django's lightweight server, not a production WSGI server.
+They are intended for a supervised local pilot or trusted private school Wi-Fi.
+Never expose port 8427 through the router or to the public internet. HTTP does
+not encrypt passwords; use dedicated Shelf-School credentials.
+Nginx and Caddy are not required for this setup.
 :::
-
-Shelf-School uses port `8427` in this guide to avoid common development-port
-collisions. A less common port is convenient, but it is not a security control.
 
 ## Prepare the Mac
 
-Create a dedicated standard macOS user, such as `library`, and keep its password
-available to the responsible staff member. Install Git and Python 3.10 or newer.
-Sign in as `library` for cloning, installing dependencies, and managing library
-data. Keep a separate macOS administrator account available for installing and
-controlling the system service; a standard account cannot run `sudo`.
-Keep the application on the Mac's local disk, not in iCloud Drive or another
-synchronized folder.
+Use a dedicated standard macOS account, such as `library`, for the application
+and its data. Keep a separate macOS administrator account for optional boot-time
+service installation. Do not run `make setup` with `sudo`.
 
-Clone Shelf-School into a stable location that will not be renamed:
+Keep the project on the Mac's local disk, outside iCloud Drive and other
+synchronized folders. A stable location such as
+`/Users/library/shelf-school` is suitable.
 
-```bash
-cd /Users/library
-git clone https://github.com/mrueda/shelf-school.git
-cd shelf-school
-```
+<details className="alert alert--info">
+<summary><strong>Git, Make, or Python is missing or too old</strong></summary>
 
-Create a new macOS virtual environment and install the dependencies:
+Check the installed commands:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+git --version
+make --version
+python3.12 --version
 ```
 
-:::warning Do not copy the old virtual environment
-The `.venv` from Linux or another computer contains platform-specific binaries.
-Always create a new `.venv` on the Mac. Only the database and `media/` directory
-are transferred.
-:::
-
-For a new empty library, initialize Shelf-School now:
+A fresh Mac may offer to install Apple's developer tools when you type `git`.
+Complete that dialog. If Git or Make is still missing, install the
+[Apple command-line tools](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools/):
 
 ```bash
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py check
+xcode-select --install
 ```
 
-To preserve an existing Shelf-School library, follow the next section. It is
-safe to do so even if the three commands above have already been run; there is
-no need to reinstall Shelf-School or recreate the virtual environment.
+Shelf-School requires **Python 3.10 or newer**. Some older Macs still resolve
+`python3` to Python 3.8. Install a compatible package from
+[Python's macOS downloads](https://www.python.org/downloads/macos/), then specify
+the versioned command in setup.
+
+The Intel Catalina machine tested for this project used
+[Python 3.12.10](https://www.python.org/downloads/release/python-31210/) and
+`make setup PYTHON=python3.12`. That is a tested older-machine example, not a
+claim that 3.12.10 is the latest security release.
+
+An incompatible existing `.venv` is never deleted automatically. Rename that
+folder and rerun setup with the correct Python. Keep `db.sqlite3` and `media/`
+unchanged. Never copy a Linux virtual environment to the Mac.
+
+</details>
 
 ## Move an existing library to the Mac
 
-The transfer preserves books, physical copies, borrowers, staff accounts and
-passwords, settings, loans, and full loan history. Copy both of these items:
-
-```text
-db.sqlite3
-media/
-```
-
-The database stores the records. `media/` stores downloaded or uploaded covers
-and school branding. Circulation and ISBN-reading photos are not stored, so
-there are no circulation-photo files to transfer.
-
-The transferred `db.sqlite3` replaces the empty database created during setup.
-If `createsuperuser` was already run on the Mac, that temporary account is
-replaced too; the staff accounts from the transferred library become active.
+Transfer **both** `db.sqlite3` and the complete `media/` folder. They contain
+books, physical copies, borrowers, staff accounts and password hashes, settings,
+loans, covers, and school branding. Circulation and ISBN-reading photos are not
+stored.
 
 ### Quick transfer
 
-Use this mode when both computers and the transfer drive or shared folder are
-under your control:
-
-1. Stop Shelf-School on both computers. For a manually started server, return
-   to its terminal and press `Control-C`.
-2. Copy `db.sqlite3` and the complete `media/` directory from the old computer.
-3. Place them in `/Users/library/shelf-school` on the Mac, replacing the
-   temporary versions there.
-4. From that directory, run:
-
-```bash
-source .venv/bin/activate
-python manage.py migrate
-python manage.py check
-```
-
-That is a complete migration. There is no need to reinstall Shelf-School or
-create another virtual environment.
-
-### Recommended verified transfer
-
-Use this mode for the school's final transfer or whenever the old computer
-contains the only current copy of the library. It adds a database integrity
-check, a single transfer archive, and a checksum that detects a damaged or
-incomplete copy.
-
-On the existing computer, stop Shelf-School. Then run from the repository root:
-
-```bash
-sqlite3 db.sqlite3 "PRAGMA integrity_check;"
-archive="$HOME/shelf-school-data-$(date +%Y%m%d).tar.gz"
-tar -czf "$archive" db.sqlite3 media
-sha256sum "$archive"
-```
-
-The integrity command must print `ok`. Record the checksum, then move the
-archive to the Mac with an external drive, a secure network copy, or a Parallels
-shared folder. Do not start circulating books on the old computer after making
-the final archive.
-
-On the Mac, preserve the temporary database and media, verify and extract the
-archive, and update the transferred database. Adjust the archive path as
-needed:
+1. Stop Shelf-School on both computers.
+2. Copy `db.sqlite3` and `media/` from the old computer into the cloned project
+   on the Mac.
+3. If a temporary library already exists on the Mac, move its database and
+   media folder aside first. Do not merge two libraries.
+4. As the macOS `library` user, run:
 
 ```bash
 cd /Users/library/shelf-school
-backup="$HOME/shelf-school-empty-install-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup"
-if [ -f db.sqlite3 ]; then mv db.sqlite3 "$backup"/; fi
-if [ -d media ]; then mv media "$backup"/; fi
-shasum -a 256 ~/Downloads/shelf-school-data-YYYYMMDD.tar.gz
-tar -xzf ~/Downloads/shelf-school-data-YYYYMMDD.tar.gz
-source .venv/bin/activate
-python manage.py migrate
-python manage.py check
+make setup PYTHON=python3.12
+make start
 ```
 
-Compare the Mac checksum with the one recorded on the existing computer. Keep
-the archive unchanged until the Mac has been tested. If restoration fails,
-stop Shelf-School, move the restored `db.sqlite3` and `media/` aside, extract
-the archive again, and repeat the migration and checks.
+It is fine if you already ran migrations or created an administrator on the
+Mac. The transferred database replaces that temporary library, including its
+accounts. Keep the old computer unchanged until the Mac has been tested.
 
-With either transfer mode, do not run `createsuperuser` again unless the
-transferred library has no usable staff administrator: staff accounts and their
-password hashes are already in the database. To reset an administrator
-password, use:
+### Recommended verified transfer
+
+For the school's final transfer, use a verified database-and-media archive.
+
+On the old computer, stop the app and run:
 
 ```bash
-python manage.py changepassword USERNAME
+make backup
 ```
+
+Move the archive printed by that command to the Mac. From the cloned project
+on the Mac, restore it into a **new folder**, adjusting the archive path:
+
+```bash
+python3.12 tools/library_backup.py restore ~/Downloads/shelf-school-ARCHIVE.tar.gz --destination ../restored-library
+```
+
+The tool checks file hashes and database integrity. Copy `db.sqlite3` and
+`media/` from `restored-library` into the project, moving any temporary versions
+aside first. Then run `make setup PYTHON=python3.12` and `make start`.
+Keep the archive unchanged until the Mac has been tested.
 
 ### Validate the transferred library
 
-Run this command on both computers and confirm that the counts match:
+Check several books, their covers, an existing borrower, and loan history.
+Sign in with a transferred Staff account, then complete a test checkout and
+return. Do not continue circulating books on the old computer after the final
+transfer.
+
+To reset a transferred administrator's password:
 
 ```bash
-python manage.py shell -c "from django.contrib.auth import get_user_model; from library.models import Book, Copy, Borrower, Loan; print({'books': Book.objects.count(), 'copies': Copy.objects.count(), 'borrowers': Borrower.objects.count(), 'loans': Loan.objects.count(), 'staff': get_user_model().objects.filter(is_staff=True).count()})"
+.venv/bin/python manage.py changepassword USERNAME
 ```
-
-Start the Mac copy and verify the school logo, several book covers, staff login,
-one existing borrower, and one loan-history page. Complete a test checkout and
-return before treating the Mac as the active installation.
-
-## Test the installation
-
-Test it on the Mac before configuring automatic startup:
-
-```bash
-python manage.py runserver 127.0.0.1:8427 --noreload
-```
-
-Open `http://127.0.0.1:8427/`, complete one checkout and return, then stop the
-server with `Control-C`.
 
 ## Allow devices on the private Wi-Fi
 
-For circulation from phones, tablets, and other computers, start Shelf-School
-on every Mac network interface:
+`make start` defaults to **this Mac only**. To allow trusted LAN devices, stop
+the running app and restart it with an explicit listening address and allowed
+browser hostnames. Substitute the actual Mac name and LAN address:
 
 ```bash
-python manage.py runserver 0.0.0.0:8427 --noreload
+make start BIND=0.0.0.0 HOSTS=localhost,127.0.0.1,Library-Mac.local,192.168.1.25
 ```
 
-`0.0.0.0` is a listening address, **not** the address entered in a browser.
-Find the Mac's Bonjour name and active LAN address in macOS Terminal:
+Open `http://Library-Mac.local:8427/` or `http://192.168.1.25:8427/` from another
+device. **Do not enter 0.0.0.0 in the browser**; it is the listening address.
+
+Find the Mac's name and active network address:
 
 ```bash
 scutil --get LocalHostName
@@ -199,285 +158,137 @@ interface=$(route -n get default | awk '/interface:/{print $2}')
 ipconfig getifaddr "$interface"
 ```
 
-If the Bonjour name is `Library-Mac` and the address is `192.168.1.25`, test
-these URLs from another device on the same Wi-Fi:
+Allow Python's incoming connections if macOS asks. Devices must share the
+private network, not an isolated guest Wi-Fi. If the IP address changes, update
+`HOSTS`; a DHCP reservation can keep the address stable.
 
-```text
-http://Library-Mac.local:8427/
-http://192.168.1.25:8427/
-```
-
-The `.local` name is easier to remember. If the school network does not carry
-Bonjour traffic reliably, ask the network administrator to reserve the Mac's IP
-address in DHCP and use that address.
-
-On the first connection, macOS may ask whether Python can accept incoming
-connections. Allow it. If another device still cannot connect, confirm that:
-
-- It is using the same private Wi-Fi, not a guest network.
-- Wireless client isolation or AP isolation is disabled for that network.
-- The macOS firewall allows incoming connections for Python.
-- No router port forwarding exposes port `8427` to the internet.
-
-The public circulation desk is intentionally available to everyone on that
-network. Staff pages still require a staff account. Camera capture uses the
-## Guided service setup
-
-After installing dependencies and creating or transferring the database, use
-the service helper to configure startup. It checks Python, dependencies, Django
-configuration, and pending migrations. It generates a private secret
-automatically, preserving the secret if the system service is already installed.
-
-From Terminal in the **macOS administrator account**, replace the user and
-hostnames with your actual values:
-
-```bash
-cd /Users/library/shelf-school
-sudo .venv/bin/python tools/macos_service.py install \
-  --user library \
-  --hosts localhost,127.0.0.1,Library-Mac.local,192.168.1.25
-```
-
-Stop a manually running server first. If you previously installed a LaunchAgent,
-unload it from its owner's session before using this helper. The helper replaces
-the system service with label `org.shelfschool.server`, if present.
-
-By default, the app listens on port **8427**. Use `--port 8428` to change it.
-Check the service:
-
-```bash
-sudo .venv/bin/python tools/macos_service.py status
-```
-
-For upgrades, manual backups, or data transfers, stop the service:
-
-```bash
-sudo .venv/bin/python tools/macos_service.py stop
-```
-
-After completing maintenance as `library`, resume it from the administrator
-account:
-
-```bash
-sudo .venv/bin/python tools/macos_service.py start
-```
-
-**Backups are manual.** This helper does not install a backup job or schedule.
-See [Backup and recovery](./backup.md#verified-full-archives) for manual backup
-and restore commands. The manual plist instructions below are an alternative
-to the helper; you do not need to follow both methods.
-
-## Manual setup: create a private secret
-
-Generate a secret once:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(50))"
-```
-
-Keep the result private. The next section stores it in a protected system
-service file. Do not add that file to Git or publish the secret in an issue.
-
-<details className="alert alert--info">
-<summary><strong>Why does Shelf-School need this secret?</strong></summary>
-
-`DJANGO_SECRET_KEY` is the installation's private cryptographic signing key. It
-protects staff login sessions and signs short-lived circulation confirmations,
-preventing checkout or return details from being altered in the browser. It is
-not an administrator password, a paid API key, or a key for encrypting the
-database, photos, or account passwords.
-
-Generate it once and keep the same value across restarts and upgrades. Changing
-it signs staff out and invalidates pending circulation confirmations, but does
-not remove books, borrowers, loans, or passwords. If the database is moved to a
-new Mac, using a new secret is acceptable; everyone will simply need to sign in
-again. Keep a secure backup of the deployed value and never commit it to Git.
-
-</details>
+Use `PORT=8428` to choose a different port. A less common port is convenient,
+not a security control. Camera permissions vary by browser over plain HTTP;
+manual search and image uploads remain available.
 
 ## Start automatically with launchd
 
-Apple uses `launchd` to manage background processes. How Shelf-School is
-started determines when it is available:
+Manual `make start` runs in a user's Terminal session. For a dedicated Mac that
+must remain available across login/logout, install the **LaunchDaemon** once.
 
-| Method | Starts | Stops |
-| --- | --- | --- |
-| Terminal command | When a person runs it | Terminal closes or that user logs out |
-| LaunchAgent | When its macOS user logs in | That user logs out |
-| **LaunchDaemon** | **When the Mac boots** | **Mac shuts down or the service is stopped** |
-
-For a dedicated library Mac, use the **LaunchDaemon** below. It keeps
-Shelf-School available over Wi-Fi while macOS users log in and out. Although
-`root` installs and manages the service, Shelf-School itself runs as the
-dedicated, non-administrator `library` user.
-
-:::note When a LaunchAgent is enough
-A LaunchAgent is simpler if the Mac automatically signs in to one dedicated
-kiosk account and Shelf-School only needs to run during that login session. A
-LaunchDaemon is the appropriate choice when the app must work before login and
-survive user logout.
-:::
-
-Create `~/org.shelfschool.server.plist` with the following content. Replace
-`PASTE_PRIVATE_SECRET_HERE`, `Library-Mac.local`, and `192.168.1.25`. Replace
-`library` and `/Users/library` if the macOS account that owns the installation
-has a different short name or home directory.
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>org.shelfschool.server</string>
-  <key>UserName</key>
-  <string>library</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/Users/library/shelf-school/.venv/bin/python</string>
-    <string>/Users/library/shelf-school/manage.py</string>
-    <string>runserver</string>
-    <string>0.0.0.0:8427</string>
-    <string>--noreload</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>/Users/library/shelf-school</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>DJANGO_SECRET_KEY</key>
-    <string>PASTE_PRIVATE_SECRET_HERE</string>
-    <key>DJANGO_ALLOWED_HOSTS</key>
-    <string>localhost,127.0.0.1,Library-Mac.local,192.168.1.25</string>
-    <key>PYTHONUNBUFFERED</key>
-    <string>1</string>
-  </dict>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/Users/library/Library/Logs/shelf-school.log</string>
-  <key>StandardErrorPath</key>
-  <string>/Users/library/Library/Logs/shelf-school-error.log</string>
-</dict>
-</plist>
-```
-
-This configuration enables private-LAN access. For a Mac-only kiosk, use
-`127.0.0.1:8427` in `ProgramArguments` and
-`localhost,127.0.0.1` in `DJANGO_ALLOWED_HOSTS` instead.
-
-Create the plist from Terminal in the **macOS administrator account**. Its `~`
-path refers to that administrator's home; the paths inside the plist still
-refer to `library`. Stop any manually running Shelf-School server first.
-If an older LaunchAgent is installed, unload it from its owner's session and
-remove its plist before enabling this service, so only one server uses the port.
-
-Install the file as a protected system service, validate it, and load it from
-the administrator's Terminal:
+First stop the manually running app. Then open Terminal in the **macOS
+administrator account**, enter the project folder, and run:
 
 ```bash
-chmod 600 ~/org.shelfschool.server.plist
-sudo cp ~/org.shelfschool.server.plist /Library/LaunchDaemons/
-sudo chown root:wheel /Library/LaunchDaemons/org.shelfschool.server.plist
-sudo chmod 600 /Library/LaunchDaemons/org.shelfschool.server.plist
-sudo plutil -lint /Library/LaunchDaemons/org.shelfschool.server.plist
-sudo launchctl bootstrap system /Library/LaunchDaemons/org.shelfschool.server.plist
-sudo launchctl kickstart -k system/org.shelfschool.server
-rm ~/org.shelfschool.server.plist
+cd /Users/library/shelf-school
+make service-install SERVICE_USER=library
 ```
 
-After loading it, verify the local and private-LAN URLs. Restart the Mac, but do
-not log in immediately; confirm from another device that Shelf-School is
-already available. Then log in and log out once and confirm that it remains
-available.
+The command asks for the macOS administrator's password through `sudo`.
+Shelf-School itself runs as the non-root `library` account. No plist editing is
+needed. The helper verifies dependencies, write access, and pending migrations.
 
-:::warning Keep the Mac awake
-`launchd` restarts Shelf-School if its process exits, but it cannot serve other
-devices while the Mac is asleep. In **System Settings > Energy Saver**, enable
-the option that prevents automatic sleeping while the display is off. The
-display may still turn off normally.
-:::
-
-An encrypted startup disk may require a FileVault unlock after a cold boot
-before macOS and its services can start. A LaunchDaemon does not bypass that
-unlock. Verify the school's actual restart procedure on the Mac.
-
-## Check status and logs
-
-Run service commands from the macOS administrator account:
+For private-Wi-Fi access, install with the same explicit network settings:
 
 ```bash
-sudo launchctl print system/org.shelfschool.server
+make service-install SERVICE_USER=library BIND=0.0.0.0 HOSTS=localhost,127.0.0.1,Library-Mac.local,192.168.1.25
+```
+
+Service settings are saved, so they need not be repeated when starting it.
+To change them, rerun `service-install` with the desired settings.
+If an older LaunchAgent is running, unload it from its owner's session first;
+only one server should use the port.
+
+### Everyday service commands
+
+From the project folder in the macOS administrator's Terminal:
+
+| Command | Effect |
+| --- | --- |
+| `make service-status` | Show launchd's service status |
+| `make service-stop` | Stop the background app |
+| `make service-start` | Start it again with its saved settings |
+
+Do not run `make start` while the service is already running.
+
+:::warning Sleep and FileVault
+A service cannot serve other devices while the Mac is asleep. Configure the Mac
+to stay awake during library hours; the display can still turn off.
+FileVault may require unlocking the disk after a cold boot before services can
+start. Test an actual restart and logout on the school's Mac.
+:::
+
+The service logs are in the library user's `~/Library/Logs/` folder:
+
+```bash
 sudo tail -f /Users/library/Library/Logs/shelf-school-error.log
 ```
 
-To stop the service:
+<details className="alert alert--info">
+<summary><strong>Where is the private secret, and why is it needed?</strong></summary>
 
-```bash
-sudo launchctl bootout system /Library/LaunchDaemons/org.shelfschool.server.plist
-```
+Make commands store the installation's signing key in `.shelf-school-secret`
+with owner-only permissions. Git ignores the file. It is not a login password
+or a paid API key, and it does not encrypt the database or photos.
 
-Load it again with the `bootstrap` command above.
+The key signs login sessions and circulation confirmations. Keep it unchanged
+across restarts and upgrades. The service installer reuses it for a new service;
+an already installed service retains its existing key in its protected plist.
+
+The database-and-media archive does not include this key. Store it separately
+if you need to preserve sessions. A new key on a new Mac is acceptable; users
+will need to sign in again.
+
+</details>
 
 ## Back up the library
 
-The database and uploaded images are both required for a complete recovery:
+Backups are **manual only**. Stop the app or service, then run as `library`:
 
-```text
-/Users/library/shelf-school/db.sqlite3
-/Users/library/shelf-school/media/
+```bash
+make backup
 ```
 
-Stop the service before taking a filesystem copy. Store backups on a different
-device and test restoration periodically. See [Backup](./backup.md) for the
-complete policy.
+The command prints the verified archive path under `backups/`. For an external
+drive, use an existing destination directory:
+
+```bash
+make backup DEST=/Volumes/LibraryBackup
+```
+
+No backup schedule is installed. Keep a copy off the Mac and test restoration.
+See [Backup and recovery](./backup.md) for details.
 
 ## Upgrade Shelf-School
 
-Choose a time when nobody is circulating books. From the **macOS administrator
-account**, stop the service:
+Choose a time when nobody is circulating books.
+
+1. As the macOS administrator, run `make service-stop`, or use Control-C for a
+   manually started server.
+2. As `library`, from the project folder:
 
 ```bash
-cd /Users/library/shelf-school
-sudo .venv/bin/python tools/macos_service.py stop
-```
-
-Then, in a Terminal session as **library**, update the application:
-
-```bash
-cd /Users/library/shelf-school
-cp db.sqlite3 "db.sqlite3.backup-$(date +%Y%m%d)"
-source .venv/bin/activate
+make backup
 git pull --ff-only
-python -m pip install -r requirements.txt
-python manage.py migrate
-python manage.py check
+make setup PYTHON=python3.12
 ```
 
-Return to the **macOS administrator account** to start the service:
+3. As the macOS administrator, run `make service-start`. For a manually run
+   installation, use `make start` instead.
+4. Verify the kiosk and a test checkout.
 
-```bash
-cd /Users/library/shelf-school
-sudo .venv/bin/python tools/macos_service.py start
-```
+Setup preserves existing records and administrator credentials; it does not
+replace the database or create duplicate accounts. It does not pull Git changes
+or create backups on its own.
 
-Open the kiosk and perform a test checkout after every upgrade.
+## Troubleshooting
 
-## When the requirements change
+- **Port already in use:** stop the other Shelf-School process or use
+  `make start PORT=8428`.
+- **Invalid HTTP_HOST:** add the actual browser hostname or IP to `HOSTS`.
+  Reinstall the service with the updated settings if using launchd.
+- **No administrator and no interactive Terminal:** setup leaves the prepared
+  library intact. Run `make admin` in Terminal.
+- **Pending migrations:** stop the app and run `make setup PYTHON=python3.12`.
+- **Need to inspect the installation:** run `make check`.
+- **Need the command list:** run `make help`.
 
-This setup is no longer appropriate when:
-
-- The Mac is reachable from outside the trusted school network.
-- Guest or otherwise untrusted devices share the same network segment.
-- Staff need encrypted remote login or the school requires HTTPS.
-- Usage grows beyond a small number of concurrent circulation devices.
-- The school requires centralized TLS certificates or device management.
-
-At that point, use a production WSGI server, `DEBUG = False`, collected static
-files, HTTPS, and a reverse proxy such as Caddy.
-
-## References
-
-- [Apple: Script management with launchd](https://support.apple.com/guide/terminal/script-management-with-launchd-apdc6c1077b-5d5d-4d35-9c19-60f2397b2369/mac)
-- [Django deployment checklist](https://docs.djangoproject.com/en/dev/howto/deployment/checklist/)
+If the Mac becomes internet-facing, shares an untrusted network, or requires
+encrypted remote access, use a production WSGI server, HTTPS, and a reverse
+proxy such as Caddy. See the
+[Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/).

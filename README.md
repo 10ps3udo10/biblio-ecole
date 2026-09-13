@@ -31,7 +31,7 @@ cataloging, borrowers, reports, school settings, and backups.
 
 School employees can also be borrowers without login credentials. Anyone can browse
 the public catalog for book availability and shelf locations. Employee positions
-are configurable in Settings and supported by borrower and school-staff CSV imports.
+and student classes are configurable in Settings and supported by the unified borrower CSV import.
 
 **Project status:** `0.1.0-dev`. Shelf-School is under active development and
 has not reached its first stable release.
@@ -88,6 +88,18 @@ It covers both Mac-only and trusted private-Wi-Fi access without Nginx or Caddy.
 The Mac service helper configures startup. Backups are manual, with portable
 commands for verified database-and-media archives and recovery.
 Create a fresh macOS `.venv`; do not copy a Linux virtual environment.
+
+After cloning on a Mac with Git, Make, and Python installed:
+
+```bash
+make setup PYTHON=python3.12
+make start
+```
+
+Setup preserves existing data and creates the first administrator only when
+needed. If transferring a library, copy `db.sqlite3` and `media/` before setup.
+No virtual-environment activation or browser installation is needed.
+Run `make help` for manual backup and optional macOS boot-time service commands.
 
 ## Development
 

@@ -1,11 +1,13 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{% if user_theme == 'dark' %}dark{% else %}light{% endif %}" data-theme-preference="{{ user_theme }}" data-table-density="{{ user_table_density }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ school_profile.display_name }}{% endblock %}</title>
+  <script src="{% static 'js/theme.js' %}"></script>
   <link rel="icon" href="{% static 'img/shelf-school-logo.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/theme.css' %}">
   <link rel="stylesheet" href="{% static 'css/library.css' %}">
   <script defer src="{% static 'vendor/lucide/lucide.min.js' %}"></script>
   <script>document.addEventListener("DOMContentLoaded", function () { if (window.lucide) window.lucide.createIcons(); });</script>
@@ -23,20 +25,20 @@
         <div>
           <a href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard" aria-hidden="true"></i>Overview</a>
           <a href="{% url 'book_list' %}"><i data-lucide="book-open" aria-hidden="true"></i>Catalog</a>
-          <a href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Photo intake</a>
           <a href="{% url 'borrower_list' %}"><i data-lucide="users" aria-hidden="true"></i>Borrowers</a>
           <a href="{% url 'overdue_loans' %}"><i data-lucide="clock-alert" aria-hidden="true"></i>Overdue</a>
+          {% if request.user.is_staff %}<hr><a href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>School settings</a>{% endif %}
         </div>
       </details>
       <a href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a>
-      <details class="nav-menu account-menu{% if request.resolver_match.url_name == 'school_settings' %} active{% endif %}">
+      <details class="nav-menu account-menu{% if request.resolver_match.url_name == 'my_account' %} active{% endif %}">
         <summary class="staff-user" aria-label="Signed in as {{ request.user.get_full_name|default:request.user.username }}"><span class="staff-user-mark" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>{{ request.user.get_full_name|default:request.user.username }}</summary>
         <div>
-          {% if request.user.is_staff %}<a href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>Settings</a>{% endif %}
+          {% if request.user.is_staff %}<a href="{% url 'my_account' %}"><i data-lucide="user-round" aria-hidden="true"></i>My account</a>{% endif %}
           <form class="nav-logout" method="post" action="{% url 'staff_logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}"><i data-lucide="log-out" aria-hidden="true"></i>Sign out</button></form>
         </div>
       </details>
-    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a href="{% url 'public_catalog' %}"><i data-lucide="library" aria-hidden="true"></i>Catalog</a><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'staff_login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Staff login</a></nav>{% endif %}
+    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a href="{% url 'public_catalog' %}"><i data-lucide="library" aria-hidden="true"></i>Catalog</a><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'staff_login' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Staff login</a></nav>{% endif %}
   </header>
   <main class="page">
     {% if messages %}

@@ -126,7 +126,14 @@ def test_installer_preserves_existing_secret(monkeypatch, tmp_path):
     monkeypatch.setattr(macos_service, "write_private", lambda path, data: path.write_bytes(data))
     macos_service.install(SimpleNamespace(
         project=project, user="library", hosts="localhost",
-        port=8427,
+        port=8427, bind="127.0.0.1",
     ))
     installed = plistlib.loads((daemons / f"{macos_service.SERVER}.plist").read_bytes())
     assert installed["EnvironmentVariables"]["DJANGO_SECRET_KEY"] == "keep-this-secret"
+
+
+@pytest.mark.parametrize("bind", ["127.0.0.1", "0.0.0.0"])
+def test_service_binding_is_explicit(monkeypatch, tmp_path, bind):
+    monkeypatch.setattr(macos_service.pwd, "getpwnam", lambda user: SimpleNamespace(pw_dir=str(tmp_path)))
+    server = macos_service.service_plist(tmp_path, "library", "localhost", 8428, "secret", bind)
+    assert f"{bind}:8428" in server["ProgramArguments"]
