@@ -113,17 +113,24 @@ cannot leave half a basket checked out.**
   <div className="model-relation"><strong>1 to many</strong><small>loan history</small></div>
   <div className="model-node"><strong>Loan</strong><small>Checkout, due, return</small></div>
   <div className="model-relation"><strong>many to 1</strong><small>assigned to</small></div>
-  <div className="model-node"><strong>Borrower</strong><small>Student or staff member</small></div>
+  <div className="model-node"><strong>Borrower</strong><small>Student or employee</small></div>
 </div>
 
 <div className="model-supporting">
   <div><strong>Staff account <span>1 to 1</span> Borrower</strong><small>Borrower ID, name, and email stay synchronized.</small></div>
   <div><strong>School profile <span>1 per installation</span></strong><small>Branding, contact details, and default loan duration.</small></div>
+  <div><strong>School class <span>1 to many</span> Students</strong><small>Optional assignment; renaming updates every linked profile.</small></div>
+  <div><strong>Employee position <span>1 to many</span> Employees</strong><small>Optional assignment, independent of login permissions.</small></div>
 </div>
 
 The database enforces **one active loan per physical copy**. Returned loans stay
 as history, and deleting or deactivating staff access does not remove the linked
 borrower or circulation records.
+
+Classes and positions are protected foreign keys: assigned entries cannot be
+deleted. Deactivation prevents new assignments while preserving existing ones.
+The single borrower CSV importer validates both roles and their assignments in
+one transaction; it never creates authentication accounts.
 
 ## Trust boundaries
 

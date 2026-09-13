@@ -36,7 +36,7 @@
           <form class="nav-logout" method="post" action="{% url 'staff_logout' %}">{% csrf_token %}<button title="Sign out {{ request.user.username }}"><i data-lucide="log-out" aria-hidden="true"></i>Sign out</button></form>
         </div>
       </details>
-    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'staff_login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Staff login</a></nav>{% endif %}
+    </nav>{% else %}<nav class="public-nav" aria-label="Utility navigation"><a href="{% url 'public_catalog' %}"><i data-lucide="library" aria-hidden="true"></i>Catalog</a><a class="public-docs" href="{{ docs_url }}"><i data-lucide="book-open-text" aria-hidden="true"></i>Docs</a><a href="{% url 'staff_login' %}?next={% url 'dashboard' %}"><i data-lucide="lock-keyhole" aria-hidden="true"></i>Staff login</a></nav>{% endif %}
   </header>
   <main class="page">
     {% if messages %}

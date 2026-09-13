@@ -11,11 +11,15 @@
   </div>
 </section>
 <form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, contributor, topic, level, ISBN, or shelf"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button><i data-lucide="search" aria-hidden="true"></i>Search</button></form>
+<div class="staff-catalog-toolbar">
+  <p class="muted">{% if books.paginator.count %}{{ books.start_index }} to {{ books.end_index }} of {{ books.paginator.count }} titles{% else %}0 titles{% endif %}</p>
+  {% include "library/staff_catalog_pagination.html" with label="Catalog pages" %}
+</div>
 <form id="cover-fetch-form" method="post" action="{% url 'fetch_book_covers' %}">
   {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
   <div class="table-wrap">
     <table>
-      <thead><tr><th class="select-cell" scope="col"><input class="table-select" id="select-all-covers" type="checkbox" aria-label="Select all books eligible for cover fetching"></th>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
+      <thead><tr><th class="select-cell" scope="col"><input class="table-select" id="select-all-covers" title="Select eligible books on this page" type="checkbox" aria-label="Select eligible books on this page"></th>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
       <tbody>
         {% for book in books %}
           <tr><td class="select-cell">{% if book.cover_fetch_eligible %}<input class="table-select cover-book-select" type="checkbox" name="books" value="{{ book.pk }}" aria-label="Select {{ book.title }}">{% endif %}</td><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} available</td><td>{{ book.copy_count }}</td><td><span class="cover-status {% if book.cover_image %}available{% else %}missing{% endif %}"><i data-lucide="{% if book.cover_image %}image{% elif book.cover_fetch_eligible %}image-off{% else %}barcode{% endif %}" aria-hidden="true"></i>{% if book.cover_image %}Available{% elif book.cover_fetch_eligible %}Missing{% else %}ISBN needed{% endif %}</span></td><td><span class="catalog-status {% if book.needs_information %}incomplete{% else %}complete{% endif %}">{% if book.needs_information %}Needs information{% else %}Complete{% endif %}</span></td></tr>
@@ -24,6 +28,7 @@
     </table>
   </div>
 </form>
+{% include "library/staff_catalog_pagination.html" with label="Catalog pages, bottom" %}
 <script>
   (function () {
     const selectAll = document.getElementById("select-all-covers");
@@ -34,7 +39,7 @@
     function updateSelection() {
       const selected = choices.filter((choice) => choice.checked).length;
       button.disabled = selected === 0;
-      count.textContent = selected + " selected";
+      count.textContent = selected + " selected on this page";
       selectAll.disabled = choices.length === 0;
       selectAll.checked = choices.length > 0 && selected === choices.length;
       selectAll.indeterminate = selected > 0 && selected < choices.length;

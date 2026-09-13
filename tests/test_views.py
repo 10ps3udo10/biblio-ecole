@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from library.forms import PhotoCirculationForm
-from library.models import Book, Borrower, Copy, Loan, SchoolProfile
+from library.models import SchoolClass, Book, Borrower, Copy, Loan, SchoolProfile
 from library.photo_intake import is_valid_isbn
 
 
@@ -54,15 +54,16 @@ def test_staff_login_is_separate_from_django_admin_and_rejects_nonstaff(client, 
 
 
 @pytest.mark.django_db
-def test_settings_explains_staff_borrower_boundary(client, django_user_model):
+def test_settings_separates_school_borrowers_and_access(client, django_user_model):
     django_user_model.objects.create_superuser(username="system-owner", password="secret", email="")
     assert client.login(username="system-owner", password="secret")
 
     response = client.get(reverse("school_settings"))
 
-    assert b"Staff accounts and borrowers serve different purposes" in response.content
-    assert b"Every staff account includes a linked borrower profile" in response.content
-    assert b"borrower ID, name, and email stay synchronized" in response.content
+    assert b"School details" in response.content
+    assert b"Access and data" in response.content
+    assert b'aria-label="Classes"' in response.content
+    assert b'aria-label="Employee positions"' in response.content
     assert b"Manage staff accounts" in response.content
     assert b"Open Advanced (Django Admin)" in response.content
 
@@ -280,8 +281,8 @@ def test_cover_fetch_requires_a_selected_book(logged_in_client):
 @pytest.mark.django_db
 def test_borrower_table_sorts_by_name_class_loans_and_status(logged_in_client):
     staff_borrower = Borrower.objects.get(username="librarian")
-    alpha = Borrower.objects.create(username="alpha", first_name="Amy", last_name="Zulu", class_name="1A")
-    beta = Borrower.objects.create(username="beta", first_name="Ben", last_name="Alpha", class_name="2B", active=False)
+    alpha = Borrower.objects.create(username="alpha", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
+    beta = Borrower.objects.create(username="beta", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="2B")[0], active=False)
     book = Book.objects.create(title="Borrowed title")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=copy, borrower=alpha)
@@ -600,7 +601,8 @@ def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
             "username": "correct-user",
             "first_name": "Correct",
             "last_name": "Name",
-            "class_name": "4A",
+            "school_role": "student",
+            "school_class": SchoolClass.objects.get_or_create(name="4A")[0].pk,
             "email": "correct@example.org",
         },
     )
@@ -891,6 +893,7 @@ def test_return_search_includes_inactive_borrower_with_active_loan(client):
             "copy_number": 1,
             "due_date": Loan.objects.get(copy=copy).due_date.isoformat(),
             "overdue": False,
+            "cover_url": "",
         }
     ]
 
@@ -1087,7 +1090,7 @@ def test_checkout_basket_rejects_duplicate_and_allows_removal(client):
 @pytest.mark.django_db
 def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
     wrong = Borrower.objects.create(username="wrong", first_name="Wrong", last_name="Student")
-    correct = Borrower.objects.create(username="correct", first_name="Correct", last_name="Student", class_name="3B")
+    correct = Borrower.objects.create(username="correct", first_name="Correct", last_name="Student", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
     copy = Copy.objects.create(book=Book.objects.create(title="Mistaken borrower"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     loan = Loan.objects.create(copy=copy, borrower=wrong)
 
@@ -1209,13 +1212,14 @@ def test_staff_can_complete_school_setup(logged_in_client):
 
 @pytest.mark.django_db
 def test_staff_can_import_and_update_borrowers(logged_in_client):
+    SchoolClass.objects.create(name="4A")
     Borrower.objects.create(username="mrueda", first_name="Old", last_name="Name")
     csv_file = SimpleUploadedFile(
         "borrowers.csv",
-        b"Borrower ID,First name,Last name,Class,Email,Active\n"
-        b"mrueda,Manuel,Rueda,Staff,mrueda@example.org,yes\n"
-        b"librarian,Changed,Name,Library,changed@example.org,yes\n"
-        b"ana,Ana,Garcia,4A,ana@example.org,true\n",
+        b"Borrower ID,First name,Last name,School role,Class,Email,Active\n"
+        b"mrueda,Manuel,Rueda,Employee,,mrueda@example.org,yes\n"
+        b"librarian,Changed,Name,Employee,,changed@example.org,yes\n"
+        b"ana,Ana,Garcia,Student,4A,ana@example.org,true\n",
         content_type="text/csv",
     )
 
@@ -1224,11 +1228,11 @@ def test_staff_can_import_and_update_borrowers(logged_in_client):
     assert response.status_code == 302
     assert Borrower.objects.count() == 3
     assert Borrower.objects.get(username="mrueda").first_name == "Manuel"
-    assert Borrower.objects.get(username="ana").class_name == "4A"
+    assert Borrower.objects.get(username="ana").school_class.name == "4A"
     staff_borrower = Borrower.objects.get(username="librarian")
     assert staff_borrower.full_name == "librarian"
     assert staff_borrower.email == ""
-    assert staff_borrower.class_name == "Library"
+    assert staff_borrower.school_class is None
 
 
 @pytest.mark.django_db

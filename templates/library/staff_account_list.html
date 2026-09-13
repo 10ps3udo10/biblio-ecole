@@ -2,7 +2,7 @@
 {% block title %}Staff accounts - Shelf-School{% endblock %}
 {% block content %}
 <section class="staff-accounts-heading">
-  <div><span class="eyebrow">People and access</span><h1>Staff accounts</h1><p>Adults who can sign in and operate Shelf-School.</p></div>
+  <div><span class="eyebrow">People and access</span><h1>Staff accounts</h1><p>People who can sign in and operate Shelf-School.</p></div>
   <a class="button primary" href="{% url 'staff_account_create' %}"><i data-lucide="user-plus" aria-hidden="true"></i>Add staff account</a>
 </section>
 <div class="table-wrap">
@@ -16,7 +16,10 @@
         <td>{% if account.borrower_profile %}<a href="{{ account.borrower_profile.get_absolute_url }}">{{ account.borrower_profile.full_name|default:account.borrower_profile.username }}</a>{% else %}<span class="muted">Not linked</span>{% endif %}</td>
         <td><span class="status-badge {% if account.is_active %}active{% else %}inactive{% endif %}">{% if account.is_active %}Active{% else %}Inactive{% endif %}</span></td>
         <td>{{ account.last_login|date:"j M Y, H:i"|default:"Never" }}</td>
-        <td class="table-actions">{% if account.is_staff %}<a href="{% url 'staff_account_edit' account.pk %}">Edit</a><a href="{% url 'staff_account_password' account.pk %}">Reset password</a>{% endif %}</td>
+        <td>{% if account.is_staff %}<div class="staff-account-actions">
+          <a class="button" href="{% url 'staff_account_edit' account.pk %}" aria-label="Edit {{ account.username }}" title="Edit account"><i data-lucide="user-pen" aria-hidden="true"></i></a>
+          <a class="button" href="{% url 'staff_account_password' account.pk %}" aria-label="Reset password for {{ account.username }}" title="Reset password"><i data-lucide="key-round" aria-hidden="true"></i></a>
+        </div>{% endif %}</td>
       </tr>
       {% empty %}<tr><td colspan="6">No staff accounts found.</td></tr>{% endfor %}
     </tbody>

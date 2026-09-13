@@ -1,0 +1,59 @@
+{% extends "library/base.html" %}
+{% block title %}Catalog - {{ school_profile.display_name }}{% endblock %}
+{% block content %}
+<header class="borrower-heading"><div><span class="eyebrow">{{ school_profile.display_name }}</span><h1>Catalog</h1></div><a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Borrow or return</a></header>
+<form class="public-catalog-search" method="get">
+  <label class="visually-hidden" for="catalog-query">Search catalog</label>
+  <input id="catalog-query" type="search" name="q" value="{{ query }}" placeholder="Title, contributor, topic, ISBN, or shelf">
+  <label class="visually-hidden" for="catalog-sort">Sort by</label>
+  <select id="catalog-sort" name="sort"><option value="title"{% if sort == "title" %} selected{% endif %}>Title</option><option value="author"{% if sort == "author" %} selected{% endif %}>Contributor</option><option value="availability"{% if sort == "availability" %} selected{% endif %}>Availability</option></select>
+  <button class="button primary"><i data-lucide="search" aria-hidden="true"></i>Search</button>
+  <div class="catalog-filters">
+    <label class="catalog-available"><input type="checkbox" name="available" value="1"{% if available_only %} checked{% endif %}>Available only</label>
+    {% if shelves %}<label><span id="catalog-shelf-label">Shelf</span><select name="shelf" aria-labelledby="catalog-shelf-label"><option value="">All shelves</option>{% for item in shelves %}<option{% if item == shelf %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>{% endif %}
+    {% if languages %}<label><span id="catalog-language-label">Language</span><select name="language" aria-labelledby="catalog-language-label"><option value="">All languages</option>{% for item in languages %}<option{% if item == language %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>{% endif %}
+    {% if query or shelf or language or available_only %}<a href="{% url 'public_catalog' %}">Clear filters</a>{% endif %}
+  </div>
+</form>
+<div class="catalog-results-toolbar"><p class="muted">{{ catalog.paginator.count }} title{{ catalog.paginator.count|pluralize }}</p>
+  <div class="catalog-view-switch" role="group" aria-label="Catalog view" hidden>
+    <button type="button" data-view="list" aria-label="List view" title="List view" aria-pressed="true"><i data-lucide="list" aria-hidden="true"></i></button>
+    <button type="button" data-view="grid" aria-label="Grid view" title="Grid view" aria-pressed="false"><i data-lucide="layout-grid" aria-hidden="true"></i></button>
+  </div>
+</div>
+<div class="public-catalog-results" data-view="list">
+{% for book in catalog %}
+<article class="public-catalog-row">
+  {% if book.cover_image %}<img class="desk-book-cover" src="{{ book.cover_image.url }}" alt="" loading="lazy">{% else %}<span class="desk-book-cover cover-fallback"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
+  <div class="catalog-book-info"><h2><a href="{% url 'public_book' book.pk %}">{{ book.title }}</a></h2><p>{{ book.authors }}</p><p class="catalog-location"><i data-lucide="map-pin" aria-hidden="true"></i>{% if book.public_locations %}{{ book.public_locations|join:", " }}{% else %}No shelf assigned{% endif %}</p></div>
+  <span class="status-badge {% if book.public_available %}active{% else %}inactive{% endif %}">{% if book.public_available %}{{ book.public_available }} available{% else %}Not available{% endif %}</span>
+</article>
+{% empty %}<p class="empty-state">No matching books.</p>{% endfor %}
+</div>
+{% if catalog.has_other_pages %}<nav class="catalog-pagination" aria-label="Catalog pages">
+{% if catalog.has_previous %}<a class="button" href="?{{ pagination_query }}&amp;page={{ catalog.previous_page_number }}">Previous</a>{% endif %}
+<span>Page {{ catalog.number }} of {{ catalog.paginator.num_pages }}</span>
+{% if catalog.has_next %}<a class="button" href="?{{ pagination_query }}&amp;page={{ catalog.next_page_number }}">Next</a>{% endif %}
+</nav>{% endif %}
+<script>
+(() => {
+  const results = document.querySelector('.public-catalog-results');
+  const controls = document.querySelector('.catalog-view-switch');
+  const buttons = controls.querySelectorAll('button');
+  function setView(view) {
+    const selected = view === 'grid' ? 'grid' : 'list';
+    results.dataset.view = selected;
+    buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === selected)));
+  }
+  try { setView(localStorage.getItem('shelf-school-catalog-view')); } catch (error) { setView('list'); }
+  controls.hidden = false;
+  buttons.forEach(button => button.addEventListener('click', () => {
+    setView(button.dataset.view);
+    try { localStorage.setItem('shelf-school-catalog-view', button.dataset.view); } catch (error) {}
+  }));
+  document.querySelectorAll('.catalog-filters input, .catalog-filters select, #catalog-sort').forEach(control => {
+    control.addEventListener('change', () => control.form.requestSubmit());
+  });
+})();
+</script>
+{% endblock %}

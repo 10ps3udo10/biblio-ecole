@@ -1,10 +1,240 @@
 import pytest
 from playwright.sync_api import expect
 
-from library.models import Book, Borrower, Copy, Loan
+from library.models import SchoolClass, Book, Borrower, Copy, Loan
 
 
 pytestmark = pytest.mark.playwright
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("kind", ["books", "borrowers"])
+@pytest.mark.parametrize("width", [390, 1440])
+def test_csv_import_reference_and_template_download(page, live_server, django_user_model, kind, width):
+    import csv
+    from pathlib import Path
+    from library.csv_templates import csv_columns
+    django_user_model.objects.create_user(username="import-admin", password="secret", is_staff=True)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.goto(f"{live_server.url}/staff/login/?next=/{kind}/import/")
+    page.locator("input[name=username]").fill("import-admin")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    expect(page.get_by_role("heading", name="Required columns")).to_be_visible()
+    for group in page.locator(".csv-field-group").all():
+        group.locator("summary").click()
+        expect(group.locator("dl")).to_be_visible()
+    with page.expect_download() as download_info:
+        page.get_by_role("link", name="Download CSV template", exact=True).click()
+    download = download_info.value
+    assert download.suggested_filename == f"shelf-school-{kind}-template.csv"
+    with Path(download.path()).open(encoding="utf-8-sig", newline="") as file:
+        assert list(csv.reader(file)) == [csv_columns(kind)["headers"]]
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-import-{kind}-{width}.png", full_page=True)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 1440])
+def test_staff_catalog_pagination_and_page_selection(page, live_server, django_user_model, monkeypatch, width):
+    django_user_model.objects.create_user(username="catalog-admin", password="secret", is_staff=True)
+    Book.objects.bulk_create([Book(title=f"Scale {index:04}", authors="Library author", isbn13="9780306406157") for index in range(1000)])
+    monkeypatch.setattr("library.views.download_cover_by_isbn", lambda isbn: None)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.goto(f"{live_server.url}/staff/login/?next=/books/?q=Scale%26sort=title%26direction=desc")
+    page.locator("input[name=username]").fill("catalog-admin")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    expect(page.get_by_text("1 to 50 of 1000 titles", exact=True)).to_be_visible()
+    expect(page.locator(".cover-book-select")).to_have_count(50)
+    page.get_by_role("checkbox", name="Select eligible books on this page").check()
+    expect(page.locator("#cover-selection-count")).to_have_text("50 selected on this page")
+    pages = page.get_by_role("navigation", name="Catalog pages", exact=True)
+    pages.get_by_role("link", name="Next page", exact=True).click()
+    expect(page.get_by_text("51 to 100 of 1000 titles", exact=True)).to_be_visible()
+    expect(page.locator("#cover-selection-count")).to_have_text("0 selected on this page")
+    expect(page.locator("#cover-fetch-form input[name=next]")).to_have_value("/books/?q=Scale&sort=title&direction=desc&page=2")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-staff-catalog-{width}.png", full_page=True)
+    page.get_by_role("checkbox", name="Select eligible books on this page").check()
+    page.locator("#fetch-covers").click()
+    expect(page.get_by_text("51 to 100 of 1000 titles", exact=True)).to_be_visible()
+    expect(page.get_by_text("Cover fetch complete:", exact=False)).to_contain_text("50 unavailable")
+    pages.get_by_role("link", name="Last page", exact=True).click()
+    expect(page.get_by_text("951 to 1000 of 1000 titles", exact=True)).to_be_visible()
+    page.locator(".search input[name=q]").fill("Scale 0001")
+    page.locator(".search button").click()
+    expect(page.get_by_text("1 to 1 of 1 titles", exact=True)).to_be_visible()
+    expect(page.locator(".cover-book-select")).to_have_count(1)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 768, 1440])
+def test_public_catalog_views_filters_and_pagination(page, live_server, width):
+    for index in range(25):
+        book = Book.objects.create(title=f"Browse book {index:02}", language="English", authors="School author")
+        Copy.objects.create(book=book, copy_number=1, shelf_location="Green")
+    unavailable = Book.objects.create(title="Unavailable book", language="Spanish")
+    Copy.objects.create(book=unavailable, copy_number=1, shelf_location="Red", status="checked_out")
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(f"{live_server.url}/catalog/")
+    expect(page.get_by_role("button", name="List view")).to_have_attribute("aria-pressed", "true")
+    page.get_by_role("button", name="Grid view").click()
+    expect(page.locator(".public-catalog-results")).to_have_attribute("data-view", "grid")
+    page.get_by_label("Available only").check()
+    expect(page.get_by_text("25 titles", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Grid view")).to_have_attribute("aria-pressed", "true")
+    page.get_by_label("Shelf", exact=True).select_option("Green")
+    page.get_by_label("Language", exact=True).select_option("English")
+    page.get_by_role("link", name="Next", exact=True).click()
+    expect(page.get_by_text("Page 2 of 2")).to_be_visible()
+    expect(page.get_by_label("Available only")).to_be_checked()
+    expect(page.get_by_label("Shelf", exact=True)).to_have_value("Green")
+    expect(page.get_by_label("Language", exact=True)).to_have_value("English")
+    expect(page.locator(".public-catalog-row")).to_have_count(1)
+    page.get_by_role("link", name="Previous", exact=True).click()
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-catalog-grid-{width}.png", full_page=True)
+    page.get_by_role("button", name="List view").click()
+    page.reload()
+    expect(page.get_by_role("button", name="List view")).to_have_attribute("aria-pressed", "true")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-catalog-list-{width}.png", full_page=True)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 1440])
+def test_public_catalog_is_read_only_and_responsive(page, live_server, width):
+    book = Book.objects.create(title="The public library book", authors="School author")
+    copy = Copy.objects.create(book=book, copy_number=1, status="checked_out", shelf_location="Green section")
+    borrower = Borrower.objects.create(first_name="Private reader", last_name="Private surname")
+    Loan.objects.create(copy=copy, borrower=borrower)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(live_server.url)
+    page.get_by_role("link", name="Catalog", exact=True).click()
+    page.get_by_role("searchbox", name="Search catalog").fill("public library")
+    page.get_by_role("button", name="Search", exact=True).click()
+    expect(page.get_by_text("Not available", exact=True)).to_be_visible()
+    page.get_by_role("link", name=book.title, exact=True).click()
+    expect(page.get_by_role("heading", name=book.title)).to_be_visible()
+    expect(page.get_by_text("Green section", exact=True)).to_be_visible()
+    expect(page.get_by_text("Checked out", exact=True)).to_be_visible()
+    expect(page.get_by_text("Private reader", exact=False)).to_have_count(0)
+    expect(page.get_by_role("link", name="Edit copy")).to_have_count(0)
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.screenshot(path=f"/tmp/shelf-school-public-catalog-{width}.png", full_page=True)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_manages_classes_positions_and_imports_borrowers(page, live_server, django_user_model):
+    from library.models import SchoolClass, EmployeePosition
+    django_user_model.objects.create_user(username="position-admin", password="secret", is_staff=True)
+    page.goto(f"{live_server.url}/staff/login/?next=/settings/")
+    page.locator("input[name='username']").fill("position-admin")
+    page.locator("input[name='password']").fill("secret")
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    page.get_by_role("link", name="Employee positions", exact=True).click()
+    page.locator("#id_name").fill("Learning support")
+    page.get_by_role("button", name="Save position", exact=True).click()
+    expect(page.get_by_role("cell", name="Learning support", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Settings", exact=True).click()
+    page.get_by_role("link", name="Classes", exact=True).click()
+    page.locator("#id_name").fill("3A")
+    page.get_by_role("button", name="Save class", exact=True).click()
+    expect(page.get_by_role("cell", name="3A", exact=True)).to_be_visible()
+    for width in (1440, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=f"/tmp/shelf-school-classes-{width}.png", full_page=True)
+    page.goto(f"{live_server.url}/borrowers/import/")
+    page.locator("input[type=file]").set_input_files({
+        "name": "staff.csv", "mimeType": "text/csv",
+        "buffer": b"Borrower ID,First name,Last name,School role,Position\nsupport,Sam,Reader,Employee,Learning support\n",
+    })
+    page.get_by_role("button", name="Import borrowers", exact=True).click()
+    expect(page.get_by_role("heading", name="Borrowers", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Sam Reader").click()
+    expect(page.locator(".borrower-badges").get_by_text("Learning support", exact=True)).to_be_visible()
+    expect(page.locator(".borrower-badges").get_by_text("Employee", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Edit borrower", exact=True).click()
+    expect(page.locator("#id_position")).to_be_visible()
+    expect(page.locator("#id_school_class")).not_to_be_visible()
+    page.locator("#id_school_role").select_option("student")
+    expect(page.locator("#id_position")).not_to_be_visible()
+    expect(page.locator("#id_school_class")).to_be_visible()
+    page.locator("#id_school_class").select_option(label="3A")
+    page.get_by_role("button", name="Save", exact=True).click()
+    expect(page.locator(".borrower-badges .school-class")).to_have_text("3A")
+    expect(page.locator(".borrower-badges .position")).to_have_count(0)
+    page.screenshot(path="/tmp/shelf-school-student-class-badge.png", full_page=True)
+    assert django_user_model.objects.count() == 1
+    assert EmployeePosition.objects.filter(name="Learning support").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width,height", [(1440, 1000), (768, 1024), (390, 844)])
+def test_circulation_receipt_and_borrower_change_responsive(page, live_server, width, height):
+    import io
+    from PIL import Image
+    from django.core.files.base import ContentFile
+
+    book = Book.objects.create(title="A school library book with a long title for curious readers")
+    cover = io.BytesIO()
+    Image.new("RGB", (90, 120), "#588276").save(cover, format="PNG")
+    book.cover_image.save("ui-review-cover.png", ContentFile(cover.getvalue()))
+    page.route("**" + book.cover_image.url, lambda route: route.fulfill(body=cover.getvalue(), content_type="image/png"))
+    copy = Copy.objects.create(book=book, copy_number=1)
+    first = Borrower.objects.create(username="alex", first_name="Alex", last_name="Reader")
+    second = Borrower.objects.create(username="maria", first_name="Maria", last_name="Fernandez")
+    page.set_viewport_size({"width": width, "height": height})
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+
+    def snapshot(state):
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        for image in page.locator(".desk-book-cover:is(img)").all():
+            expect(image).to_be_visible()
+            image.evaluate("(image) => image.decode()")
+            assert image.evaluate("(image) => image.naturalWidth > 0")
+        page.screenshot(path=f"/tmp/shelf-school-{width}-{state}.png", full_page=True)
+
+    try:
+        page.goto(live_server.url)
+        snapshot("start")
+        select_borrower(page, "alex", "alex - Alex Reader", first.id)
+        page.get_by_role("button", name="Continue").click()
+        page.get_by_role("tab", name="Find manually").click()
+        page.locator("#id_manual_copy").select_option(str(copy.id))
+        page.get_by_role("button", name="Review book", exact=True).click()
+        snapshot("confirm")
+        page.get_by_role("button", name="Add another book").click()
+        page.get_by_role("button", name="Change", exact=True).click()
+        select_borrower(page, "maria", "maria - Maria Fernandez", second.id)
+        page.get_by_role("button", name="Continue").click()
+        expect(page.locator("#id_basket_token")).to_have_value("")
+        page.get_by_role("tab", name="Find manually").click()
+        page.locator("#id_manual_copy").select_option(str(copy.id))
+        page.get_by_role("button", name="Review book", exact=True).click()
+        page.get_by_role("button", name="Borrow 1 book", exact=True).click()
+        expect(page.get_by_role("heading", name="All set, Maria Fernandez.")).to_be_visible()
+        snapshot("receipt")
+        assert Loan.objects.get(copy=copy).borrower_id == second.id
+        page.get_by_role("link", name="Same borrower", exact=True).click()
+        page.locator("input[name='action'][value='checkin']").check()
+        select_borrower(page, "maria", "maria - Maria Fernandez", second.id)
+        page.get_by_role("button", name="Continue").click()
+        expect(page.locator("input[name='return_copies']")).to_have_count(1)
+        expect(page.get_by_role("button", name="Select books to return")).to_be_disabled()
+        page.locator("input[name='return_copies']").check()
+        snapshot("return")
+        page.get_by_role("button", name="Review 1 book", exact=True).click()
+        page.get_by_role("button", name="Return 1 book", exact=True).click()
+        page.get_by_role("link", name="Next borrower", exact=True).click()
+        expect(page.locator("#id_borrower")).to_have_value("")
+        assert Loan.objects.get(copy=copy).return_date is not None
+        assert not errors
+    finally:
+        book.cover_image.delete(save=False)
 
 
 def select_borrower(page, query, option_name, borrower_id, keyboard=False):
@@ -24,7 +254,7 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
     django_user_model.objects.create_superuser(username="librarian", password="secret", email="")
     book = Book.objects.create(title="The Wild Robot", authors="Peter Brown")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="R1")
-    borrower = Borrower.objects.create(first_name="Mia", last_name="Lopez", class_name="3B")
+    borrower = Borrower.objects.create(first_name="Mia", last_name="Lopez", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
 
     page.goto(f"{live_server.url}/staff/login/?next=/dashboard/")
     page.locator("input[name='username']").fill("librarian")
@@ -179,6 +409,8 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     select_borrower(page, "mia", "mia - Mia Lopez", borrower.id)
     page.locator("input[name='action'][value='checkout']").check()
     page.get_by_role("button", name="Continue").click()
+    expect(page.get_by_role("tab", name="Find manually")).to_have_attribute("aria-selected", "true")
+    page.get_by_role("tab", name="Take photo").click()
     expect(page.get_by_text("The photo is read once and never saved.")).to_be_visible()
     page.locator("input[name='book_photo']").set_input_files(str(qr_path))
     page.get_by_role("button", name="Identify book").click()
@@ -188,13 +420,15 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     page.get_by_role("button", name="Add another book").click()
     expect(page.get_by_role("heading", name="Add another book")).to_be_visible()
     expect(page.get_by_text("1 selected", exact=True)).to_be_visible()
+    page.get_by_role("tab", name="Take photo").click()
     page.locator("input[name='book_photo']").set_input_files(str(second_qr_path))
     page.get_by_role("button", name="Add to checkout").click()
     expect(page.get_by_text("Second Circulation Book", exact=True)).to_be_visible()
     expect(page.get_by_text("2 books ready to check out")).to_be_visible()
-    page.get_by_role("button", name="Confirm checkout").click()
+    page.get_by_role("button", name="Borrow 2 books", exact=True).click()
     expect(page.get_by_text("Checked out 2 books to Mia Lopez.")).to_be_visible()
-    expect(page.locator("input[name='borrower']")).to_have_value(str(borrower.id))
+    expect(page.get_by_role("heading", name="All set, Mia Lopez.")).to_be_visible()
+    page.get_by_role("link", name="Same borrower").click()
 
     copy.refresh_from_db()
     second_copy.refresh_from_db()
@@ -209,10 +443,10 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     expect(page.locator("input[name='return_copies']")).to_have_count(2)
     page.locator("input[name='return_copies']").nth(0).check()
     page.locator("input[name='return_copies']").nth(1).check()
-    page.get_by_role("button", name="Review return").click()
+    page.get_by_role("button", name="Review 2 books").click()
     expect(page.get_by_text("Dropdown Circulation", exact=True)).to_be_visible()
     assert Loan.objects.get(copy=copy).return_date is None
-    page.get_by_role("button", name="Confirm return").click()
+    page.get_by_role("button", name="Return 2 books", exact=True).click()
     expect(page.get_by_text("Returned 2 books for Mia Lopez.")).to_be_visible()
 
     copy.refresh_from_db()
@@ -236,10 +470,10 @@ def test_student_can_find_book_manually_with_partial_text(page, live_server):
     page.locator("#copy-filter").fill("Specific Writer")
     expect(page.locator("select[name='manual_copy'] option")).to_have_count(1)
     page.locator("select[name='manual_copy']").select_option(str(copy.id))
-    page.get_by_role("button", name="Identify book").click()
+    page.get_by_role("button", name="Review book").click()
 
     expect(page.get_by_text("Manual Search Book", exact=True)).to_be_visible()
-    page.get_by_role("button", name="Confirm checkout").click()
+    page.get_by_role("button", name="Borrow 1 book", exact=True).click()
     expect(page.get_by_text("Checked out Manual Search Book to Alex Reader.")).to_be_visible()
     assert Loan.objects.filter(copy=copy, borrower=borrower, return_date__isnull=True).exists()
 
@@ -250,7 +484,7 @@ def test_admin_borrower_view_highlights_current_and_overdue_loans(page, live_ser
     from django.utils import timezone
 
     django_user_model.objects.create_superuser(username="borrowers", password="secret", email="")
-    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez", class_name="3B")
+    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
     copy = Copy.objects.create(book=Book.objects.create(title="Overdue classroom book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=copy, borrower=borrower, due_date=timezone.localdate() - timedelta(days=2))
 
@@ -333,7 +567,7 @@ def test_admin_can_correct_book_copy_and_borrower_in_browser(page, live_server, 
 def test_admin_can_move_active_loan_to_correct_borrower_in_browser(page, live_server, django_user_model):
     django_user_model.objects.create_superuser(username="loan-editor", password="secret", email="")
     wrong = Borrower.objects.create(username="wrong-child", first_name="Wrong", last_name="Child")
-    correct = Borrower.objects.create(username="right-child", first_name="Right", last_name="Child", class_name="4A")
+    correct = Borrower.objects.create(username="right-child", first_name="Right", last_name="Child", school_class=SchoolClass.objects.get_or_create(name="4A")[0])
     copy = Copy.objects.create(
         book=Book.objects.create(title="Borrowed under wrong name"),
         copy_number=1,
@@ -369,8 +603,8 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     alpha_copy = Copy.objects.create(book=alpha, copy_number=1, shelf_location="Z9", status=Copy.Status.CHECKED_OUT)
     Copy.objects.create(book=alpha, copy_number=2, shelf_location="A1")
     beta_copy = Copy.objects.create(book=beta, copy_number=1, shelf_location="B1", status=Copy.Status.CHECKED_OUT)
-    alpha_borrower = Borrower.objects.create(username="alpha-user", first_name="Amy", last_name="Zulu", class_name="2B")
-    beta_borrower = Borrower.objects.create(username="beta-user", first_name="Ben", last_name="Alpha", class_name="1A")
+    alpha_borrower = Borrower.objects.create(username="alpha-user", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="2B")[0])
+    beta_borrower = Borrower.objects.create(username="beta-user", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
     Loan.objects.create(copy=alpha_copy, borrower=alpha_borrower, due_date=timezone.localdate() - timedelta(days=1))
     Loan.objects.create(copy=beta_copy, borrower=beta_borrower, due_date=timezone.localdate() - timedelta(days=2))
 
@@ -414,7 +648,7 @@ def test_admin_selects_books_and_fetches_missing_covers_in_browser(
 
     fetch_button = page.get_by_role("button", name="Fetch missing covers")
     expect(fetch_button).to_be_disabled()
-    page.get_by_role("checkbox", name="Select all books eligible for cover fetching").check()
+    page.get_by_role("checkbox", name="Select eligible books on this page").check()
     expect(page.get_by_text("2 selected")).to_be_visible()
     expect(fetch_button).to_be_enabled()
     fetch_button.click()
@@ -460,7 +694,7 @@ def test_admin_imports_enriched_catalog_and_reviews_incomplete_book(
 
 @pytest.mark.django_db(transaction=True)
 def test_admin_can_complete_school_setup_in_browser(page, live_server, django_user_model):
-    from library.models import SchoolProfile
+    from library.models import SchoolClass, SchoolProfile
 
     django_user_model.objects.create_superuser(username="setup", password="secret", email="")
     page.goto(f"{live_server.url}/staff/login/?next=/dashboard/")
@@ -480,6 +714,16 @@ def test_admin_can_complete_school_setup_in_browser(page, live_server, django_us
     profile = SchoolProfile.current()
     assert profile.setup_completed is True
     assert profile.default_loan_days == 21
+    for width in (1440, 768, 390):
+        page.set_viewport_size({"width": width, "height": 1000})
+        expect(page.get_by_role("link", name="Classes", exact=True)).to_be_visible()
+        expect(page.get_by_role("link", name="Employee positions", exact=True)).to_be_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=f"/tmp/shelf-school-settings-{width}.png", full_page=True)
+    page.locator("#id_school_name").fill("")
+    page.locator("#school-settings-form").evaluate("(form) => form.noValidate = true")
+    page.get_by_role("button", name="Save school settings").click()
+    expect(page.get_by_text("This field is required.", exact=True)).to_be_visible()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -518,3 +762,18 @@ def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     assert borrower.username == account.username == "lrueda"
     assert borrower.full_name == account.get_full_name() == "Luis Rueda"
     assert borrower.email == account.email == "lrueda@example.org"
+    for width in (1440, 390):
+        page.set_viewport_size({"width": width, "height": 900})
+        edit = staff_row.get_by_role("link", name="Edit lrueda", exact=True)
+        reset = staff_row.get_by_role("link", name="Reset password for lrueda", exact=True)
+        expect(edit.locator("svg")).to_be_visible()
+        expect(reset.locator("svg")).to_be_visible()
+        for control in (edit, reset):
+            box = control.bounding_box()
+            assert box["width"] == 44 and box["height"] == 44
+        page.screenshot(path=f"/tmp/shelf-school-staff-actions-{width}.png", full_page=True)
+    edit.click()
+    expect(page.get_by_role("heading", name="Edit staff account")).to_be_visible()
+    page.get_by_role("link", name="Cancel", exact=True).click()
+    staff_row.get_by_role("link", name="Reset password for lrueda", exact=True).click()
+    expect(page.get_by_role("heading", name="Reset staff password")).to_be_visible()

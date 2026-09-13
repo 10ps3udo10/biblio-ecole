@@ -58,7 +58,11 @@ def _find_book(values, isbn):
         match = Book.objects.filter(Q(isbn13=isbn) | Q(isbn10=isbn)).first()
         if match:
             return match
-    return Book.objects.filter(
+    candidates = Book.objects.all()
+    if isbn:
+        # Metadata alone cannot establish that two different ISBNs are one edition.
+        candidates = candidates.filter(isbn10="", isbn13="")
+    return candidates.filter(
         title__iexact=values["title"],
         subtitle=values["subtitle"],
         authors=values["authors"],

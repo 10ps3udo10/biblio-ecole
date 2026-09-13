@@ -1,30 +1,59 @@
 {% extends "library/base.html" %}
 {% block title %}School settings - Shelf-School{% endblock %}
 {% block content %}
-<section class="hero compact">
-  <div><h1>School settings</h1><p class="muted">Configure this installation for one school.</p></div>
-  <div class="actions"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a></div>
-</section>
-<section class="people-access" aria-labelledby="people-access-title">
-  <div class="section-heading"><span class="section-heading-icon"><i data-lucide="users-round" aria-hidden="true"></i></span><div><h2 id="people-access-title">People and access</h2><p>Staff accounts and borrowers serve different purposes.</p></div></div>
-  <div class="people-access-row">
-    <i data-lucide="user-cog" aria-hidden="true"></i>
-    <div><h3>Staff accounts</h3><p>Adults who sign in to catalog books, manage borrowers, review loans, and change settings.</p></div>
-    {% if request.user.is_superuser %}<a class="button" href="{% url 'staff_account_list' %}">Manage staff accounts</a>{% endif %}
-  </div>
-  <div class="people-access-row">
-    <i data-lucide="contact" aria-hidden="true"></i>
-    <div><h3>Borrowers</h3><p>Students or teachers who receive books. They do not sign in and do not need passwords.</p></div>
-    <a class="button" href="{% url 'borrower_list' %}">Manage borrowers</a>
-  </div>
-  <p class="identity-boundary"><strong>Every staff account includes a linked borrower profile.</strong> The borrower ID, name, and email stay synchronized; class and loan history remain borrower-specific.</p>
-  {% if request.user.is_superuser %}<p class="django-admin-link"><i data-lucide="wrench" aria-hidden="true"></i><span><strong>Advanced</strong><small>Django Admin for technical database and permission management.</small></span><a href="{% url 'admin:index' %}">Open Advanced (Django Admin)</a></p>{% endif %}
-</section>
-<section class="form-panel settings-panel">
-  <form method="post" enctype="multipart/form-data">
+<div class="school-settings">
+  <header class="settings-heading">
+    <h1>School settings</h1>
+    <button class="button primary" type="submit" form="school-settings-form"><i data-lucide="save" aria-hidden="true"></i>Save school settings</button>
+  </header>
+  <form id="school-settings-form" method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save school settings</button>
+    {{ form.non_field_errors }}
+    <section class="settings-section" aria-labelledby="school-details-title">
+      <h2 id="school-details-title"><i data-lucide="school" aria-hidden="true"></i>School details</h2>
+      <div class="settings-fields">
+        {% include "library/settings_field.html" with field=form.school_name %}
+        {% include "library/settings_field.html" with field=form.short_name %}
+        <div class="settings-field settings-field-wide">
+          {{ form.logo.label_tag }}{{ form.logo.errors }}
+          {% if school_profile.logo %}<img class="settings-logo" src="{{ school_profile.logo.url }}" alt="Current school logo">{% endif %}
+          {{ form.logo }}
+        </div>
+      </div>
+    </section>
+    <section class="settings-section" aria-labelledby="school-contact-title">
+      <h2 id="school-contact-title"><i data-lucide="contact" aria-hidden="true"></i>Contact</h2>
+      <div class="settings-fields">
+        {% include "library/settings_field.html" with field=form.contact_email %}
+        {% include "library/settings_field.html" with field=form.contact_phone %}
+        {% include "library/settings_field.html" with field=form.address wide=True %}
+      </div>
+    </section>
+    <section class="settings-section" aria-labelledby="school-loans-title">
+      <h2 id="school-loans-title"><i data-lucide="book-open" aria-hidden="true"></i>Borrowing</h2>
+      <div class="settings-fields">
+        {% include "library/settings_field.html" with field=form.default_loan_days %}
+        {% include "library/settings_field.html" with field=form.label_footer %}
+      </div>
+    </section>
   </form>
-</section>
+  <section class="settings-section" aria-labelledby="borrower-settings-title">
+    <h2 id="borrower-settings-title"><i data-lucide="users-round" aria-hidden="true"></i>Borrowers</h2>
+    <div class="settings-links">
+      <a class="settings-edit-link" href="{% url 'school_classes' %}" aria-label="Classes"><i data-lucide="graduation-cap" aria-hidden="true"></i><span>Classes</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <a class="settings-edit-link" href="{% url 'employee_positions' %}" aria-label="Employee positions"><i data-lucide="briefcase-business" aria-hidden="true"></i><span>Employee positions</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <div class="settings-commands"><a class="button" href="{% url 'import_borrowers' %}"><i data-lucide="upload" aria-hidden="true"></i>Import borrowers CSV</a></div>
+    </div>
+  </section>
+  <section class="settings-section" aria-labelledby="settings-access-title">
+    <h2 id="settings-access-title"><i data-lucide="shield-check" aria-hidden="true"></i>Access and data</h2>
+    <div class="settings-links">
+      {% if request.user.is_superuser %}
+      <a class="settings-edit-link" href="{% url 'staff_account_list' %}" aria-label="Manage staff accounts"><i data-lucide="user-cog" aria-hidden="true"></i><span>Manage staff accounts</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <a class="settings-edit-link" href="{% url 'admin:index' %}" aria-label="Open Advanced (Django Admin)"><i data-lucide="wrench" aria-hidden="true"></i><span>Advanced (Django Admin)</span><i data-lucide="external-link" aria-hidden="true"></i></a>
+      {% endif %}
+      <div class="settings-commands"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a></div>
+    </div>
+  </section>
+</div>
 {% endblock %}

@@ -9,7 +9,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Book, Borrower, Copy, SchoolProfile
+from .models import Book, Borrower, Copy, SchoolProfile, EmployeePosition, SchoolClass
 from .photo_intake import clean_isbn, is_valid_isbn
 
 
@@ -171,6 +171,12 @@ class BookEditForm(BookValidationMixin, forms.ModelForm):
 
 
 class CopyForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["status"].choices = [
+            choice for choice in Copy.Status.choices if choice[0] != Copy.Status.CHECKED_OUT
+        ]
+
     class Meta:
         model = Copy
         fields = ["shelf_location", "condition", "status"]
@@ -183,27 +189,65 @@ class CopyEditForm(CopyForm):
             self.fields.pop("status")
 
 
+class EmployeePositionForm(forms.ModelForm):
+    class Meta:
+        model = EmployeePosition
+        fields = ["name", "active"]
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if EmployeePosition.objects.filter(name__iexact=name).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("A position with this name already exists.")
+        return name
+
+
+class SchoolClassForm(forms.ModelForm):
+    class Meta:
+        model = SchoolClass
+        fields = ["name", "active"]
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if SchoolClass.objects.filter(name__iexact=name).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("A class with this name already exists.")
+        return name
+
+
 class BorrowerForm(forms.ModelForm):
     class Meta:
         model = Borrower
-        fields = ["username", "first_name", "last_name", "class_name", "email", "active"]
+        fields = ["username", "first_name", "last_name", "school_role", "position", "school_class", "email", "active"]
         labels = {"username": "Borrower ID"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["position"].queryset = EmployeePosition.objects.filter(Q(active=True) | Q(pk=self.instance.position_id))
+        self.fields["position"].empty_label = "No position set"
+        self.fields["school_class"].queryset = SchoolClass.objects.filter(Q(active=True) | Q(pk=self.instance.school_class_id))
+        self.fields["school_class"].empty_label = "No class assigned"
         if self.instance.pk and self.instance.staff_account_id:
             for field_name in ("username", "first_name", "last_name", "email"):
                 self.fields[field_name].disabled = True
+                self.fields[field_name].required = False
                 self.fields[field_name].help_text = "Managed from the linked staff account."
 
     def clean_username(self):
         return self.cleaned_data.get("username") or None
 
+    def clean(self):
+        data = super().clean()
+        if data.get("school_role") == Borrower.SchoolRole.STUDENT:
+            if data.get("position"):
+                self.add_error("position", "Positions can only be assigned to employees.")
+        elif data.get("school_role") == Borrower.SchoolRole.EMPLOYEE:
+            data["school_class"] = None
+        return data
+
 
 class BorrowerChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, borrower):
         identifier = borrower.username or "no borrower ID"
-        class_name = f" - {borrower.class_name}" if borrower.class_name else ""
+        class_name = f" - {borrower.school_class}" if borrower.school_class else ""
         return f"{identifier} - {borrower.full_name}{class_name}"
 
 
@@ -213,7 +257,7 @@ class LoanBorrowerCorrectionForm(forms.Form):
     def __init__(self, *args, loan=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.loan = loan
-        self.fields["borrower"].queryset = Borrower.objects.filter(active=True).order_by("last_name", "first_name")
+        self.fields["borrower"].queryset = Borrower.objects.filter(active=True).select_related("school_class").order_by("last_name", "first_name")
 
     def clean_borrower(self):
         borrower = self.cleaned_data["borrower"]
@@ -235,6 +279,7 @@ class SchoolProfileForm(forms.ModelForm):
             "default_loan_days",
             "label_footer",
         ]
+        widgets = {"address": forms.Textarea(attrs={"rows": 3})}
 
     def clean_default_loan_days(self):
         days = self.cleaned_data["default_loan_days"]

@@ -157,12 +157,41 @@ class Copy(models.Model):
         return self.loans.filter(return_date__isnull=True).select_related("borrower").first()
 
 
+class EmployeePosition(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class SchoolClass(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "school classes"
+
+    def __str__(self):
+        return self.name
+
+
 class Borrower(models.Model):
+    class SchoolRole(models.TextChoices):
+        STUDENT = "student", "Student"
+        EMPLOYEE = "employee", "Employee"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = models.CharField("Borrower ID", max_length=80, unique=True, null=True, blank=True)
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
-    class_name = models.CharField("Class", max_length=120, blank=True, db_column="class")
+    school_class = models.ForeignKey(SchoolClass, verbose_name="Class", null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
+    school_role = models.CharField(max_length=16, choices=SchoolRole.choices, default=SchoolRole.STUDENT)
+    position = models.ForeignKey(EmployeePosition, null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
     email = models.EmailField(blank=True)
     qr_code = models.CharField(max_length=128, blank=True)
     active = models.BooleanField(default=True)
@@ -179,7 +208,6 @@ class Borrower(models.Model):
         indexes = [
             models.Index(fields=["username"]),
             models.Index(fields=["last_name", "first_name"]),
-            models.Index(fields=["class_name"]),
         ]
 
     def __str__(self):

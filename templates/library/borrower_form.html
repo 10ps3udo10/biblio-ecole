@@ -1,3 +1,18 @@
 {% extends "library/base.html" %}
 {% block title %}{{ title }} - School Library{% endblock %}
-{% block content %}<section class="form-panel"><h1>{{ title }}</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save</button></form></section>{% endblock %}
+{% block content %}<section class="form-panel"><h1>{{ title }}</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save</button></form></section>
+<script>
+const schoolRole = document.getElementById("id_school_role");
+function showRoleFields() {
+  const employee = schoolRole.value === "employee";
+  const position = document.getElementById("id_position");
+  const classroom = document.getElementById("id_school_class");
+  position.closest("p").hidden = !employee;
+  position.disabled = !employee;
+  classroom.closest("p").hidden = employee;
+  classroom.disabled = employee;
+}
+schoolRole.addEventListener("change", showRoleFields);
+showRoleFields();
+</script>
+{% endblock %}

@@ -47,7 +47,7 @@ export default function Home() {
             <h1>Shelf-School</h1>
             <p className={styles.lede}>
               A focused circulation and cataloging system built around how
-              students and school staff actually use a library.
+              students and school employees actually use a library.
             </p>
             <div className={styles.actions}>
               <Link className="button button--primary button--lg" to="/docs/overview">

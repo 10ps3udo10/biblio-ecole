@@ -4,7 +4,10 @@ from . import views
 
 
 urlpatterns = [
+    path("imports/<str:kind>/template.csv", views.download_csv_template, name="download_csv_template"),
     path("", views.photo_circulation, name="photo_circulation"),
+    path("catalog/", views.public_catalog, name="public_catalog"),
+    path("catalog/<uuid:pk>/", views.public_catalog, name="public_book"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("books/", views.book_list, name="book_list"),
     path("books/add/", views.book_create, name="book_create"),
@@ -36,6 +39,10 @@ urlpatterns = [
     path("loans/overdue/", views.overdue_loans, name="overdue_loans"),
     path("loans/overdue.csv", views.overdue_loans_csv, name="overdue_loans_csv"),
     path("settings/", views.school_settings, name="school_settings"),
+    path("settings/positions/", views.employee_positions, name="employee_positions"),
+    path("settings/classes/", views.school_classes, name="school_classes"),
+    path("settings/classes/<int:pk>/", views.school_classes, name="school_class_edit"),
+    path("settings/positions/<int:pk>/", views.employee_positions, name="employee_position_edit"),
     path("staff/accounts/", views.staff_account_list, name="staff_account_list"),
     path("staff/accounts/add/", views.staff_account_create, name="staff_account_create"),
     path("staff/accounts/<int:pk>/edit/", views.staff_account_edit, name="staff_account_edit"),

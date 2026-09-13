@@ -26,6 +26,9 @@ collisions. A less common port is convenient, but it is not a security control.
 
 Create a dedicated standard macOS user, such as `library`, and keep its password
 available to the responsible staff member. Install Git and Python 3.10 or newer.
+Sign in as `library` for cloning, installing dependencies, and managing library
+data. Keep a separate macOS administrator account available for installing and
+controlling the system service; a standard account cannot run `sudo`.
 Keep the application on the Mac's local disk, not in iCloud Drive or another
 synchronized folder.
 
@@ -218,10 +221,53 @@ connections. Allow it. If another device still cannot connect, confirm that:
 
 The public circulation desk is intentionally available to everyone on that
 network. Staff pages still require a staff account. Camera capture uses the
-device's image picker; if browser-side barcode detection is unavailable, the
-uploaded image is decoded on the Mac and is not retained.
+## Guided service setup
 
-## Create a private secret
+After installing dependencies and creating or transferring the database, use
+the service helper to configure startup. It checks Python, dependencies, Django
+configuration, and pending migrations. It generates a private secret
+automatically, preserving the secret if the system service is already installed.
+
+From Terminal in the **macOS administrator account**, replace the user and
+hostnames with your actual values:
+
+```bash
+cd /Users/library/shelf-school
+sudo .venv/bin/python tools/macos_service.py install \
+  --user library \
+  --hosts localhost,127.0.0.1,Library-Mac.local,192.168.1.25
+```
+
+Stop a manually running server first. If you previously installed a LaunchAgent,
+unload it from its owner's session before using this helper. The helper replaces
+the system service with label `org.shelfschool.server`, if present.
+
+By default, the app listens on port **8427**. Use `--port 8428` to change it.
+Check the service:
+
+```bash
+sudo .venv/bin/python tools/macos_service.py status
+```
+
+For upgrades, manual backups, or data transfers, stop the service:
+
+```bash
+sudo .venv/bin/python tools/macos_service.py stop
+```
+
+After completing maintenance as `library`, resume it from the administrator
+account:
+
+```bash
+sudo .venv/bin/python tools/macos_service.py start
+```
+
+**Backups are manual.** This helper does not install a backup job or schedule.
+See [Backup and recovery](./backup.md#verified-full-archives) for manual backup
+and restore commands. The manual plist instructions below are an alternative
+to the helper; you do not need to follow both methods.
+
+## Manual setup: create a private secret
 
 Generate a secret once:
 
@@ -321,7 +367,14 @@ This configuration enables private-LAN access. For a Mac-only kiosk, use
 `127.0.0.1:8427` in `ProgramArguments` and
 `localhost,127.0.0.1` in `DJANGO_ALLOWED_HOSTS` instead.
 
-Install the file as a protected system service, validate it, and load it:
+Create the plist from Terminal in the **macOS administrator account**. Its `~`
+path refers to that administrator's home; the paths inside the plist still
+refer to `library`. Stop any manually running Shelf-School server first.
+If an older LaunchAgent is installed, unload it from its owner's session and
+remove its plist before enabling this service, so only one server uses the port.
+
+Install the file as a protected system service, validate it, and load it from
+the administrator's Terminal:
 
 ```bash
 chmod 600 ~/org.shelfschool.server.plist
@@ -346,11 +399,17 @@ the option that prevents automatic sleeping while the display is off. The
 display may still turn off normally.
 :::
 
+An encrypted startup disk may require a FileVault unlock after a cold boot
+before macOS and its services can start. A LaunchDaemon does not bypass that
+unlock. Verify the school's actual restart procedure on the Mac.
+
 ## Check status and logs
+
+Run service commands from the macOS administrator account:
 
 ```bash
 sudo launchctl print system/org.shelfschool.server
-tail -f /Users/library/Library/Logs/shelf-school-error.log
+sudo tail -f /Users/library/Library/Logs/shelf-school-error.log
 ```
 
 To stop the service:
@@ -376,10 +435,17 @@ complete policy.
 
 ## Upgrade Shelf-School
 
-Choose a time when nobody is circulating books:
+Choose a time when nobody is circulating books. From the **macOS administrator
+account**, stop the service:
 
 ```bash
-sudo launchctl bootout system /Library/LaunchDaemons/org.shelfschool.server.plist
+cd /Users/library/shelf-school
+sudo .venv/bin/python tools/macos_service.py stop
+```
+
+Then, in a Terminal session as **library**, update the application:
+
+```bash
 cd /Users/library/shelf-school
 cp db.sqlite3 "db.sqlite3.backup-$(date +%Y%m%d)"
 source .venv/bin/activate
@@ -387,7 +453,13 @@ git pull --ff-only
 python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py check
-sudo launchctl bootstrap system /Library/LaunchDaemons/org.shelfschool.server.plist
+```
+
+Return to the **macOS administrator account** to start the service:
+
+```bash
+cd /Users/library/shelf-school
+sudo .venv/bin/python tools/macos_service.py start
 ```
 
 Open the kiosk and perform a test checkout after every upgrade.

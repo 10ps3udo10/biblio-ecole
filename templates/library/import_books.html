@@ -1,3 +1,12 @@
 {% extends "library/base.html" %}
-{% block title %}Import books - School Library{% endblock %}
-{% block content %}<section class="form-panel"><h1>Import books</h1><p class="muted">Import a UTF-8 CSV with one physical book per row. Required column: Title. Supported optional columns include Source photo, Photo position, Subtitle, Contributors, ISBN, Publisher, Publication year, Language, Pages, Format, Category, Topics, Description, Montessori level, age range, reading level, confidence, review notes, and source URL.</p><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="upload" aria-hidden="true"></i>Import books</button></form></section>{% endblock %}
+{% block title %}Import books - Shelf-School{% endblock %}
+{% block content %}
+<section class="csv-import">
+  <header class="csv-import-heading"><div><h1>Import books</h1><p class="muted">One physical copy per row. UTF-8 CSV.</p></div><a class="button" href="{% url 'download_csv_template' 'books' %}"><i data-lucide="download" aria-hidden="true"></i>Download CSV template</a></header>
+  <form class="csv-upload" method="post" enctype="multipart/form-data">
+    {% csrf_token %}{{ form.as_p }}
+    <button class="button primary"><i data-lucide="upload" aria-hidden="true"></i>Import books</button>
+  </form>
+  {% include "library/csv_field_reference.html" %}
+</section>
+{% endblock %}

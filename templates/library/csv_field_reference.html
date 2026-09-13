@@ -1,0 +1,13 @@
+<section class="csv-reference" aria-labelledby="csv-required-title">
+  <header><h2 id="csv-required-title">Required columns</h2><span>{{ required_columns|length }}</span></header>
+  <dl class="csv-column-list">{% for name, example in required_columns %}<div><dt>{{ name }}</dt><dd>{{ example }}</dd></div>{% endfor %}</dl>
+</section>
+<section class="csv-reference" aria-labelledby="csv-optional-title">
+  <header><h2 id="csv-optional-title">Optional columns</h2><span>May be left blank</span></header>
+  {% for title, fields in optional_groups %}
+  <details class="csv-field-group">
+    <summary>{{ title }}<span>{{ fields|length }} columns</span></summary>
+    <dl class="csv-column-list">{% for name, example in fields %}<div><dt>{{ name }}</dt><dd>{{ example }}</dd></div>{% endfor %}</dl>
+  </details>
+  {% endfor %}
+</section>

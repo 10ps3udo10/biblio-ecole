@@ -4,13 +4,32 @@
 <header class="desk-heading">
   <span class="eyebrow">{{ school_profile.display_name }}</span>
   <h1>Borrow or return a book</h1>
-  <p>Self-service library desk</p>
 </header>
 
+{% if receipt %}
+<section class="desk-receipt" aria-labelledby="receipt-title">
+  <div class="receipt-check"><i data-lucide="check" aria-hidden="true"></i></div>
+  <span class="eyebrow">{% if receipt.action == "checkout" %}Checkout complete{% else %}Return complete{% endif %}</span>
+  <h2 id="receipt-title">All set, {{ receipt.borrower }}.</h2>
+  <p>{{ receipt.books|length }} book{{ receipt.books|length|pluralize }} {% if receipt.action == "checkout" %}borrowed{% else %}returned{% endif %}{% if receipt.due_date %} · Due {{ receipt.due_date }}{% endif %}</p>
+  <div class="receipt-books">
+  {% for book in receipt.books %}
+    <div class="confirmation-book-row">
+      {% if book.cover %}<img class="desk-book-cover" src="{{ book.cover }}" alt="" width="48" height="64">{% else %}<span class="desk-book-cover cover-fallback"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
+      <span class="desk-book-details"><strong>{{ book.title }}</strong><small>Copy #{{ book.copy_number }}</small></span>
+    </div>
+  {% endfor %}
+  </div>
+  <div class="receipt-actions">
+    <a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-right" aria-hidden="true"></i>Next borrower</a>
+    <a class="button" href="{% url 'photo_circulation' %}?borrower={{ receipt.borrower_id }}&amp;action={{ receipt.action }}">Same borrower</a>
+  </div>
+</section>
+{% else %}
 {% if has_borrowers or confirmation %}
 <ol class="desk-progress" id="desk-progress" aria-label="Circulation progress">
   <li{% if not confirmation %} class="active"{% else %} class="complete"{% endif %}><span>1</span>Borrower</li>
-  <li{% if confirmation %} class="complete"{% endif %}><span>2</span>Book</li>
+  <li{% if confirmation %} class="complete"{% endif %}><span>2</span>Books</li>
   <li{% if confirmation %} class="active"{% endif %}><span>3</span>Confirm</li>
 </ol>
 {% endif %}
@@ -20,24 +39,23 @@
   <form method="post" class="confirmation-form">
     {% csrf_token %}
     <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
+    <div class="confirmation-person"><i data-lucide="user-round" aria-hidden="true"></i><span><small>{% if action == "checkout" %}Borrowing for{% else %}Returning for{% endif %}</small><strong>{{ borrower.full_name }}</strong></span></div>
     <div class="confirmation-book-list">
     <span class="eyebrow">{% if action == "checkout" %}Checkout basket{% else %}Books selected{% endif %}</span>
     <h2>{{ copies|length }} book{{ copies|length|pluralize }} {% if action == "checkout" %}ready to check out{% else %}to return{% endif %}</h2>
     {% for selected_copy in copies %}
     <div class="confirmation-book-row">
-      <span><strong>{{ selected_copy.book.title }}</strong><small>Copy #{{ selected_copy.copy_number }}</small></span>
+      {% if selected_copy.book.cover_image %}<img class="desk-book-cover" src="{{ selected_copy.book.cover_image.url }}" alt="" width="48" height="64">{% else %}<span class="desk-book-cover cover-fallback"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
+      <span class="desk-book-details"><strong>{{ selected_copy.book.title }}</strong><small>Copy #{{ selected_copy.copy_number }}{% if selected_copy.shelf_location %} · {{ selected_copy.shelf_location }}{% endif %}</small></span>
       {% if action == "checkout" %}<button class="remove-basket-book" name="remove_copy_id" value="{{ selected_copy.id }}" title="Remove {{ selected_copy.book.title }}" aria-label="Remove {{ selected_copy.book.title }}"><i data-lucide="x" aria-hidden="true"></i></button>{% endif %}
     </div>
     {% endfor %}
     </div>
     <dl class="transaction-summary">
-      <div><dt>Action</dt><dd>{% if action == "checkout" %}Check out{% else %}Return{% endif %}</dd></div>
-      <div><dt>Borrower</dt><dd>{{ borrower.username|default:"No borrower ID" }}<span>{{ borrower.full_name }}</span></dd></div>
-      <div><dt>Books</dt><dd>{{ copies|length }}</dd></div>
       {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
     </dl>
     <div class="confirmation-actions">
-      <button class="button primary confirm-transaction" name="intent" value="confirm"><i data-lucide="circle-check" aria-hidden="true"></i>Confirm {% if action == "checkout" %}checkout{% else %}return{% endif %}</button>
+      <button class="button primary confirm-transaction" name="intent" value="confirm"><i data-lucide="circle-check" aria-hidden="true"></i>{% if action == "checkout" %}Borrow{% else %}Return{% endif %} {{ copies|length }} book{{ copies|length|pluralize }}</button>
       {% if action == "checkout" %}<button class="button" name="intent" value="add_another"><i data-lucide="book-plus" aria-hidden="true"></i>Add another book</button>{% endif %}
       <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Cancel</a>
     </div>
@@ -54,7 +72,7 @@
   <section class="desk-controls" aria-label="Transaction details"{% if resume_checkout or form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
     <div class="desk-section-heading">
       <span class="desk-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-      <div><span class="eyebrow">Step 1</span><h2>Start a transaction</h2></div>
+      <div><span class="eyebrow">Welcome to the library</span><h2>Who is borrowing?</h2></div>
     </div>
     <div class="control-block mode-block">
       <span class="control-label">Choose an action</span>
@@ -85,10 +103,10 @@
     </div>
     {{ form.book_photo.errors }}
     <div class="identification-switch" id="identification-switch" role="tablist" aria-label="Book identification method">
-      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="true"><i data-lucide="camera" aria-hidden="true"></i>Take photo</button>
-      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="false"><i data-lucide="search" aria-hidden="true"></i>Find manually</button>
+      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="true"><i data-lucide="search" aria-hidden="true"></i>Find manually</button>
+      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="false"><i data-lucide="camera" aria-hidden="true"></i>Take photo</button>
     </div>
-    <div id="photo-method" class="identification-method" role="tabpanel" aria-labelledby="photo-method-tab">
+    <div id="photo-method" class="identification-method" role="tabpanel" aria-labelledby="photo-method-tab" hidden>
       <div class="book-scan-target" id="book-scan-target">
         {{ form.book_photo }}
         <img id="scan-preview" alt="Selected book code photo">
@@ -104,7 +122,7 @@
       </div>
       <p class="photo-privacy"><i data-lucide="shield-check" aria-hidden="true"></i>The photo is read once and never saved.</p>
     </div>
-    <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab" hidden>
+    <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab">
       <label class="control-label" for="copy-filter">Search title, contributor, ISBN, shelf, or copy number</label>
       <input id="copy-filter" type="search" placeholder="Start typing to filter books" autocomplete="off">
       {{ form.manual_copy }}
@@ -120,6 +138,7 @@
     <button class="button primary identify-book" id="identify-book"><i data-lucide="scan-search" aria-hidden="true"></i><span id="identify-book-label">Identify book</span></button>
   </section>
 </form>
+{% endif %}
 {% endif %}
 {% endif %}
 
@@ -157,7 +176,7 @@
   const identifyButtonLabel = document.getElementById("identify-book-label");
   const scanTitle = document.getElementById("scan-title");
   const progressSteps = Array.from(document.querySelectorAll("#desk-progress li"));
-  const basketCount = Number(document.querySelector(".circulation-desk").dataset.basketCount || 0);
+  let basketCount = Number(document.querySelector(".circulation-desk").dataset.basketCount || 0);
   const borrowerSearchUrl = "{% url 'circulation_borrower_search' %}";
   const borrowerLoansUrl = "{% url 'circulation_borrower_loans' '00000000-0000-0000-0000-000000000000' %}";
   if (!fileInput || !status || !preview || !borrowerId || !borrowerSearch) return;
@@ -266,6 +285,7 @@
 
   function updateMode(clearSelection) {
     borrowerLabelElement.textContent = "Choose your name";
+    document.querySelector(".desk-controls h2").textContent = currentAction() === "checkin" ? "Who is returning?" : "Who is borrowing?";
     if (clearSelection) clearBorrower();
   }
   actionInputs.forEach((input) => input.addEventListener("change", function () { updateMode(true); }));
@@ -286,6 +306,8 @@
     scanTitle.textContent = returning ? "Choose books to return" : basketCount ? "Add another book" : "Choose the book";
     identifyButtonLabel.textContent = returning ? "Review return" : basketCount ? "Add to checkout" : "Identify book";
     if (returning) {
+      fileInput.disabled = true;
+      copySelect.disabled = true;
       photoMethod.hidden = true;
       manualMethod.hidden = true;
       loadReturnLoans();
@@ -300,10 +322,18 @@
   }
   continueButton.addEventListener("click", showScan);
   changeSession.addEventListener("click", function () {
+    document.getElementById("id_basket_token").value = "";
+    basketCount = 0;
+    const basketPreview = document.querySelector(".checkout-basket-preview");
+    if (basketPreview) basketPreview.hidden = true;
+    returnOptions.replaceChildren();
+    copySelect.value = "";
+    fileInput.value = "";
     scan.hidden = true;
     controls.hidden = false;
     progressSteps.forEach((step, index) => { step.className = index === 0 ? "active" : ""; });
     borrowerSearch.focus();
+    borrowerSearch.select();
   });
   if (!scan.hidden) showScan();
 
@@ -311,6 +341,10 @@
     const manual = method === "manual";
     photoMethod.hidden = manual;
     manualMethod.hidden = !manual;
+    fileInput.disabled = manual;
+    copySelect.disabled = !manual;
+    identifyButton.disabled = false;
+    identifyButtonLabel.textContent = basketCount ? "Add to checkout" : manual ? "Review book" : "Identify book";
     photoMethodTab.setAttribute("aria-selected", String(!manual));
     manualMethodTab.setAttribute("aria-selected", String(manual));
     (manual ? copyFilter : fileInput).focus();
@@ -320,13 +354,19 @@
   if (copySelect.value) selectMethod("manual");
 
   async function loadReturnLoans() {
+    const requestedBorrower = borrowerId.value;
     const selectedValues = new Set(Array.from(document.querySelectorAll("input[name='return_copies']:checked")).map((input) => input.value));
     returnOptions.replaceChildren();
     noReturnLoans.hidden = true;
+    noReturnLoans.textContent = "This borrower has no books to return.";
+    returnOptions.textContent = "Loading borrowed books...";
     identifyButton.disabled = true;
     try {
       const response = await fetch(borrowerLoansUrl.replace("00000000-0000-0000-0000-000000000000", borrowerId.value), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
+      if (borrowerId.value !== requestedBorrower || currentAction() !== "checkin") return;
+      if (!response.ok) throw new Error("Could not load loans");
+      returnOptions.replaceChildren();
       const loans = payload.loans;
     loans.forEach((loan) => {
       const label = document.createElement("label");
@@ -336,19 +376,40 @@
       input.name = "return_copies";
       input.value = loan.copy_id;
       input.checked = selectedValues.has(loan.copy_id);
+      input.addEventListener("change", updateReturnSelection);
       const details = document.createElement("span");
       details.innerHTML = "<strong></strong><small></small>";
       details.querySelector("strong").textContent = loan.title;
       details.querySelector("small").textContent = "Copy #" + loan.copy_number + " · Due " + loan.due_date;
-      label.append(input, details);
+      const cover = document.createElement(loan.cover_url ? "img" : "span");
+      cover.className = "desk-book-cover" + (loan.cover_url ? "" : " cover-fallback");
+      if (loan.cover_url) {
+        cover.src = loan.cover_url;
+        cover.alt = "";
+      } else {
+        const icon = document.createElement("i");
+        icon.setAttribute("data-lucide", "book-open");
+        icon.setAttribute("aria-hidden", "true");
+        cover.append(icon);
+      }
+      label.append(input, cover, details);
       returnOptions.append(label);
     });
     noReturnLoans.hidden = loans.length !== 0;
-    identifyButton.disabled = loans.length === 0;
+    updateReturnSelection();
+    if (window.lucide) window.lucide.createIcons();
     } catch (error) {
+      if (borrowerId.value !== requestedBorrower) return;
+      returnOptions.replaceChildren();
       noReturnLoans.textContent = "Borrowed books could not be loaded. Try again.";
       noReturnLoans.hidden = false;
     }
+  }
+
+  function updateReturnSelection() {
+    const count = returnOptions.querySelectorAll("input:checked").length;
+    identifyButton.disabled = count === 0;
+    identifyButtonLabel.textContent = count ? "Review " + count + " book" + (count === 1 ? "" : "s") : "Select books to return";
   }
 
   function setStatus(message, state) {

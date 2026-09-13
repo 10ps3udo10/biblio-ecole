@@ -29,6 +29,10 @@ borrower's current loans and allows one or several books to be returned together
 Students need no accounts or library cards. Staff sign in separately for
 cataloging, borrowers, reports, school settings, and backups.
 
+School employees can also be borrowers without login credentials. Anyone can browse
+the public catalog for book availability and shelf locations. Employee positions
+are configurable in Settings and supported by borrower and school-staff CSV imports.
+
 **Project status:** `0.1.0-dev`. Shelf-School is under active development and
 has not reached its first stable release.
 
@@ -81,6 +85,8 @@ For a dedicated Mac, including transfer of an existing `db.sqlite3`, covers,
 branding, staff accounts, and loan history, follow the
 [Mac deployment guide](https://mrueda.github.io/shelf-school/docs/operations/mac-mini-deployment).
 It covers both Mac-only and trusted private-Wi-Fi access without Nginx or Caddy.
+The Mac service helper configures startup. Backups are manual, with portable
+commands for verified database-and-media archives and recovery.
 Create a fresh macOS `.venv`; do not copy a Linux virtual environment.
 
 ## Development

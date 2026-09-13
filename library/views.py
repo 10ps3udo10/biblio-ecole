@@ -1,6 +1,10 @@
 import csv
 import logging
+import shutil
+import sqlite3
+import tempfile
 import uuid
+from contextlib import closing
 from datetime import timedelta
 from io import StringIO, TextIOWrapper
 from urllib.parse import quote_plus
@@ -9,13 +13,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model, update_session_auth_hash
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import SetPasswordForm
 from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
+from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Max, Q
+from django.db.models.deletion import ProtectedError
+from django.db.models import Count, Max, Q, Prefetch, F, Value
+from django.db.models.functions import Coalesce, NullIf
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -41,10 +47,14 @@ from .forms import (
     SchoolProfileForm,
     StaffAccountCreationForm,
     StaffAccountEditForm,
+    EmployeePositionForm,
+    SchoolClassForm,
     default_form_due_date,
 )
 from .catalog_import import import_catalog_rows
-from .models import Book, Borrower, Copy, Loan, SchoolProfile
+from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass
+from .csv_templates import csv_columns
+from .borrower_import import import_borrower_rows
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
 from .qr import svg_qr
 
@@ -215,7 +225,7 @@ def _circulation_context(form, **extra):
     return context
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def dashboard(request):
     active_loans = Loan.objects.filter(return_date__isnull=True)
     total_copies = Copy.objects.count()
@@ -248,13 +258,55 @@ def dashboard(request):
         "circulation_days": circulation_days,
         "max_daily_activity": max_daily_activity,
         "recent_books": Book.objects.order_by("-created_at")[:6],
-        "recent_loans": Loan.objects.select_related("copy__book", "borrower").order_by("-checkout_date")[:8],
+        "recent_loans": Loan.objects.select_related("copy__book", "borrower__school_class").order_by("-checkout_date")[:8],
         "setup_needed": not SchoolProfile.current().setup_completed,
     }
     return render(request, "library/dashboard.html", context)
 
 
-@login_required
+@require_GET
+def public_catalog(request, pk=None):
+    all_copies = Copy.objects.exclude(status=Copy.Status.ARCHIVED).order_by("shelf_location", "copy_number")
+    shelf = request.GET.get("shelf", "").strip() if not pk else ""
+    language = request.GET.get("language", "").strip()
+    available_only = request.GET.get("available") == "1"
+    copies = all_copies.filter(shelf_location=shelf) if shelf else all_copies
+    books = Book.objects.filter(copies__in=copies).distinct().annotate(
+        public_available=Count("copies", filter=Q(copies__status=Copy.Status.AVAILABLE), distinct=True),
+    ).prefetch_related(Prefetch("copies", queryset=copies, to_attr="public_copies"))
+    if pk:
+        book = get_object_or_404(books, pk=pk)
+        return render(request, "library/public_book.html", {"book": book})
+    query = request.GET.get("q", "").strip()
+    if language:
+        books = books.filter(language=language)
+    if available_only:
+        books = books.filter(public_available__gt=0)
+    if query:
+        isbn = clean_isbn(query)
+        match = Q(title__icontains=query) | Q(authors__icontains=query) | Q(topics__icontains=query) | Q(copies__shelf_location__icontains=query)
+        if len(isbn) in (10, 13):
+            match |= Q(isbn13__icontains=isbn) | Q(isbn10__icontains=isbn)
+        books = books.filter(match).distinct()
+    sort = request.GET.get("sort", "title")
+    fields = {"title": "title", "author": "authors", "availability": "-public_available"}
+    if sort not in fields:
+        sort = "title"
+    page = Paginator(books.order_by(fields[sort], "title", "pk"), 24).get_page(request.GET.get("page"))
+    for book in page:
+        book.public_locations = list(dict.fromkeys(copy.shelf_location for copy in book.public_copies if copy.shelf_location))
+    pagination = request.GET.copy()
+    pagination.pop("page", None)
+    return render(request, "library/public_catalog.html", {
+        "catalog": page, "query": query, "sort": sort,
+        "shelf": shelf, "language": language, "available_only": available_only,
+        "shelves": all_copies.exclude(shelf_location="").order_by("shelf_location").values_list("shelf_location", flat=True).distinct(),
+        "languages": Book.objects.filter(copies__in=all_copies).exclude(language="").order_by("language").values_list("language", flat=True).distinct(),
+        "pagination_query": pagination.urlencode(),
+    })
+
+
+@staff_member_required(login_url="staff_login")
 def book_list(request):
     query = request.GET.get("q", "").strip()
     sort = request.GET.get("sort", "title")
@@ -296,7 +348,7 @@ def book_list(request):
     order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
     if sort != "title":
         order_by.append("title")
-    books = list(books.order_by(*order_by))
+    books = Paginator(books.order_by(*order_by, "pk"), 50).get_page(request.GET.get("page"))
     for book in books:
         book.cover_fetch_eligible = not book.cover_image and is_valid_isbn(book.isbn13 or book.isbn10)
     sort_headers = [
@@ -324,7 +376,7 @@ def book_list(request):
     )
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 @require_POST
 def fetch_book_covers(request):
     form = FetchCoversForm(request.POST)
@@ -372,7 +424,7 @@ def fetch_book_covers(request):
     return redirect(redirect_to)
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def book_detail(request, pk):
     book = get_object_or_404(Book, pk=pk)
     copy_sort = request.GET.get("sort", "copy")
@@ -419,7 +471,7 @@ def book_detail(request, pk):
     )
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 @require_POST
 def delete_book(request, pk):
     book = get_object_or_404(Book, pk=pk)
@@ -434,7 +486,7 @@ def delete_book(request, pk):
     return redirect("book_list")
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 @require_POST
 def delete_book_photo(request, pk):
     book = get_object_or_404(Book, pk=pk)
@@ -446,7 +498,7 @@ def delete_book_photo(request, pk):
     return redirect(book)
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 @require_GET
 def isbn_metadata(request):
     isbn = clean_isbn(request.GET.get("isbn"))
@@ -494,7 +546,7 @@ def isbn_metadata(request):
     )
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def book_create(request):
     if request.method == "POST":
         form = BookForm(request.POST, request.FILES)
@@ -518,7 +570,7 @@ def book_create(request):
     return render(request, "library/book_form.html", {"form": form, "title": "Add book", "is_edit": False})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def book_edit(request, pk):
     book = get_object_or_404(Book, pk=pk)
     if request.method == "POST":
@@ -532,7 +584,7 @@ def book_edit(request, pk):
     return render(request, "library/book_form.html", {"form": form, "title": "Edit book", "is_edit": True})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def photo_intake(request):
     if request.method == "POST":
         form = PhotoIntakeForm(request.POST, request.FILES)
@@ -596,7 +648,7 @@ def photo_intake(request):
     return render(request, "library/photo_intake.html", {"form": form})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def add_copy(request, book_pk):
     book = get_object_or_404(Book, pk=book_pk)
     if request.method == "POST":
@@ -613,7 +665,7 @@ def add_copy(request, book_pk):
     return render(request, "library/copy_form.html", {"form": form, "book": book})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def copy_edit(request, pk):
     copy = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
     if request.method == "POST":
@@ -627,7 +679,7 @@ def copy_edit(request, pk):
     return render(request, "library/copy_form.html", {"form": form, "book": copy.book, "copy": copy, "is_edit": True})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def copy_detail(request, pk):
     copy = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
     loans = copy.loans.select_related("borrower").all()[:20]
@@ -647,7 +699,7 @@ def copy_detail(request, pk):
 @staff_member_required(login_url="staff_login")
 def correct_loan_borrower(request, pk):
     loan = get_object_or_404(
-        Loan.objects.select_related("copy__book", "borrower"),
+        Loan.objects.select_related("copy__book", "borrower__school_class"),
         pk=pk,
         return_date__isnull=True,
     )
@@ -656,7 +708,7 @@ def correct_loan_borrower(request, pk):
         if form.is_valid():
             with transaction.atomic():
                 locked_loan = get_object_or_404(
-                    Loan.objects.select_for_update().select_related("copy__book", "borrower"),
+                    Loan.objects.select_for_update().select_related("copy__book", "borrower__school_class"),
                     pk=loan.pk,
                     return_date__isnull=True,
                 )
@@ -677,7 +729,7 @@ def correct_loan_borrower(request, pk):
     return render(request, "library/loan_borrower_form.html", {"form": form, "loan": loan})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 @require_POST
 def delete_copy(request, pk):
     with transaction.atomic():
@@ -696,14 +748,15 @@ def delete_copy(request, pk):
     return redirect(book)
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def borrower_list(request):
+    people = Borrower.objects.all()
     query = request.GET.get("q", "").strip()
     sort = request.GET.get("sort", "borrower")
     direction = request.GET.get("direction", "asc")
     sort_fields = {
         "borrower": ("last_name", "first_name"),
-        "class": ("class_name",),
+        "class": ("display_group",),
         "loans": ("active_loan_count",),
         "status": ("active",),
     }
@@ -711,25 +764,31 @@ def borrower_list(request):
         sort = "borrower"
     if direction not in {"asc", "desc"}:
         direction = "asc"
-    borrowers = Borrower.objects.annotate(
+    borrowers = people.annotate(
         active_loan_count=Count("loans", filter=Q(loans__return_date__isnull=True)),
         overdue_loan_count=Count(
             "loans",
             filter=Q(loans__return_date__isnull=True, loans__due_date__lt=timezone.localdate()),
         ),
     )
+    borrowers = borrowers.select_related("position", "school_class").annotate(
+        display_group=Coalesce(NullIf("position__name", Value("")), NullIf("school_class__name", Value("")))
+    )
     if query:
         borrowers = borrowers.filter(
             Q(username__icontains=query)
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
-            | Q(class_name__icontains=query)
+            | Q(school_class__name__icontains=query)
             | Q(email__icontains=query)
+            | Q(position__name__icontains=query)
         )
     prefix = "-" if direction == "desc" else ""
     order_by = [f"{prefix}{field}" for field in sort_fields[sort]]
     if sort != "borrower":
         order_by.extend(["last_name", "first_name"])
+    if sort == "class":
+        order_by[0] = F("display_group").desc(nulls_last=True) if direction == "desc" else F("display_group").asc(nulls_last=True)
     borrowers = borrowers.order_by(*order_by)
     sort_headers = [
         {
@@ -741,7 +800,7 @@ def borrower_list(request):
         }
         for key, label in (
             ("borrower", "Borrower"),
-            ("class", "Class"),
+            ("class", "Class / Position"),
             ("loans", "Current loans"),
             ("status", "Status"),
         )
@@ -755,14 +814,14 @@ def borrower_list(request):
             "sort": sort,
             "direction": direction,
             "sort_headers": sort_headers,
-            "total_borrowers": Borrower.objects.count(),
-            "active_borrowers": Borrower.objects.filter(active=True).count(),
-            "borrowers_with_loans": Borrower.objects.filter(loans__return_date__isnull=True).distinct().count(),
+            "total_borrowers": people.count(),
+            "active_borrowers": people.filter(active=True).count(),
+            "borrowers_with_loans": people.filter(loans__isnull=False, loans__return_date__isnull=True).distinct().count(),
         },
     )
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def borrower_detail(request, pk):
     borrower = get_object_or_404(Borrower, pk=pk)
     active_loans = borrower.loans.filter(return_date__isnull=True).select_related("copy__book")
@@ -780,7 +839,7 @@ def borrower_detail(request, pk):
     )
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def borrower_create(request):
     if request.method == "POST":
         form = BorrowerForm(request.POST)
@@ -789,11 +848,11 @@ def borrower_create(request):
             messages.success(request, "Borrower added.")
             return redirect(borrower)
     else:
-        form = BorrowerForm(initial={"active": True})
+        form = BorrowerForm(initial={"active": True, "school_role": Borrower.SchoolRole.STUDENT})
     return render(request, "library/borrower_form.html", {"form": form, "title": "Add borrower"})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def borrower_edit(request, pk):
     borrower = get_object_or_404(Borrower, pk=pk)
     if request.method == "POST":
@@ -814,7 +873,7 @@ def circulation_borrower_search(request):
     if len(query) < 2 or action not in PhotoCirculationForm.Action.values:
         return JsonResponse({"results": []})
 
-    borrowers = Borrower.objects.all()
+    borrowers = Borrower.objects.select_related("school_class")
     if action == PhotoCirculationForm.Action.CHECKOUT:
         borrowers = borrowers.filter(active=True)
     else:
@@ -835,7 +894,7 @@ def circulation_borrower_search(request):
                     "id": str(borrower.id),
                     "name": borrower.full_name,
                     "identifier": borrower.username or "",
-                    "class_name": borrower.class_name,
+                    "class_name": str(borrower.school_class or ""),
                 }
                 for borrower in borrowers
             ]
@@ -858,6 +917,7 @@ def circulation_borrower_loans(request, pk):
                     "copy_number": loan.copy.copy_number,
                     "due_date": loan.due_date.isoformat(),
                     "overdue": loan.is_overdue,
+                    "cover_url": loan.copy.book.cover_image.url if loan.copy.book.cover_image else "",
                 }
                 for loan in loans
             ]
@@ -945,8 +1005,19 @@ def photo_circulation(request):
                 messages.error(request, str(exc) or "The circulation record changed. Please scan the book again.")
                 return redirect("photo_circulation")
             messages.success(request, success_message)
+            request.session["circulation_receipt"] = {
+                "borrower": borrower.full_name,
+                "borrower_id": str(borrower.id),
+                "action": action,
+                "due_date": str(due_date or ""),
+                "books": [
+                    {"title": item.book.title, "copy_number": item.copy_number,
+                     "cover": item.book.cover_image.url if item.book.cover_image else ""}
+                    for item in copies
+                ],
+            }
             next_url = reverse("photo_circulation")
-            return redirect(f"{next_url}?borrower={borrower.id}&action={action}")
+            return redirect(f"{next_url}?receipt=1")
 
         form = PhotoCirculationForm(request.POST, request.FILES)
         if form.is_valid():
@@ -1058,6 +1129,9 @@ def photo_circulation(request):
                 ),
             )
     else:
+        receipt = request.session.pop("circulation_receipt", None)
+        if receipt and request.GET.get("receipt") == "1":
+            return render(request, "library/photo_circulation.html", {"receipt": receipt})
         form = PhotoCirculationForm(
             initial={
                 "borrower": request.GET.get("borrower", ""),
@@ -1067,59 +1141,48 @@ def photo_circulation(request):
     return render(request, "library/photo_circulation.html", _circulation_context(form))
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def checkout(request):
-    if request.method == "POST":
-        form = CheckoutForm(request.POST)
-        if form.is_valid():
-            try:
-                borrower_id = _uuid_from_code(form.cleaned_data["borrower_code"], "BORROWER")
-                copy_id = _uuid_from_code(form.cleaned_data["copy_code"], "COPY")
-            except ValueError as exc:
-                form.add_error(None, str(exc))
-            else:
+    form = CheckoutForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            borrower_id = _uuid_from_code(form.cleaned_data["borrower_code"], "BORROWER")
+            copy_id = _uuid_from_code(form.cleaned_data["copy_code"], "COPY")
+            with transaction.atomic():
                 borrower = get_object_or_404(Borrower, pk=borrower_id, active=True)
-                copy = get_object_or_404(Copy.objects.select_related("book"), pk=copy_id)
-                if copy.status != Copy.Status.AVAILABLE:
-                    form.add_error("copy_code", "This copy is not available.")
-                else:
-                    Loan.objects.create(copy=copy, borrower=borrower, due_date=form.cleaned_data["due_date"])
-                    copy.status = Copy.Status.CHECKED_OUT
-                    copy.save(update_fields=["status"])
-                    messages.success(request, f"Checked out {copy.book.title} to {borrower.full_name}.")
-                    return redirect("dashboard")
-    else:
-        form = CheckoutForm()
+                copy = get_object_or_404(Copy.objects.select_for_update().select_related("book"), pk=copy_id)
+                message = _perform_circulation(
+                    copy, borrower, PhotoCirculationForm.Action.CHECKOUT, form.cleaned_data["due_date"]
+                )
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, message)
+            return redirect("dashboard")
     return render(request, "library/checkout.html", {"form": form})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def return_copy(request):
-    if request.method == "POST":
-        form = ReturnForm(request.POST)
-        if form.is_valid():
-            try:
-                copy_id = _uuid_from_code(form.cleaned_data["copy_code"], "COPY")
-            except ValueError as exc:
-                form.add_error(None, str(exc))
-            else:
-                copy = get_object_or_404(Copy.objects.select_related("book"), pk=copy_id)
-                loan = copy.loans.filter(return_date__isnull=True).first()
+    form = ReturnForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            copy_id = _uuid_from_code(form.cleaned_data["copy_code"], "COPY")
+            with transaction.atomic():
+                copy = get_object_or_404(Copy.objects.select_for_update().select_related("book"), pk=copy_id)
+                loan = copy.active_loan
                 if loan is None:
-                    form.add_error("copy_code", "This copy has no active loan.")
-                else:
-                    loan.return_date = timezone.localdate()
-                    loan.save(update_fields=["return_date"])
-                    copy.status = Copy.Status.AVAILABLE
-                    copy.save(update_fields=["status"])
-                    messages.success(request, f"Returned {copy.book.title}.")
-                    return redirect(copy)
-    else:
-        form = ReturnForm()
+                    raise ValueError("This copy has no active loan.")
+                _perform_circulation(copy, loan.borrower, PhotoCirculationForm.Action.CHECKIN)
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, f"Returned {copy.book.title}.")
+            return redirect(copy)
     return render(request, "library/return.html", {"form": form})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def label(request, kind, pk):
     if kind == "copy":
         obj = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
@@ -1134,7 +1197,7 @@ def label(request, kind, pk):
     return render(request, "library/label.html", {"title": title, "payload": payload, "qr_svg": mark_safe(svg_qr(payload))})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def import_books(request):
     if request.method == "POST":
         form = CsvImportForm(request.POST, request.FILES)
@@ -1159,10 +1222,22 @@ def import_books(request):
                 return redirect("book_list")
     else:
         form = CsvImportForm()
-    return render(request, "library/import_books.html", {"form": form})
+    return render(request, "library/import_books.html", {"form": form, **csv_columns("books")})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
+@require_GET
+def download_csv_template(request, kind):
+    if kind not in {"books", "borrowers"}:
+        raise Http404("Unknown import template.")
+    output = StringIO()
+    csv.writer(output).writerow(csv_columns(kind)["headers"])
+    response = HttpResponse("\ufeff" + output.getvalue(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="shelf-school-{kind}-template.csv"'
+    return response
+
+
+@staff_member_required(login_url="staff_login")
 def export_books_csv(request):
     output = StringIO()
     writer = csv.writer(output)
@@ -1195,8 +1270,69 @@ def backup_sqlite(request):
     database = settings.DATABASES["default"]
     if database["ENGINE"] != "django.db.backends.sqlite3":
         raise Http404("SQLite backup is only available when using SQLite.")
-    path = database["NAME"]
-    return FileResponse(open(path, "rb"), as_attachment=True, filename="library-db.sqlite3")
+    snapshot = tempfile.TemporaryFile()
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/snapshot.sqlite3"
+            with closing(sqlite3.connect(database["NAME"])) as source, closing(sqlite3.connect(path)) as destination:
+                source.backup(destination)
+            with open(path, "rb") as saved:
+                shutil.copyfileobj(saved, snapshot)
+        snapshot.seek(0)
+        return FileResponse(snapshot, as_attachment=True, filename="library-db.sqlite3")
+    except Exception:
+        snapshot.close()
+        raise
+
+
+@staff_member_required(login_url="staff_login")
+def employee_positions(request, pk=None):
+    position = get_object_or_404(EmployeePosition, pk=pk) if pk else None
+    if request.method == "POST" and request.POST.get("action") == "delete" and position:
+        try:
+            position.delete()
+        except ProtectedError:
+            messages.error(request, "This position is assigned to employees. Deactivate it instead.")
+        else:
+            messages.success(request, "Position deleted.")
+        return redirect("employee_positions")
+    form = EmployeePositionForm(request.POST if request.method == "POST" else None, instance=position)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Employee position saved.")
+        return redirect("employee_positions")
+    sort = request.GET.get("sort", "name")
+    if sort not in {"name", "active", "assigned"}:
+        sort = "name"
+    return render(request, "library/employee_positions.html", {
+        "form": form, "position": position,
+        "positions": EmployeePosition.objects.annotate(assigned=Count("borrowers")).order_by(sort, "pk"),
+    })
+
+
+@staff_member_required(login_url="staff_login")
+def school_classes(request, pk=None):
+    school_class = get_object_or_404(SchoolClass, pk=pk) if pk else None
+    if request.method == "POST" and request.POST.get("action") == "delete" and school_class:
+        try:
+            school_class.delete()
+        except ProtectedError:
+            messages.error(request, "This class is assigned to students. Deactivate it instead.")
+        else:
+            messages.success(request, "Class deleted.")
+        return redirect("school_classes")
+    form = SchoolClassForm(request.POST if request.method == "POST" else None, instance=school_class)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Class saved.")
+        return redirect("school_classes")
+    sort = request.GET.get("sort", "name")
+    if sort not in {"name", "active", "assigned"}:
+        sort = "name"
+    return render(request, "library/school_classes.html", {
+        "form": form, "school_class": school_class,
+        "classes": SchoolClass.objects.annotate(assigned=Count("borrowers")).order_by(sort, "pk"),
+    })
 
 
 @staff_member_required(login_url="staff_login")
@@ -1273,46 +1409,23 @@ def staff_account_password(request, pk):
 
 @staff_member_required(login_url="staff_login")
 def import_borrowers(request):
-    if request.method == "POST":
-        form = BorrowerCsvImportForm(request.POST, request.FILES)
-        if form.is_valid():
+    form = BorrowerCsvImportForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        try:
             wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
             reader = csv.DictReader(wrapper)
             required = {"Borrower ID", "First name", "Last name"}
             if not required.issubset(set(reader.fieldnames or [])):
-                form.add_error("csv_file", "CSV must include Borrower ID, First name, and Last name columns.")
-            else:
-                created = 0
-                updated = 0
-                skipped = 0
-                for row in reader:
-                    identifier = (row.get("Borrower ID") or "").strip()
-                    first_name = (row.get("First name") or "").strip()
-                    last_name = (row.get("Last name") or "").strip()
-                    if not identifier or not (first_name or last_name):
-                        skipped += 1
-                        continue
-                    active_value = (row.get("Active") or "yes").strip().lower()
-                    _borrower, was_created = Borrower.objects.update_or_create(
-                        username=identifier,
-                        defaults={
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "class_name": (row.get("Class") or "").strip(),
-                            "email": (row.get("Email") or "").strip(),
-                            "active": active_value not in {"0", "false", "no", "inactive"},
-                        },
-                    )
-                    created += int(was_created)
-                    updated += int(not was_created)
-                messages.success(request, f"Borrowers imported: {created} created, {updated} updated, {skipped} skipped.")
-                return redirect("borrower_list")
-    else:
-        form = BorrowerCsvImportForm()
-    return render(request, "library/import_borrowers.html", {"form": form})
+                raise ValueError("CSV must include Borrower ID, First name, and Last name columns.")
+            created, updated, skipped = import_borrower_rows(reader)
+        except (UnicodeDecodeError, csv.Error, ValueError) as exc:
+            form.add_error("csv_file", str(exc))
+        else:
+            messages.success(request, f"Borrowers imported: {created} created, {updated} updated, {skipped} skipped.")
+            return redirect("borrower_list")
+    return render(request, "library/import_borrowers.html", {"form": form, **csv_columns("borrowers")})
 
-
-@login_required
+@staff_member_required(login_url="staff_login")
 def overdue_loans(request):
     sort = request.GET.get("sort", "due")
     direction = request.GET.get("direction", "asc")
@@ -1322,7 +1435,7 @@ def overdue_loans(request):
         "copy": ("copy__copy_number",),
         "borrower": ("borrower__last_name", "borrower__first_name"),
         "username": ("borrower__username",),
-        "class": ("borrower__class_name",),
+        "class": ("borrower__school_class__name",),
     }
     if sort not in sort_fields:
         sort = "due"
@@ -1335,7 +1448,7 @@ def overdue_loans(request):
     loans = Loan.objects.filter(
         return_date__isnull=True,
         due_date__lt=timezone.localdate(),
-    ).select_related("copy__book", "borrower").order_by(*order_by)
+    ).select_related("copy__book", "borrower__school_class").order_by(*order_by)
     sort_headers = [
         {
             "key": key,
@@ -1356,7 +1469,7 @@ def overdue_loans(request):
     return render(request, "library/overdue_loans.html", {"loans": loans, "sort_headers": sort_headers})
 
 
-@login_required
+@staff_member_required(login_url="staff_login")
 def overdue_loans_csv(request):
     output = StringIO()
     writer = csv.writer(output)
@@ -1364,7 +1477,7 @@ def overdue_loans_csv(request):
     loans = Loan.objects.filter(
         return_date__isnull=True,
         due_date__lt=timezone.localdate(),
-    ).select_related("copy__book", "borrower").order_by("due_date")
+    ).select_related("copy__book", "borrower__school_class").order_by("due_date")
     for loan in loans:
         writer.writerow(
             [
@@ -1372,7 +1485,7 @@ def overdue_loans_csv(request):
                 loan.copy.copy_number,
                 loan.borrower.username or "",
                 loan.borrower.full_name,
-                loan.borrower.class_name,
+                str(loan.borrower.school_class or ""),
                 loan.checkout_date,
                 loan.due_date,
             ]

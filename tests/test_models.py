@@ -4,14 +4,14 @@ import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from library.models import Book, Borrower, Copy, Loan, SchoolProfile
+from library.models import SchoolClass, Book, Borrower, Copy, Loan, SchoolProfile
 
 
 @pytest.mark.django_db
 def test_copy_and_borrower_qr_payloads_are_generated():
     book = Book.objects.create(title="The Hobbit", authors="J. R. R. Tolkien")
     copy = Copy.objects.create(book=book, copy_number=1)
-    borrower = Borrower.objects.create(first_name="Ana", last_name="Garcia", class_name="4A")
+    borrower = Borrower.objects.create(first_name="Ana", last_name="Garcia", school_class=SchoolClass.objects.get_or_create(name="4A")[0])
 
     assert copy.qr_code == f"COPY:{copy.id}"
     assert borrower.qr_code == f"BORROWER:{borrower.id}"
@@ -32,7 +32,8 @@ def test_staff_account_automatically_creates_matching_borrower(django_user_model
     assert borrower.first_name == account.first_name
     assert borrower.last_name == account.last_name
     assert borrower.email == account.email
-    assert borrower.class_name == "Staff"
+    assert borrower.school_class is None
+    assert borrower.school_role == Borrower.SchoolRole.EMPLOYEE
 
 
 @pytest.mark.django_db
@@ -41,7 +42,7 @@ def test_staff_account_links_existing_borrower_and_uses_staff_identity(django_us
         username="teacher",
         first_name="Old",
         last_name="Name",
-        class_name="Staff",
+        school_class=SchoolClass.objects.get_or_create(name="Staff")[0],
     )
 
     account = django_user_model.objects.create_user(
@@ -56,7 +57,7 @@ def test_staff_account_links_existing_borrower_and_uses_staff_identity(django_us
     assert account.borrower_profile == existing
     assert existing.full_name == "Teresa Reader"
     assert existing.email == "teacher@example.org"
-    assert existing.class_name == "Staff"
+    assert existing.school_class.name == "Staff"
 
 
 @pytest.mark.django_db

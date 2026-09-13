@@ -22,7 +22,7 @@ def ensure_staff_borrower_profile(sender, instance, **kwargs):
     if borrower is None:
         borrower = Borrower.objects.filter(username=instance.username, staff_account__isnull=True).first()
     if borrower is None:
-        borrower = Borrower(staff_account=instance, class_name="Staff")
+        borrower = Borrower(staff_account=instance, school_role=Borrower.SchoolRole.EMPLOYEE)
     borrower.staff_account = instance
     borrower.username = instance.username
     borrower.first_name = instance.first_name
