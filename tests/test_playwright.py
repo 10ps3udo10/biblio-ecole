@@ -123,6 +123,17 @@ def test_csv_import_reference_and_template_download(page, live_server, django_us
         assert list(csv.reader(file)) == [csv_columns(kind)["headers"]]
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     page.screenshot(path=f"/tmp/shelf-school-import-{kind}-{width}.png", full_page=True)
+    if kind == "borrowers":
+        SchoolClass.objects.get_or_create(name="Lower Elementary (6-9)")
+        page.locator("input[type=file]").set_input_files({
+            "name": "borrowers.csv", "mimeType": "text/csv",
+            "buffer": b"First name,Last name,School ID,School role,Class\nAna,Garcia,S-1042,Student,Lower Elementary (6-9)\n",
+        })
+        page.get_by_role("button", name="Preview borrowers", exact=True).click()
+        expect(page.get_by_role("heading", name="Import preview", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Add 1 borrower", exact=True)).to_be_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=f"/tmp/shelf-school-import-borrowers-preview-{width}.png", full_page=True)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -240,9 +251,11 @@ def test_admin_manages_classes_positions_and_imports_borrowers(page, live_server
     page.goto(f"{live_server.url}/borrowers/import/")
     page.locator("input[type=file]").set_input_files({
         "name": "staff.csv", "mimeType": "text/csv",
-        "buffer": b"Borrower ID,First name,Last name,School role,Position\nsupport,Sam,Reader,Employee,Learning support\n",
+        "buffer": b"First name,Last name,School role,Position,School ID\nSam,Reader,Employee,Learning support,support\n",
     })
-    page.get_by_role("button", name="Import borrowers", exact=True).click()
+    page.get_by_role("button", name="Preview borrowers", exact=True).click()
+    expect(page.get_by_role("heading", name="Import preview", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Add 1 borrower", exact=True).click()
     expect(page.get_by_role("heading", name="Borrowers", exact=True)).to_be_visible()
     page.get_by_role("link", name="Sam Reader").click()
     expect(page.locator(".borrower-badges").get_by_text("Learning support", exact=True)).to_be_visible()
@@ -275,8 +288,8 @@ def test_circulation_receipt_and_borrower_change_responsive(page, live_server, w
     book.cover_image.save("ui-review-cover.png", ContentFile(cover.getvalue()))
     page.route("**" + book.cover_image.url, lambda route: route.fulfill(body=cover.getvalue(), content_type="image/png"))
     copy = Copy.objects.create(book=book, copy_number=1)
-    first = Borrower.objects.create(username="alex", first_name="Alex", last_name="Reader")
-    second = Borrower.objects.create(username="maria", first_name="Maria", last_name="Fernandez")
+    first = Borrower.objects.create(borrower_id="alex", first_name="Alex", last_name="Reader")
+    second = Borrower.objects.create(borrower_id="maria", first_name="Maria", last_name="Fernandez")
     page.set_viewport_size({"width": width, "height": height})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -489,7 +502,7 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
     copy = Copy.objects.create(book=book, copy_number=1)
     second_book = Book.objects.create(title="Second Circulation Book")
     second_copy = Copy.objects.create(book=second_book, copy_number=1)
-    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez")
+    borrower = Borrower.objects.create(borrower_id="mia", first_name="Mia", last_name="Lopez")
     qr_path = tmp_path / "copy-qr.png"
     second_qr_path = tmp_path / "second-copy-qr.png"
     qrcode.make(copy.qr_code).save(qr_path)
@@ -556,7 +569,7 @@ def test_student_can_self_circulate_copy_without_admin_login(page, live_server, 
 def test_student_can_find_book_manually_with_partial_text(page, live_server):
     book = Book.objects.create(title="Manual Search Book", authors="Specific Writer", isbn13="9780316381994")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Green-2")
-    borrower = Borrower.objects.create(username="alex", first_name="Alex", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="alex", first_name="Alex", last_name="Reader")
 
     page.goto(live_server.url)
     select_borrower(page, "alex", "alex - Alex Reader", borrower.id, keyboard=True)
@@ -579,7 +592,7 @@ def test_admin_borrower_view_highlights_current_and_overdue_loans(page, live_ser
     from django.utils import timezone
 
     django_user_model.objects.create_superuser(username="borrowers", password="secret", email="")
-    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
+    borrower = Borrower.objects.create(borrower_id="mia", first_name="Mia", last_name="Lopez", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
     copy = Copy.objects.create(book=Book.objects.create(title="Overdue classroom book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=copy, borrower=borrower, due_date=timezone.localdate() - timedelta(days=2))
 
@@ -625,7 +638,7 @@ def test_admin_can_correct_book_copy_and_borrower_in_browser(page, live_server, 
     django_user_model.objects.create_superuser(username="editor", password="secret", email="")
     book = Book.objects.create(title="Title with typo")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Wrong")
-    borrower = Borrower.objects.create(username="student", first_name="Studnt", last_name="Name")
+    borrower = Borrower.objects.create(borrower_id="student", first_name="Studnt", last_name="Name")
 
     page.goto(f"{live_server.url}/staff/login/?next={book.get_absolute_url()}")
     page.locator("input[name='username']").fill("editor")
@@ -661,8 +674,8 @@ def test_admin_can_correct_book_copy_and_borrower_in_browser(page, live_server, 
 @pytest.mark.django_db(transaction=True)
 def test_admin_can_move_active_loan_to_correct_borrower_in_browser(page, live_server, django_user_model):
     django_user_model.objects.create_superuser(username="loan-editor", password="secret", email="")
-    wrong = Borrower.objects.create(username="wrong-child", first_name="Wrong", last_name="Child")
-    correct = Borrower.objects.create(username="right-child", first_name="Right", last_name="Child", school_class=SchoolClass.objects.get_or_create(name="4A")[0])
+    wrong = Borrower.objects.create(borrower_id="wrong-child", first_name="Wrong", last_name="Child")
+    correct = Borrower.objects.create(borrower_id="right-child", first_name="Right", last_name="Child", school_class=SchoolClass.objects.get_or_create(name="4A")[0])
     copy = Copy.objects.create(
         book=Book.objects.create(title="Borrowed under wrong name"),
         copy_number=1,
@@ -698,8 +711,8 @@ def test_admin_can_sort_every_data_table_in_browser(page, live_server, django_us
     alpha_copy = Copy.objects.create(book=alpha, copy_number=1, shelf_location="Z9", status=Copy.Status.CHECKED_OUT)
     Copy.objects.create(book=alpha, copy_number=2, shelf_location="A1")
     beta_copy = Copy.objects.create(book=beta, copy_number=1, shelf_location="B1", status=Copy.Status.CHECKED_OUT)
-    alpha_borrower = Borrower.objects.create(username="alpha-user", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="2B")[0])
-    beta_borrower = Borrower.objects.create(username="beta-user", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
+    alpha_borrower = Borrower.objects.create(borrower_id="alpha-user", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="2B")[0])
+    beta_borrower = Borrower.objects.create(borrower_id="beta-user", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
     Loan.objects.create(copy=alpha_copy, borrower=alpha_borrower, due_date=timezone.localdate() - timedelta(days=1))
     Loan.objects.create(copy=beta_copy, borrower=beta_borrower, due_date=timezone.localdate() - timedelta(days=2))
 
@@ -826,7 +839,8 @@ def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     page, live_server, django_user_model
 ):
     django_user_model.objects.create_superuser(username="owner", password="secret", email="")
-    borrower = Borrower.objects.create(username="lrueda", first_name="Leo", last_name="Rueda")
+    borrower = Borrower.objects.create(school_id="school-lrueda", first_name="Leo", last_name="Rueda")
+    borrower_id = borrower.borrower_id
 
     page.goto(f"{live_server.url}/staff/login/?next=/settings/")
     page.locator("input[name='username']").fill("owner")
@@ -841,6 +855,7 @@ def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     page.locator("input[name='first_name']").fill("Luis")
     page.locator("input[name='last_name']").fill("Rueda")
     page.locator("input[name='email']").fill("lrueda@example.org")
+    page.get_by_label("Existing borrower:", exact=True).select_option(str(borrower.pk))
     page.locator("input[name='password1']").fill("library-test-password-42")
     page.locator("input[name='password2']").fill("library-test-password-42")
     page.get_by_role("button", name="Save staff account").click()
@@ -854,7 +869,9 @@ def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     assert account.is_staff is True
     assert account.is_superuser is False
     assert borrower.staff_account == account
-    assert borrower.username == account.username == "lrueda"
+    assert borrower.borrower_id == borrower_id
+    assert borrower.school_id == "school-lrueda"
+    assert account.username == "lrueda"
     assert borrower.full_name == account.get_full_name() == "Luis Rueda"
     assert borrower.email == account.email == "lrueda@example.org"
     for width in (1440, 390):

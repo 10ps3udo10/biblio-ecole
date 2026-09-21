@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -201,13 +201,27 @@ class SchoolClass(models.Model):
         return self.name
 
 
+class BorrowerIdSequence(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    current = models.PositiveBigIntegerField(default=0)
+
+    @classmethod
+    def next_id(cls):
+        with transaction.atomic():
+            sequence, _ = cls.objects.select_for_update().get_or_create(pk=1)
+            sequence.current += 1
+            sequence.save(update_fields=["current"])
+            return f"B{sequence.current:06d}"
+
+
 class Borrower(models.Model):
     class SchoolRole(models.TextChoices):
         STUDENT = "student", "Student"
         EMPLOYEE = "employee", "Employee"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    username = models.CharField("Borrower ID", max_length=80, unique=True, null=True, blank=True)
+    borrower_id = models.CharField("Borrower ID", max_length=80, unique=True, editable=False)
+    school_id = models.CharField("School ID", max_length=80, unique=True, null=True, blank=True)
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
     school_class = models.ForeignKey(SchoolClass, verbose_name="Class", null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
@@ -227,7 +241,8 @@ class Borrower(models.Model):
     class Meta:
         ordering = ["last_name", "first_name"]
         indexes = [
-            models.Index(fields=["username"]),
+            models.Index(fields=["borrower_id"]),
+            models.Index(fields=["school_id"]),
             models.Index(fields=["last_name", "first_name"]),
         ]
 
@@ -236,12 +251,16 @@ class Borrower(models.Model):
 
     def save(self, *args, **kwargs):
         if self.staff_account_id:
-            self.username = self.staff_account.username
             self.first_name = self.staff_account.first_name
             self.last_name = self.staff_account.last_name
             self.email = self.staff_account.email
         if not self.qr_code:
             self.qr_code = self.qr_payload
+        if not self.borrower_id:
+            with transaction.atomic():
+                self.borrower_id = BorrowerIdSequence.next_id()
+                super().save(*args, **kwargs)
+            return
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):

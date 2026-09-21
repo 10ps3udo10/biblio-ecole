@@ -9,6 +9,16 @@ from library.models import Borrower, SchoolClass
 pytestmark = pytest.mark.django_db
 
 
+def test_default_montessori_classes():
+    assert set(SchoolClass.objects.values_list("name", flat=True)) >= {
+        "Assistants to Infancy (0-3)",
+        "Children's House (3-6)",
+        "Lower Elementary (6-9)",
+        "Upper Elementary (9-12)",
+        "Adolescent (12-18)",
+    }
+
+
 def test_class_management_preserves_assignments_and_protects_used_classes(client, django_user_model):
     url = reverse("school_classes")
     assert client.get(url).status_code == 302
@@ -26,7 +36,7 @@ def test_class_management_preserves_assignments_and_protects_used_classes(client
     borrower.school_class = None
     borrower.save()
     client.post(edit, {"action": "delete"})
-    assert not SchoolClass.objects.exists()
+    assert not SchoolClass.objects.filter(pk=school_class.pk).exists()
 
 
 def test_class_form_choices_and_role_switch():
@@ -44,37 +54,34 @@ def test_class_form_choices_and_role_switch():
 
 def test_class_csv_validation_preservation_and_clearing():
     school_class = SchoolClass.objects.create(name="3A")
-    row = {"Borrower ID": "sam", "First name": "Sam", "Last name": "Reader"}
+    row = {"School ID": "sam", "First name": "Sam", "Last name": "Reader"}
     import_borrower_rows([{**row, "Class": "3a"}])
-    borrower = Borrower.objects.get(username="sam")
+    borrower = Borrower.objects.get(school_id="sam")
     assert borrower.school_class == school_class
     school_class.active = False
     school_class.save()
-    import_borrower_rows([{**row, "Class": "3A"}])
-    import_borrower_rows([row])
+    with pytest.raises(ValueError, match="inactive"):
+        import_borrower_rows([{**row, "School ID": "new", "First name": "New", "Class": "3A"}])
+    with pytest.raises(ValueError, match="Row 3: Unknown class"):
+        import_borrower_rows([{**row, "School ID": "new", "First name": "New"}, {**row, "School ID": "other", "First name": "Other", "Class": "Typo"}])
+    assert not Borrower.objects.filter(school_id="new").exists()
     borrower.refresh_from_db()
     assert borrower.school_class == school_class
-    with pytest.raises(ValueError, match="inactive"):
-        import_borrower_rows([{**row, "Borrower ID": "new", "Class": "3A"}])
-    with pytest.raises(ValueError, match="Row 3: Unknown class"):
-        import_borrower_rows([{**row, "Borrower ID": "new"}, {**row, "Class": "Typo"}])
-    assert not Borrower.objects.filter(username="new").exists()
-    import_borrower_rows([{**row, "Class": ""}])
-    borrower.refresh_from_db()
-    assert borrower.school_class is None
 
 
 def test_single_csv_import_accepts_students_and_employees(client, django_user_model):
     SchoolClass.objects.create(name="3A")
     client.force_login(django_user_model.objects.create_user(username="operator", is_staff=True))
     upload = SimpleUploadedFile("borrowers.csv",
-        b"Borrower ID,First name,Last name,School role,Position,Class\n"
-        b"student,Sam,Reader,Student,,3A\n"
-        b"employee,Pat,Reader,Employee,Teacher,\n")
+        b"First name,Last name,School role,Position,Class,School ID\n"
+        b"Sam,Reader,Student,,3A,student\n"
+        b"Pat,Reader,Employee,Teacher,,employee\n")
     response = client.post(reverse("import_borrowers"), {"csv_file": upload})
+    assert response.status_code == 200
+    response = client.post(reverse("import_borrowers"), {"action": "confirm"})
     assert response.status_code == 302
-    assert Borrower.objects.get(username="student").school_class.name == "3A"
-    assert Borrower.objects.get(username="employee").position.name == "Teacher"
+    assert Borrower.objects.get(school_id="student").school_class.name == "3A"
+    assert Borrower.objects.get(school_id="employee").position.name == "Teacher"
     assert django_user_model.objects.count() == 1
     assert client.get("/employees/import/").status_code == 404
     assert client.get("/employees/").status_code == 404

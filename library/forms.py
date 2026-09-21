@@ -35,14 +35,31 @@ class StaffAuthenticationForm(AuthenticationForm):
             raise ValidationError("This account does not have Shelf-School staff access.", code="not_staff")
 
 
+class ExistingBorrowerChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, borrower):
+        school_id = f" · School ID {borrower.school_id}" if borrower.school_id else ""
+        return f"{borrower.full_name} · {borrower.borrower_id}{school_id}"
+
+
 class StaffAccountCreationForm(UserCreationForm):
     first_name = forms.CharField(label="First name", max_length=150)
     last_name = forms.CharField(label="Last name", max_length=150)
+    borrower = ExistingBorrowerChoiceField(
+        label="Existing borrower",
+        queryset=Borrower.objects.none(),
+        required=False,
+        empty_label="Create a new borrower profile",
+        help_text="Choose the person if they are already in Borrowers.",
+    )
 
     class Meta(UserCreationForm.Meta):
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email")
-        labels = {"username": "Borrower ID / login"}
+        labels = {"username": "Login username"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["borrower"].queryset = Borrower.objects.filter(staff_account__isnull=True).order_by("last_name", "first_name")
 
     def save(self, commit=True):
         account = super().save(commit=False)
@@ -59,7 +76,7 @@ class StaffAccountEditForm(forms.ModelForm):
     class Meta:
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email", "is_active")
-        labels = {"username": "Borrower ID / login"}
+        labels = {"username": "Login username"}
 
     def __init__(self, *args, operator=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -72,17 +89,6 @@ class StaffAccountEditForm(forms.ModelForm):
         if not is_active and self.instance.is_superuser:
             raise ValidationError("System administrator accounts cannot be deactivated here.")
         return is_active
-
-    def clean_username(self):
-        username = self.cleaned_data["username"]
-        linked_borrower_id = getattr(getattr(self.instance, "borrower_profile", None), "pk", None)
-        matches = Borrower.objects.filter(username=username)
-        if linked_borrower_id:
-            matches = matches.exclude(pk=linked_borrower_id)
-        if matches.exists():
-            raise ValidationError("This identifier belongs to another borrower.")
-        return username
-
 
 def default_form_due_date():
     try:
@@ -231,8 +237,7 @@ class SchoolClassForm(forms.ModelForm):
 class BorrowerForm(forms.ModelForm):
     class Meta:
         model = Borrower
-        fields = ["username", "first_name", "last_name", "school_role", "position", "school_class", "email", "active"]
-        labels = {"username": "Borrower ID"}
+        fields = ["school_id", "first_name", "last_name", "school_role", "position", "school_class", "email", "active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -241,13 +246,16 @@ class BorrowerForm(forms.ModelForm):
         self.fields["school_class"].queryset = SchoolClass.objects.filter(Q(active=True) | Q(pk=self.instance.school_class_id))
         self.fields["school_class"].empty_label = "No class assigned"
         if self.instance.pk and self.instance.staff_account_id:
-            for field_name in ("username", "first_name", "last_name", "email"):
+            for field_name in ("first_name", "last_name", "email"):
                 self.fields[field_name].disabled = True
                 self.fields[field_name].required = False
                 self.fields[field_name].help_text = "Managed from the linked staff account."
 
-    def clean_username(self):
-        return self.cleaned_data.get("username") or None
+    def clean_school_id(self):
+        school_id = self.cleaned_data.get("school_id") or None
+        if school_id and Borrower.objects.filter(school_id__iexact=school_id).exclude(pk=self.instance.pk).exists():
+            raise ValidationError("This School ID is already assigned to another borrower.")
+        return school_id
 
     def clean(self):
         data = super().clean()
@@ -261,7 +269,7 @@ class BorrowerForm(forms.ModelForm):
 
 class BorrowerChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, borrower):
-        identifier = borrower.username or "no borrower ID"
+        identifier = borrower.borrower_id
         class_name = f" - {borrower.school_class}" if borrower.school_class else ""
         return f"{identifier} - {borrower.full_name}{class_name}"
 

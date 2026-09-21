@@ -41,7 +41,8 @@ staff member's settings.
 To change your password, enter your current password and your new password twice,
 then select **Change password**. You stay signed in after changing it.
 
-Your profile shows your name, borrower ID/login, email, and access level.
+Your profile shows your name, generated Borrower ID, separate login username,
+email, and access level.
 A system administrator manages those details through
 [Staff Accounts](./staff-accounts.md).
 

@@ -185,6 +185,17 @@ th { background: var(--surface-muted); font-size: .9rem; color: var(--text-secon
 .csv-upload p { flex: 1 1 260px; min-width: 0; margin: 0; }
 .csv-upload input[type=file] { margin: 0; }
 .csv-import-note { color: var(--text-muted); font-size: .88rem; line-height: 1.6; }
+.import-preview { margin-top: 28px; padding: 22px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.import-preview > header { margin-bottom: 16px; }
+.import-preview > header h2, .import-preview > header p { margin: 0; }
+.import-preview > header p { margin-top: 5px; color: var(--text-muted); }
+.duplicate-review { margin-top: 18px; padding: 16px; border: 1px solid var(--warning-border); border-radius: 6px; background: var(--warning-soft); color: var(--warning-text); }
+.duplicate-review h3, .duplicate-review p { margin: 0; }
+.duplicate-review p { margin-top: 4px; }
+.duplicate-review ul { margin: 12px 0 0; padding-left: 20px; }
+.duplicate-review li + li { margin-top: 8px; }
+.duplicate-review li span { display: block; }
+.import-confirm { margin-top: 18px; }
 .csv-reference { margin-top: 28px; }
 .csv-reference > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .csv-reference h2 { margin: 0; font-size: 1rem; }
@@ -481,6 +492,14 @@ th { background: var(--surface-muted); font-size: .9rem; color: var(--text-secon
   .public-copy-row > strong { grid-column: 1 / -1; }
   .public-book-heading { grid-template-columns: 80px minmax(0, 1fr); gap: 16px; }
   .public-book-heading img, .public-book-heading .book-placeholder { width: 80px; height: 120px; }
+  .import-preview-table { overflow: visible; }
+  .import-preview-table table, .import-preview-table tbody, .import-preview-table tr, .import-preview-table td { display: block; width: 100%; }
+  .import-preview-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .import-preview-table tbody { display: grid; gap: 12px; }
+  .import-preview-table tr { padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  .import-preview-table td { display: grid; grid-template-columns: minmax(105px, .7fr) minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--divider); overflow-wrap: anywhere; }
+  .import-preview-table td:last-child { border-bottom: 0; }
+  .import-preview-table td::before { content: attr(data-label); color: var(--text-muted); font-size: .78rem; font-weight: 700; text-transform: uppercase; }
 }
 .borrower-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
 .borrower-heading h1 { margin: 3px 0 4px; }

@@ -27,15 +27,17 @@ BOOK_OPTIONAL = (
     )),
 )
 BORROWER_REQUIRED = (
-    ("Borrower ID", "student-001"),
     ("First name", "Sam"),
     ("Last name", "Reader"),
 )
 BORROWER_OPTIONAL = (
+    ("School records", (
+        ("School ID", "Optional student or employee number"),
+    )),
     ("School role and assignment", (
         ("School role", "Student or Employee"),
         ("Position", "An employee position configured in Settings"),
-        ("Class", "A student class configured in Settings"),
+        ("Class", "Lower Elementary (6-9)"),
     )),
     ("Contact and status", (
         ("Email", "sam@example.org"),

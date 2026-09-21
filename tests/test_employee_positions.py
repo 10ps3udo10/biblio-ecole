@@ -60,29 +60,29 @@ def test_inactive_position_can_be_retained_but_not_assigned():
 
 
 def test_csv_employee_has_position_but_no_login(django_user_model):
-    import_borrower_rows([{
-        "Borrower ID": "employee1", "First name": "Pat", "Last name": "Reader",
-        "School role": "EMPLOYEE", "Position": "teacher", "Class": "4A",
+    result = import_borrower_rows([{
+        "School ID": "employee1", "First name": "Pat", "Last name": "Reader",
+        "School role": "EMPLOYEE", "Position": "teacher",
     }])
-    borrower = Borrower.objects.get(username="employee1")
+    borrower = Borrower.objects.get(school_id="employee1")
+    assert result.created == 1
+    assert borrower.borrower_id.startswith("B")
     assert borrower.school_role == "employee"
     assert borrower.position.name == "Teacher"
     assert borrower.school_class is None
     assert borrower.staff_account_id is None
     assert not django_user_model.objects.exists()
-    import_borrower_rows([{"Borrower ID": "employee1", "First name": "Pat", "Last name": "Updated"}])
+    duplicate = import_borrower_rows([{"School ID": "employee1", "First name": "Pat", "Last name": "Reader"}])
+    assert duplicate.created == 0
+    assert len(duplicate.duplicates) == 1
     borrower.refresh_from_db()
     assert borrower.position.name == "Teacher"
-    assert borrower.school_role == "employee"
-    import_borrower_rows([{"Borrower ID": "employee1", "First name": "Pat", "Last name": "Updated", "Position": ""}])
-    borrower.refresh_from_db()
-    assert borrower.position_id is None
 
 
 def test_csv_bad_position_rolls_back_all_rows():
     rows = [
-        {"Borrower ID": "one", "First name": "A", "Last name": "Reader", "Position": "Teacher"},
-        {"Borrower ID": "two", "First name": "B", "Last name": "Reader", "Position": "Typo"},
+        {"School ID": "one", "First name": "A", "Last name": "Reader", "Position": "Teacher"},
+        {"School ID": "two", "First name": "B", "Last name": "Reader", "Position": "Typo"},
     ]
     with pytest.raises(ValueError, match="Row 3: Unknown position"):
         import_borrower_rows([{**row, "School role": "Employee"} for row in rows])
@@ -96,10 +96,13 @@ def test_borrower_csv_imports_employees_and_is_protected(client, django_user_mod
     account = django_user_model.objects.create_user(username="admin", is_staff=True)
     client.force_login(account)
     response = client.post(url, {"csv_file": SimpleUploadedFile(
-        "borrowers.csv", b"Borrower ID,First name,Last name,School role,Position\nnew,Pat,Reader,Employee,Librarian\n",
+        "borrowers.csv", b"First name,Last name,School role,Position,School ID\nPat,Reader,Employee,Librarian,new\n",
     )})
+    assert response.status_code == 200
+    assert b"Import preview" in response.content
+    response = client.post(url, {"action": "confirm"})
     assert response.status_code == 302
-    borrower = Borrower.objects.get(username="new")
+    borrower = Borrower.objects.get(school_id="new")
     assert borrower.school_role == "employee"
     assert borrower.position.name == "Librarian"
     assert borrower.staff_account_id is None
@@ -107,8 +110,11 @@ def test_borrower_csv_imports_employees_and_is_protected(client, django_user_mod
 
 
 def test_student_with_login_keeps_student_role_on_account_save(django_user_model):
-    borrower = Borrower.objects.create(username="student-admin", first_name="Student", last_name="Helper")
-    account = django_user_model.objects.create_user(username="student-admin", is_staff=True)
+    borrower = Borrower.objects.create(first_name="Student", last_name="Helper")
+    account = django_user_model.objects.create_user(username="student-admin")
+    borrower.staff_account = account
+    borrower.save()
+    account.is_staff = True
     account.save()
     borrower.refresh_from_db()
     assert borrower.school_role == "student"

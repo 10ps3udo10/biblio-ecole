@@ -56,7 +56,7 @@ from .forms import (
 from .catalog_import import import_catalog_rows
 from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass, UserPreference
 from .csv_templates import csv_columns
-from .borrower_import import import_borrower_rows
+from .borrower_import import import_borrower_rows, preview_borrower_rows
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
 from .qr import svg_qr
 
@@ -778,7 +778,8 @@ def borrower_list(request):
     )
     if query:
         borrowers = borrowers.filter(
-            Q(username__icontains=query)
+            Q(borrower_id__icontains=query)
+            | Q(school_id__icontains=query)
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
             | Q(school_class__name__icontains=query)
@@ -882,7 +883,8 @@ def circulation_borrower_search(request):
         borrowers = borrowers.filter(loans__return_date__isnull=True)
     borrowers = (
         borrowers.filter(
-            Q(username__icontains=query)
+            Q(borrower_id__icontains=query)
+            | Q(school_id__icontains=query)
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
         )
@@ -895,7 +897,7 @@ def circulation_borrower_search(request):
                 {
                     "id": str(borrower.id),
                     "name": borrower.full_name,
-                    "identifier": borrower.username or "",
+                    "identifier": borrower.borrower_id,
                     "class_name": str(borrower.school_class or ""),
                 }
                 for borrower in borrowers
@@ -1398,9 +1400,13 @@ def staff_account_create(request):
     _require_system_administrator(request)
     form = StaffAccountCreationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        existing_borrower = Borrower.objects.filter(username=form.cleaned_data["username"]).first()
+        existing_borrower = form.cleaned_data["borrower"]
         account = form.save()
         if existing_borrower:
+            generated_profile = account.borrower_profile
+            generated_profile.delete()
+            existing_borrower.staff_account = account
+            existing_borrower.save()
             messages.success(request, f"Staff account {account.username} created and linked to the existing borrower.")
         else:
             messages.success(request, f"Staff account {account.username} and borrower profile created.")
@@ -1445,20 +1451,35 @@ def staff_account_password(request, pk):
 @staff_member_required(login_url="staff_login")
 def import_borrowers(request):
     form = BorrowerCsvImportForm(request.POST or None, request.FILES or None)
-    if request.method == "POST" and form.is_valid():
+    preview = None
+    if request.method == "POST":
+        action = request.POST.get("action", "preview")
         try:
+            if action == "confirm":
+                stored = request.session.get("borrower_import_preview") or {}
+                if stored.get("user_id") != request.user.pk or not stored.get("rows"):
+                    raise ValueError("The import preview expired. Upload the CSV again.")
+                result = import_borrower_rows(stored["rows"])
+                request.session.pop("borrower_import_preview", None)
+                messages.success(
+                    request,
+                    f"Borrowers imported: {result.created} created, "
+                    f"{len(result.duplicates)} possible duplicates not imported, {result.skipped} blank rows skipped.",
+                )
+                return redirect("borrower_list")
+            if not form.is_valid():
+                return render(request, "library/import_borrowers.html", {"form": form, "preview": preview, **csv_columns("borrowers")})
             wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
             reader = csv.DictReader(wrapper)
-            required = {"Borrower ID", "First name", "Last name"}
+            required = {"First name", "Last name"}
             if not required.issubset(set(reader.fieldnames or [])):
-                raise ValueError("CSV must include Borrower ID, First name, and Last name columns.")
-            created, updated, skipped = import_borrower_rows(reader)
+                raise ValueError("CSV must include First name and Last name columns.")
+            rows = list(reader)
+            preview = preview_borrower_rows(rows)
+            request.session["borrower_import_preview"] = {"user_id": request.user.pk, "rows": rows}
         except (UnicodeDecodeError, csv.Error, ValueError) as exc:
             form.add_error("csv_file", str(exc))
-        else:
-            messages.success(request, f"Borrowers imported: {created} created, {updated} updated, {skipped} skipped.")
-            return redirect("borrower_list")
-    return render(request, "library/import_borrowers.html", {"form": form, **csv_columns("borrowers")})
+    return render(request, "library/import_borrowers.html", {"form": form, "preview": preview, **csv_columns("borrowers")})
 
 @staff_member_required(login_url="staff_login")
 def overdue_loans(request):
@@ -1469,7 +1490,7 @@ def overdue_loans(request):
         "book": ("copy__book__title",),
         "copy": ("copy__copy_number",),
         "borrower": ("borrower__last_name", "borrower__first_name"),
-        "username": ("borrower__username",),
+        "borrower_id": ("borrower__borrower_id",),
         "class": ("borrower__school_class__name",),
     }
     if sort not in sort_fields:
@@ -1497,7 +1518,7 @@ def overdue_loans(request):
             ("book", "Book"),
             ("copy", "Copy"),
             ("borrower", "Borrower"),
-            ("username", "Borrower ID"),
+            ("borrower_id", "Borrower ID"),
             ("class", "Class"),
         )
     ]
@@ -1518,7 +1539,7 @@ def overdue_loans_csv(request):
             [
                 loan.copy.book.title,
                 loan.copy.copy_number,
-                loan.borrower.username or "",
+                loan.borrower.borrower_id,
                 loan.borrower.full_name,
                 str(loan.borrower.school_class or ""),
                 loan.checkout_date,

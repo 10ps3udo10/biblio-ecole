@@ -4,6 +4,7 @@ import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from library.forms import BorrowerForm
 from library.models import SchoolClass, Book, Borrower, Copy, Loan, SchoolProfile
 
 
@@ -18,6 +19,32 @@ def test_copy_and_borrower_qr_payloads_are_generated():
 
 
 @pytest.mark.django_db
+def test_borrower_ids_are_generated_sequentially_and_not_editable():
+    first = Borrower.objects.create(first_name="Ana", last_name="Garcia")
+    second = Borrower.objects.create(first_name="Leo", last_name="Martinez")
+
+    assert first.borrower_id == "B000001"
+    assert second.borrower_id == "B000002"
+    assert "borrower_id" not in BorrowerForm().fields
+
+
+@pytest.mark.django_db
+def test_optional_school_id_is_case_insensitively_unique_in_staff_form():
+    existing = Borrower.objects.create(school_id="S-100", first_name="Ana", last_name="Garcia")
+    form = BorrowerForm({
+        "school_id": "s-100", "first_name": "Leo", "last_name": "Martinez",
+        "school_role": "student", "active": "on",
+    })
+    assert not form.is_valid()
+    assert "already assigned" in form.errors["school_id"][0]
+    edit = BorrowerForm({
+        "school_id": "s-100", "first_name": "Ana", "last_name": "Garcia",
+        "school_role": "student", "active": "on",
+    }, instance=existing)
+    assert edit.is_valid()
+
+
+@pytest.mark.django_db
 def test_staff_account_automatically_creates_matching_borrower(django_user_model):
     account = django_user_model.objects.create_user(
         username="teacher",
@@ -28,7 +55,9 @@ def test_staff_account_automatically_creates_matching_borrower(django_user_model
     )
 
     borrower = account.borrower_profile
-    assert borrower.username == account.username
+    assert borrower.borrower_id == "B000001"
+    assert borrower.borrower_id != account.username
+    assert borrower.school_id is None
     assert borrower.first_name == account.first_name
     assert borrower.last_name == account.last_name
     assert borrower.email == account.email
@@ -37,9 +66,9 @@ def test_staff_account_automatically_creates_matching_borrower(django_user_model
 
 
 @pytest.mark.django_db
-def test_staff_account_links_existing_borrower_and_uses_staff_identity(django_user_model):
+def test_staff_account_does_not_link_borrowers_by_matching_free_text(django_user_model):
     existing = Borrower.objects.create(
-        username="teacher",
+        borrower_id="B009999",
         first_name="Old",
         last_name="Name",
         school_class=SchoolClass.objects.get_or_create(name="Staff")[0],
@@ -54,9 +83,9 @@ def test_staff_account_links_existing_borrower_and_uses_staff_identity(django_us
     )
 
     existing.refresh_from_db()
-    assert account.borrower_profile == existing
-    assert existing.full_name == "Teresa Reader"
-    assert existing.email == "teacher@example.org"
+    assert account.borrower_profile != existing
+    assert existing.full_name == "Old Name"
+    assert existing.email == ""
     assert existing.school_class.name == "Staff"
 
 
@@ -75,7 +104,9 @@ def test_staff_identity_changes_are_synchronized_to_borrower(django_user_model):
 
     borrower = account.borrower_profile
     borrower.refresh_from_db()
-    assert borrower.username == "treader"
+    borrower_id = borrower.borrower_id
+    assert borrower_id.startswith("B")
+    assert borrower.borrower_id != "treader"
     assert borrower.full_name == "Tess Reader"
     assert borrower.email == "tess@example.org"
 
@@ -84,6 +115,7 @@ def test_staff_identity_changes_are_synchronized_to_borrower(django_user_model):
     borrower.email = "different@example.org"
     borrower.save()
     borrower.refresh_from_db()
+    assert borrower.borrower_id == borrower_id
     assert borrower.full_name == "Tess Reader"
     assert borrower.email == "tess@example.org"
 
@@ -130,7 +162,7 @@ def test_school_profile_is_singleton_and_controls_default_due_date():
     profile.default_loan_days = 21
     profile.save()
 
-    borrower = Borrower.objects.create(username="student", first_name="Student", last_name="One")
+    borrower = Borrower.objects.create(borrower_id="student", first_name="Student", last_name="One")
     book = Book.objects.create(title="Configured Loan")
     copy = Copy.objects.create(book=book, copy_number=1)
     loan = Loan.objects.create(copy=copy, borrower=borrower)

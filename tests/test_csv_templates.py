@@ -24,7 +24,7 @@ def test_template_download_and_import_round_trip(client, django_user_model, kind
     assert client.post(url).status_code == 405
     row = {header: "" for header in records[0]}
     row.update({"Title": "Template book"} if kind == "books" else {
-        "Borrower ID": "template-reader", "First name": "Sam", "Last name": "Reader",
+        "First name": "Sam", "Last name": "Reader", "School ID": "student-001",
     })
     output = StringIO()
     writer = csv.DictWriter(output, fieldnames=records[0])
@@ -33,13 +33,17 @@ def test_template_download_and_import_round_trip(client, django_user_model, kind
     imported = client.post(reverse(f"import_{kind}"), {
         "csv_file": SimpleUploadedFile("template.csv", output.getvalue().encode("utf-8")),
     })
-    assert imported.status_code == 302
+    assert imported.status_code == (302 if kind == "books" else 200)
     if kind == "books":
         assert Book.objects.filter(title="Template book").exists()
         exported = client.get(reverse("export_books_csv"))
         assert set(next(csv.reader(StringIO(exported.content.decode())))) == set(records[0])
     else:
-        assert Borrower.objects.filter(username="template-reader", staff_account__isnull=True).exists()
+        assert b"Import preview" in imported.content
+        confirmed = client.post(reverse("import_borrowers"), {"action": "confirm"})
+        assert confirmed.status_code == 302
+        borrower = Borrower.objects.get(school_id="student-001")
+        assert borrower.borrower_id.startswith("B")
 
 
 @pytest.mark.parametrize("kind", ["books", "borrowers"])

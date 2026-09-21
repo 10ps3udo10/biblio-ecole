@@ -7,7 +7,8 @@
     <h2 id="account-profile-title"><i data-lucide="user-round" aria-hidden="true"></i>Profile</h2>
     <dl class="account-profile-details">
       <div><dt>Name</dt><dd>{{ request.user.get_full_name|default:request.user.username }}</dd></div>
-      <div><dt>Borrower ID / login</dt><dd>{{ request.user.username }}</dd></div>
+      <div><dt>Borrower ID</dt><dd>{{ request.user.borrower_profile.borrower_id }}</dd></div>
+      <div><dt>Login username</dt><dd>{{ request.user.username }}</dd></div>
       <div><dt>Email</dt><dd>{{ request.user.email|default:"Not set" }}</dd></div>
       <div><dt>Access</dt><dd>{% if request.user.is_superuser %}System administrator{% else %}Staff{% endif %}</dd></div>
     </dl>

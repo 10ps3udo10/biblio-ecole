@@ -23,10 +23,11 @@ Shelf-School uses two related records for people with administrator access:
 | **Borrower** | No | Receives and returns books through the circulation desk. |
 
 :::important Staff can always borrow
-Creating a staff account automatically creates its borrower profile. If that
-Borrower ID already exists, Shelf-School links the existing profile so its
-loans and history are preserved. The Borrower ID, name, and email always match
-the staff account.
+Creating a staff account automatically creates a borrower profile with its own
+generated Borrower ID. If the person already exists in Borrowers, select that
+person explicitly while creating the login so loans and history remain on one
+profile. Name and email stay synchronized; Borrower ID and login username are
+separate identifiers.
 :::
 
 ## Add administrator login access
@@ -36,19 +37,19 @@ Only the system administrator can manage staff accounts.
 1. Sign in and open **Library > School settings**.
 2. Select **Manage staff accounts**.
 3. Select **Add staff account**.
-4. Enter the person's name, Borrower ID, email address, and initial password.
-5. Select **Save staff account**.
+4. Enter the person's login username, name, email address, and initial password.
+5. If the person already exists in Borrowers, choose them under **Existing borrower**.
+6. Select **Save staff account**.
 
 The new account receives ordinary Shelf-School Staff access. Shelf-School also
-creates its borrower profile automatically. When a borrower with the same
-identifier already exists, that profile is linked instead, preserving its loans
-and history. The new account does not become a system administrator.
+creates its borrower profile automatically. Shelf-School never guesses a match
+from names or identifiers. The new account does not become a system administrator.
 
 ## Maintain access
 
 Open **Library > School settings > Manage staff accounts** to:
 
-- Edit a Borrower ID, name, or email address for both linked records.
+- Edit the login username, name, or email address. Name and email also update the linked borrower.
 - Deactivate an account without deleting its history.
 - Reset a forgotten password.
 - Distinguish ordinary **Staff** from the **System administrator**.

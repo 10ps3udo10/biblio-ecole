@@ -28,10 +28,10 @@ class CopyAdmin(admin.ModelAdmin):
 
 @admin.register(Borrower)
 class BorrowerAdmin(admin.ModelAdmin):
-    list_display = ("username", "full_name", "school_class", "email", "staff_account", "active")
-    search_fields = ("username", "first_name", "last_name", "school_class__name", "email", "id", "qr_code")
+    list_display = ("borrower_id", "school_id", "full_name", "school_class", "email", "staff_account", "active")
+    search_fields = ("borrower_id", "school_id", "first_name", "last_name", "school_class__name", "email", "id", "qr_code")
     list_filter = ("active", "school_class")
-    readonly_fields = ("qr_code",)
+    readonly_fields = ("borrower_id", "qr_code")
 
 
 @admin.register(Loan)

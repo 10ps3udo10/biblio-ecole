@@ -85,10 +85,10 @@
       {{ form.borrower }}
       <div class="borrower-search-field">
         <i data-lucide="search" aria-hidden="true"></i>
-        <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.username|default:selected_borrower.full_name }} - {{ selected_borrower.full_name }}{% endif %}">
+        <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.borrower_id }} - {{ selected_borrower.full_name }}{% endif %}">
         <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
       </div>
-      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your borrower ID or name.</p>
+      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your name, Borrower ID, or School ID.</p>
       {{ form.borrower.errors }}
     </div>
     <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continue</button>
@@ -211,7 +211,7 @@
     borrowerId.value = "";
     borrowerSearch.value = "";
     closeBorrowerResults();
-    borrowerSearchStatus.textContent = "Type part of your borrower ID or name.";
+    borrowerSearchStatus.textContent = "Type part of your name, Borrower ID, or School ID.";
   }
 
   function formatBorrower(item) {

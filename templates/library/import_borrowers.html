@@ -2,12 +2,20 @@
 {% block title %}Import borrowers - Shelf-School{% endblock %}
 {% block content %}
 <section class="csv-import">
-  <header class="csv-import-heading"><div><h1>Import borrowers</h1><p class="muted">Students and employees in one UTF-8 CSV.</p></div><a class="button" href="{% url 'download_csv_template' 'borrowers' %}"><i data-lucide="download" aria-hidden="true"></i>Download CSV template</a></header>
+  <header class="csv-import-heading"><div><h1>Add borrowers from CSV</h1><p class="muted">Create students and employees in one UTF-8 CSV.</p></div><a class="button" href="{% url 'download_csv_template' 'borrowers' %}"><i data-lucide="download" aria-hidden="true"></i>Download CSV template</a></header>
   <form class="csv-upload" method="post" enctype="multipart/form-data">
-    {% csrf_token %}{{ form.as_p }}
-    <button class="button primary"><i data-lucide="upload" aria-hidden="true"></i>Import borrowers</button>
+    {% csrf_token %}<input type="hidden" name="action" value="preview">{{ form.as_p }}
+    <button class="button primary"><i data-lucide="scan-search" aria-hidden="true"></i>Preview borrowers</button>
   </form>
-  <p class="csv-import-note">Existing Borrower IDs are updated. New borrowers default to Student when School role is omitted. Classes and positions must match Settings. No login access is granted.</p>
+  <p class="csv-import-note"><strong>This import only adds new borrowers.</strong> Shelf-School assigns every Borrower ID. Edit existing borrowers in the app. Possible duplicates are held back for review, and no login access is granted.</p>
+  {% if preview %}
+  <section class="import-preview" aria-labelledby="import-preview-title">
+    <header><div><h2 id="import-preview-title">Import preview</h2><p>{{ preview.rows|length }} ready to add · {{ preview.duplicates|length }} possible duplicate{{ preview.duplicates|length|pluralize }} · {{ preview.skipped }} blank row{{ preview.skipped|pluralize }}</p></div></header>
+    {% if preview.rows %}<div class="table-wrap import-preview-table"><table><thead><tr><th>CSV row</th><th>Name</th><th>Role</th><th>Class / Position</th><th>School ID</th></tr></thead><tbody>{% for row in preview.rows %}<tr><td data-label="CSV row">{{ row.line }}</td><td data-label="Name">{{ row.first_name }} {{ row.last_name }}</td><td data-label="Role">{{ row.school_role|title }}</td><td data-label="Class / Position">{{ row.school_class|default:row.position|default:"Not set" }}</td><td data-label="School ID">{{ row.school_id|default:"Not set" }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+    {% if preview.duplicates %}<div class="duplicate-review" role="alert"><h3>Not imported: possible duplicates</h3><p>Edit these people in Shelf-School, or correct the CSV if they are different people.</p><ul>{% for row in preview.duplicates %}<li><strong>Row {{ row.line }} · {{ row.first_name }} {{ row.last_name }}</strong><span>{{ row.reason }}</span></li>{% endfor %}</ul></div>{% endif %}
+    {% if preview.rows %}<form method="post" class="import-confirm">{% csrf_token %}<input type="hidden" name="action" value="confirm"><button class="button primary"><i data-lucide="users-round" aria-hidden="true"></i>Add {{ preview.rows|length }} borrower{{ preview.rows|length|pluralize }}</button></form>{% else %}<p class="csv-import-note">There are no new borrowers to add.</p>{% endif %}
+  </section>
+  {% endif %}
   {% include "library/csv_field_reference.html" %}
 </section>
 {% endblock %}

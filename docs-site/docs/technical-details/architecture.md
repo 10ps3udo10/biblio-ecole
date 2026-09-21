@@ -117,7 +117,7 @@ cannot leave half a basket checked out.**
 </div>
 
 <div className="model-supporting">
-  <div><strong>Staff account <span>1 to 1</span> Borrower</strong><small>Borrower ID, name, and email stay synchronized.</small></div>
+  <div><strong>Staff account <span>1 to 1</span> Borrower</strong><small>Login username and Borrower ID are separate; name and email stay synchronized.</small></div>
   <div><strong>School profile <span>1 per installation</span></strong><small>Branding, contact details, and default loan duration.</small></div>
   <div><strong>School class <span>1 to many</span> Students</strong><small>Optional assignment; renaming updates every linked profile.</small></div>
   <div><strong>Employee position <span>1 to many</span> Employees</strong><small>Optional assignment, independent of login permissions.</small></div>

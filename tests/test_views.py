@@ -27,7 +27,7 @@ def test_unauthenticated_user_uses_staff_login(client):
 
 @pytest.mark.django_db
 def test_public_circulation_desk_does_not_require_admin_login(client):
-    Borrower.objects.create(username="student", first_name="Student", last_name="One")
+    Borrower.objects.create(borrower_id="student", first_name="Student", last_name="One")
 
     response = client.get(reverse("photo_circulation"))
 
@@ -71,7 +71,8 @@ def test_settings_separates_school_borrowers_and_access(client, django_user_mode
 @pytest.mark.django_db
 def test_system_administrator_links_and_synchronizes_matching_borrower(client, django_user_model):
     django_user_model.objects.create_superuser(username="system-owner", password="secret", email="")
-    borrower = Borrower.objects.create(username="lrueda", first_name="Leo", last_name="Rueda")
+    borrower = Borrower.objects.create(school_id="school-lrueda", first_name="Leo", last_name="Rueda")
+    borrower_id = borrower.borrower_id
     assert client.login(username="system-owner", password="secret")
 
     response = client.post(
@@ -83,6 +84,7 @@ def test_system_administrator_links_and_synchronizes_matching_borrower(client, d
             "email": "lrueda@example.org",
             "password1": "library-test-password-42",
             "password2": "library-test-password-42",
+            "borrower": borrower.pk,
         },
         follow=True,
     )
@@ -93,7 +95,9 @@ def test_system_administrator_links_and_synchronizes_matching_borrower(client, d
     assert account.is_staff is True
     assert account.is_superuser is False
     assert borrower.staff_account == account
-    assert borrower.username == account.username == "lrueda"
+    assert borrower.borrower_id == borrower_id
+    assert account.username == "lrueda"
+    assert borrower.school_id == "school-lrueda"
     assert borrower.full_name == account.get_full_name() == "Luis Rueda"
     assert borrower.email == account.email == "lrueda@example.org"
     assert b"Staff account lrueda created and linked to the existing borrower" in response.content
@@ -280,9 +284,9 @@ def test_cover_fetch_requires_a_selected_book(logged_in_client):
 
 @pytest.mark.django_db
 def test_borrower_table_sorts_by_name_class_loans_and_status(logged_in_client):
-    staff_borrower = Borrower.objects.get(username="librarian")
-    alpha = Borrower.objects.create(username="alpha", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
-    beta = Borrower.objects.create(username="beta", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="2B")[0], active=False)
+    staff_borrower = Borrower.objects.get(staff_account__username="librarian")
+    alpha = Borrower.objects.create(borrower_id="alpha", first_name="Amy", last_name="Zulu", school_class=SchoolClass.objects.get_or_create(name="1A")[0])
+    beta = Borrower.objects.create(borrower_id="beta", first_name="Ben", last_name="Alpha", school_class=SchoolClass.objects.get_or_create(name="2B")[0], active=False)
     book = Book.objects.create(title="Borrowed title")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=copy, borrower=alpha)
@@ -303,8 +307,8 @@ def test_overdue_and_copy_tables_sort_by_columns(logged_in_client):
     book = Book.objects.create(title="Sortable copies")
     first = Copy.objects.create(book=book, copy_number=1, shelf_location="Z9", status=Copy.Status.CHECKED_OUT)
     second = Copy.objects.create(book=book, copy_number=2, shelf_location="A1", status=Copy.Status.CHECKED_OUT)
-    first_borrower = Borrower.objects.create(username="z-user", first_name="Zed", last_name="Zulu")
-    second_borrower = Borrower.objects.create(username="a-user", first_name="Amy", last_name="Alpha")
+    first_borrower = Borrower.objects.create(borrower_id="z-user", first_name="Zed", last_name="Zulu")
+    second_borrower = Borrower.objects.create(borrower_id="a-user", first_name="Amy", last_name="Alpha")
     Loan.objects.create(copy=first, borrower=first_borrower, due_date=timezone.localdate() - timedelta(days=1))
     Loan.objects.create(copy=second, borrower=second_borrower, due_date=timezone.localdate() - timedelta(days=2))
 
@@ -538,7 +542,7 @@ def test_staff_can_delete_book_without_loan_history(logged_in_client, tmp_path, 
 def test_returned_book_and_loan_history_can_be_deleted(logged_in_client):
     book = Book.objects.create(title="Delete returned history")
     copy = Copy.objects.create(book=book, copy_number=1)
-    borrower = Borrower.objects.create(username="history", first_name="History", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="history", first_name="History", last_name="Reader")
     Loan.objects.create(copy=copy, borrower=borrower, return_date=timezone.localdate())
 
     response = logged_in_client.post(reverse("delete_book", args=[book.id]))
@@ -552,7 +556,7 @@ def test_returned_book_and_loan_history_can_be_deleted(logged_in_client):
 def test_checked_out_book_cannot_be_deleted(logged_in_client):
     book = Book.objects.create(title="Currently checked out")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="active", first_name="Active", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="active", first_name="Active", last_name="Reader")
     Loan.objects.create(copy=copy, borrower=borrower)
 
     response = logged_in_client.post(reverse("delete_book", args=[book.id]), follow=True)
@@ -566,7 +570,8 @@ def test_checked_out_book_cannot_be_deleted(logged_in_client):
 def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
     book = Book.objects.create(title="Original title", isbn13="9780316381994")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Old")
-    borrower = Borrower.objects.create(username="old-user", first_name="Old", last_name="Name")
+    borrower = Borrower.objects.create(first_name="Old", last_name="Name")
+    borrower_id = borrower.borrower_id
 
     response = logged_in_client.post(
         reverse("book_edit", args=[book.id]),
@@ -598,7 +603,7 @@ def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
     response = logged_in_client.post(
         reverse("borrower_edit", args=[borrower.id]),
         {
-            "username": "correct-user",
+            "school_id": "school-correct-user",
             "first_name": "Correct",
             "last_name": "Name",
             "school_role": "student",
@@ -608,7 +613,8 @@ def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
     )
     assert response.status_code == 302
     borrower.refresh_from_db()
-    assert borrower.username == "correct-user"
+    assert borrower.borrower_id == borrower_id
+    assert borrower.school_id == "school-correct-user"
     assert borrower.full_name == "Correct Name"
     assert borrower.active is False
 
@@ -690,7 +696,7 @@ def test_manual_book_form_rejects_invalid_dashed_isbn(logged_in_client):
 def test_checked_out_copy_edit_cannot_change_circulation_status(logged_in_client):
     book = Book.objects.create(title="Checked out edit")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="status-reader", first_name="Status", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="status-reader", first_name="Status", last_name="Reader")
     Loan.objects.create(copy=copy, borrower=borrower)
 
     response = logged_in_client.post(
@@ -710,7 +716,7 @@ def test_staff_can_delete_one_of_multiple_copies_and_its_returned_history(logged
     book = Book.objects.create(title="Several physical copies")
     first = Copy.objects.create(book=book, copy_number=1)
     second = Copy.objects.create(book=book, copy_number=2)
-    borrower = Borrower.objects.create(username="copy-history", first_name="Copy", last_name="History")
+    borrower = Borrower.objects.create(borrower_id="copy-history", first_name="Copy", last_name="History")
     Loan.objects.create(copy=second, borrower=borrower, return_date=timezone.localdate())
 
     response = logged_in_client.post(reverse("delete_copy", args=[second.id]), follow=True)
@@ -728,7 +734,7 @@ def test_checked_out_copy_cannot_be_deleted(logged_in_client):
     book = Book.objects.create(title="Loaned duplicate")
     Copy.objects.create(book=book, copy_number=1)
     loaned = Copy.objects.create(book=book, copy_number=2, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="copy-active", first_name="Active", last_name="Copy")
+    borrower = Borrower.objects.create(borrower_id="copy-active", first_name="Active", last_name="Copy")
     Loan.objects.create(copy=loaned, borrower=borrower)
 
     response = logged_in_client.post(reverse("delete_copy", args=[loaned.id]), follow=True)
@@ -788,7 +794,7 @@ def test_photo_intake_requires_isbn_or_title_after_failed_barcode_read(logged_in
 def test_photo_circulation_checkout_and_checkin_with_borrower_dropdown(logged_in_client, monkeypatch):
     book = Book.objects.create(title="Real Library Workflow", isbn13="9781234567897")
     copy = Copy.objects.create(book=book, copy_number=1)
-    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez")
+    borrower = Borrower.objects.create(borrower_id="mia", first_name="Mia", last_name="Lopez")
     monkeypatch.setattr("library.views.decode_barcodes_from_image", lambda photo: [copy.qr_code])
     photo = SimpleUploadedFile("copy-qr.png", b"fake image bytes", content_type="image/png")
 
@@ -837,7 +843,7 @@ def test_photo_circulation_checkout_and_checkin_with_borrower_dropdown(logged_in
 @pytest.mark.django_db
 def test_public_circulation_does_not_embed_borrower_records(client):
     borrower = Borrower.objects.create(
-        username="private-student",
+        borrower_id="private-student",
         first_name="Private",
         last_name="Student",
         email="private@example.org",
@@ -856,7 +862,7 @@ def test_public_circulation_does_not_embed_borrower_records(client):
 def test_borrower_search_is_limited_and_returns_only_public_identity_fields(client):
     for index in range(10):
         Borrower.objects.create(
-            username=f"reader-{index}",
+            borrower_id=f"reader-{index}",
             first_name="Reader",
             last_name=f"Student {index}",
             email=f"reader-{index}@example.org",
@@ -877,7 +883,7 @@ def test_borrower_search_is_limited_and_returns_only_public_identity_fields(clie
 def test_return_search_includes_inactive_borrower_with_active_loan(client):
     book = Book.objects.create(title="Outstanding inactive loan")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="former-reader", first_name="Former", last_name="Reader", active=False)
+    borrower = Borrower.objects.create(borrower_id="former-reader", first_name="Former", last_name="Reader", active=False)
     Loan.objects.create(copy=copy, borrower=borrower)
 
     checkout = client.get(reverse("circulation_borrower_search"), {"q": "former", "action": "checkout"})
@@ -902,7 +908,7 @@ def test_return_search_includes_inactive_borrower_with_active_loan(client):
 def test_inactive_borrower_can_return_outstanding_loan(client):
     book = Book.objects.create(title="Inactive return")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="inactive-return", first_name="Inactive", last_name="Reader", active=False)
+    borrower = Borrower.objects.create(borrower_id="inactive-return", first_name="Inactive", last_name="Reader", active=False)
     Loan.objects.create(copy=copy, borrower=borrower)
 
     response = client.post(
@@ -919,7 +925,7 @@ def test_circulation_photo_is_not_saved_to_media(client, tmp_path, settings, mon
     settings.MEDIA_ROOT = tmp_path
     book = Book.objects.create(title="Temporary circulation photo")
     copy = Copy.objects.create(book=book, copy_number=1)
-    borrower = Borrower.objects.create(username="student", first_name="Student", last_name="One")
+    borrower = Borrower.objects.create(borrower_id="student", first_name="Student", last_name="One")
     monkeypatch.setattr("library.views.decode_barcodes_from_image", lambda photo: [copy.qr_code])
     photo = SimpleUploadedFile("circulation.png", b"temporary bytes", content_type="image/png")
 
@@ -942,7 +948,7 @@ def test_circulation_photo_is_not_saved_to_media(client, tmp_path, settings, mon
 def test_circulation_accepts_exact_copy_from_manual_fallback(client):
     book = Book.objects.create(title="Manual fallback", authors="Searchable Author")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="A4")
-    borrower = Borrower.objects.create(username="reader", first_name="Test", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="reader", first_name="Test", last_name="Reader")
 
     response = client.post(
         reverse("photo_circulation"),
@@ -976,7 +982,7 @@ def test_manual_checkout_choices_show_only_useful_metadata_for_available_copies(
 
 @pytest.mark.django_db
 def test_borrower_can_checkout_multiple_books_in_one_atomic_basket(client):
-    borrower = Borrower.objects.create(username="basket-reader", first_name="Basket", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="basket-reader", first_name="Basket", last_name="Reader")
     first = Copy.objects.create(book=Book.objects.create(title="First basket book"), copy_number=1)
     second = Copy.objects.create(book=Book.objects.create(title="Second basket book"), copy_number=1)
 
@@ -1015,8 +1021,8 @@ def test_borrower_can_checkout_multiple_books_in_one_atomic_basket(client):
 
 @pytest.mark.django_db
 def test_multi_book_checkout_rolls_back_if_one_copy_becomes_unavailable(client):
-    borrower = Borrower.objects.create(username="atomic-reader", first_name="Atomic", last_name="Reader")
-    other = Borrower.objects.create(username="other-reader", first_name="Other", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="atomic-reader", first_name="Atomic", last_name="Reader")
+    other = Borrower.objects.create(borrower_id="other-reader", first_name="Other", last_name="Reader")
     first = Copy.objects.create(book=Book.objects.create(title="Atomic first"), copy_number=1)
     second = Copy.objects.create(book=Book.objects.create(title="Atomic second"), copy_number=1)
     due_date = timezone.localdate() + timedelta(days=14)
@@ -1046,7 +1052,7 @@ def test_multi_book_checkout_rolls_back_if_one_copy_becomes_unavailable(client):
 
 @pytest.mark.django_db
 def test_checkout_basket_rejects_duplicate_and_allows_removal(client):
-    borrower = Borrower.objects.create(username="edit-basket", first_name="Edit", last_name="Basket")
+    borrower = Borrower.objects.create(borrower_id="edit-basket", first_name="Edit", last_name="Basket")
     first = Copy.objects.create(book=Book.objects.create(title="Keep in basket"), copy_number=1)
     second = Copy.objects.create(book=Book.objects.create(title="Remove from basket"), copy_number=1)
 
@@ -1089,8 +1095,8 @@ def test_checkout_basket_rejects_duplicate_and_allows_removal(client):
 
 @pytest.mark.django_db
 def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
-    wrong = Borrower.objects.create(username="wrong", first_name="Wrong", last_name="Student")
-    correct = Borrower.objects.create(username="correct", first_name="Correct", last_name="Student", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
+    wrong = Borrower.objects.create(borrower_id="wrong", first_name="Wrong", last_name="Student")
+    correct = Borrower.objects.create(borrower_id="correct", first_name="Correct", last_name="Student", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
     copy = Copy.objects.create(book=Book.objects.create(title="Mistaken borrower"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     loan = Loan.objects.create(copy=copy, borrower=wrong)
 
@@ -1111,7 +1117,7 @@ def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
 
 @pytest.mark.django_db
 def test_returned_loan_cannot_be_reassigned(logged_in_client):
-    borrower = Borrower.objects.create(username="returned", first_name="Returned", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="returned", first_name="Returned", last_name="Reader")
     copy = Copy.objects.create(book=Book.objects.create(title="Already returned"), copy_number=1)
     loan = Loan.objects.create(copy=copy, borrower=borrower, return_date=timezone.localdate())
 
@@ -1124,8 +1130,8 @@ def test_returned_loan_cannot_be_reassigned(logged_in_client):
 def test_photo_circulation_rejects_checkin_for_wrong_borrower(logged_in_client):
     book = Book.objects.create(title="Borrower mismatch")
     copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(username="mia", first_name="Mia", last_name="Lopez")
-    other = Borrower.objects.create(username="leo", first_name="Leo", last_name="Garcia")
+    borrower = Borrower.objects.create(borrower_id="mia", first_name="Mia", last_name="Lopez")
+    other = Borrower.objects.create(borrower_id="leo", first_name="Leo", last_name="Garcia")
     Loan.objects.create(copy=copy, borrower=borrower)
     response = logged_in_client.post(
         reverse("photo_circulation"),
@@ -1140,8 +1146,8 @@ def test_photo_circulation_rejects_checkin_for_wrong_borrower(logged_in_client):
 
 @pytest.mark.django_db
 def test_borrower_can_return_multiple_active_loans_together(client):
-    borrower = Borrower.objects.create(username="reader", first_name="Test", last_name="Reader")
-    other = Borrower.objects.create(username="other", first_name="Other", last_name="Reader")
+    borrower = Borrower.objects.create(borrower_id="reader", first_name="Test", last_name="Reader")
+    other = Borrower.objects.create(borrower_id="other", first_name="Other", last_name="Reader")
     first = Copy.objects.create(book=Book.objects.create(title="First return"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     second = Copy.objects.create(book=Book.objects.create(title="Second return"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     other_copy = Copy.objects.create(book=Book.objects.create(title="Not this borrower"), copy_number=1, status=Copy.Status.CHECKED_OUT)
@@ -1211,25 +1217,29 @@ def test_staff_can_complete_school_setup(logged_in_client):
 
 
 @pytest.mark.django_db
-def test_staff_can_import_and_update_borrowers(logged_in_client):
+def test_staff_can_preview_and_add_borrowers_without_updating_existing(logged_in_client):
     SchoolClass.objects.create(name="4A")
-    Borrower.objects.create(username="mrueda", first_name="Old", last_name="Name")
+    existing = Borrower.objects.create(school_id="mrueda", first_name="Old", last_name="Name")
     csv_file = SimpleUploadedFile(
         "borrowers.csv",
-        b"Borrower ID,First name,Last name,School role,Class,Email,Active\n"
-        b"mrueda,Manuel,Rueda,Employee,,mrueda@example.org,yes\n"
-        b"librarian,Changed,Name,Employee,,changed@example.org,yes\n"
-        b"ana,Ana,Garcia,Student,4A,ana@example.org,true\n",
+        b"First name,Last name,School role,Class,Email,School ID,Active\n"
+        b"Old,Name,Employee,,mrueda@example.org,mrueda,yes\n"
+        b"Ana,Garcia,Student,4A,ana@example.org,ana,true\n",
         content_type="text/csv",
     )
 
     response = logged_in_client.post(reverse("import_borrowers"), {"csv_file": csv_file})
 
+    assert response.status_code == 200
+    assert b"1 ready to add" in response.content
+    assert b"1 possible duplicate" in response.content
+    response = logged_in_client.post(reverse("import_borrowers"), {"action": "confirm"})
     assert response.status_code == 302
     assert Borrower.objects.count() == 3
-    assert Borrower.objects.get(username="mrueda").first_name == "Manuel"
-    assert Borrower.objects.get(username="ana").school_class.name == "4A"
-    staff_borrower = Borrower.objects.get(username="librarian")
+    existing.refresh_from_db()
+    assert existing.first_name == "Old"
+    assert Borrower.objects.get(school_id="ana").school_class.name == "4A"
+    staff_borrower = Borrower.objects.get(staff_account__username="librarian")
     assert staff_borrower.full_name == "librarian"
     assert staff_borrower.email == ""
     assert staff_borrower.school_class is None
@@ -1237,7 +1247,7 @@ def test_staff_can_import_and_update_borrowers(logged_in_client):
 
 @pytest.mark.django_db
 def test_overdue_report_and_csv_only_include_overdue_active_loans(logged_in_client):
-    borrower = Borrower.objects.create(username="ana", first_name="Ana", last_name="Garcia")
+    borrower = Borrower.objects.create(borrower_id="ana", first_name="Ana", last_name="Garcia")
     overdue_copy = Copy.objects.create(book=Book.objects.create(title="Late book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     current_copy = Copy.objects.create(book=Book.objects.create(title="Current book"), copy_number=1, status=Copy.Status.CHECKED_OUT)
     Loan.objects.create(copy=overdue_copy, borrower=borrower, due_date=timezone.localdate() - timedelta(days=1))
