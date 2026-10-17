@@ -12,6 +12,7 @@
   <article><span>Catalog titles</span><strong>{{ total_books }}</strong><small>{{ total_copies }} physical copies</small></article>
   <article><span>Available now</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% of inventory</small></article>
   <article><span>On loan</span><strong>{{ borrowed_books }}</strong><small>{{ borrowed_percent }}% of inventory</small></article>
+  {% if previous_year_open_loans %}<article class="attention"><span>Années précédentes</span><strong>{{ previous_year_open_loans }}</strong><small><a href="{% url 'school_year_overview' %}">Emprunts non rendus à récupérer</a></small></article>{% endif %}
   <article class="{% if overdue_books %}attention{% endif %}"><span>Overdue</span><strong>{{ overdue_books }}</strong><small>{% if overdue_books %}<a href="{% url 'overdue_loans' %}">Review overdue loans</a>{% else %}Nothing needs attention{% endif %}</small></article>
 </section>
 <section class="dashboard-analytics">

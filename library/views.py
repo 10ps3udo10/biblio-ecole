@@ -5,7 +5,7 @@ import sqlite3
 import tempfile
 import uuid
 from contextlib import closing
-from datetime import timedelta
+from datetime import date, timedelta
 from io import StringIO, TextIOWrapper
 from urllib.parse import quote_plus
 
@@ -55,6 +55,7 @@ from .forms import (
 )
 from .catalog_import import import_catalog_rows
 from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass, SchoolYear, UserPreference
+from . import school_year as school_year_service
 from .csv_templates import csv_columns
 from .borrower_import import import_borrower_rows, preview_borrower_rows
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
@@ -257,6 +258,7 @@ def dashboard(request):
         "unavailable_percent": round((unavailable_copies / total_copies) * 100) if total_copies else 0,
         "borrowed_books": active_loans.count(),
         "overdue_books": active_loans.filter(due_date__lt=timezone.localdate()).count(),
+        "previous_year_open_loans": school_year_service.open_loans_from_previous_years().count(),
         "circulation_days": circulation_days,
         "max_daily_activity": max_daily_activity,
         "recent_books": Book.objects.order_by("-created_at")[:6],
@@ -1550,3 +1552,85 @@ def overdue_loans_csv(request):
     response = HttpResponse(output.getvalue(), content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="overdue-loans.csv"'
     return response
+
+
+SCHOOL_LEVELS = ["TPS", "PS", "MS", "GS", "CP", "CE1", "CE2", "CM1", "CM2"]
+
+
+def _suggested_destination(old_class_name, new_class_names):
+    """Suggest the next level's class (CP -> CE1...); CM2 pupils leave the school."""
+    tokens = old_class_name.upper().replace("-", " ").replace("/", " ").split()
+    levels = [token for token in tokens if token in SCHOOL_LEVELS]
+    if not levels:
+        return ""
+    highest = max(SCHOOL_LEVELS.index(level) for level in levels)
+    if highest == len(SCHOOL_LEVELS) - 1:
+        return school_year_service.LEAVES_SCHOOL
+    next_level = SCHOOL_LEVELS[highest + 1]
+    for name in new_class_names:
+        if next_level in name.upper().replace("-", " ").replace("/", " ").split():
+            return name
+    return ""
+
+
+@staff_member_required(login_url="staff_login")
+def school_year_overview(request):
+    current = SchoolYear.current()
+    years = SchoolYear.objects.annotate(class_count=Count("classes", distinct=True), loan_count=Count("loans", distinct=True))
+    return render(request, "library/school_year_overview.html", {
+        "current_year": current,
+        "years": years,
+        "open_loans": school_year_service.open_loans_from_previous_years(),
+    })
+
+
+@staff_member_required(login_url="staff_login")
+def school_year_new(request):
+    current = SchoolYear.current()
+    name, start_date, end_date = school_year_service.next_year_defaults()
+    class_names_text = "\n".join(SchoolClass.objects.filter(school_year=current, active=True).values_list("name", flat=True))
+    step = request.POST.get("step") if request.method == "POST" else None
+    error = None
+    if step in {"classes", "confirm"}:
+        name = request.POST.get("name", "").strip()
+        class_names_text = request.POST.get("class_names", "")
+        try:
+            start_date = date.fromisoformat(request.POST.get("start_date", ""))
+            end_date = date.fromisoformat(request.POST.get("end_date", ""))
+        except ValueError:
+            error = "Les dates doivent être au format AAAA-MM-JJ."
+        class_names = school_year_service.parse_class_names(class_names_text)
+        if not error and not class_names:
+            error = "Ajoutez au moins une classe pour la nouvelle année."
+        if not error and SchoolYear.objects.filter(name__iexact=name).exists():
+            error = f"L'année {name} existe déjà."
+        if not error and step == "confirm":
+            placements = {key.removeprefix("placement_"): value for key, value in request.POST.items() if key.startswith("placement_")}
+            try:
+                new_year, summary = school_year_service.start_new_school_year(
+                    name=name, start_date=start_date, end_date=end_date, class_names=class_names, placements=placements,
+                )
+            except ValueError as exc:
+                error = str(exc)
+            else:
+                messages.success(
+                    request,
+                    f"Année {new_year} commencée : {summary['moved']} élève(s) passé(s) dans leur nouvelle classe, "
+                    f"{summary['archived']} archivé(s), {summary['unplaced']} sans classe, "
+                    f"{summary['open_loans']} emprunt(s) d'années précédentes encore en cours.",
+                )
+                return redirect("school_year_overview")
+        if not error:
+            students = list(school_year_service.students_to_place())
+            for student in students:
+                student.suggested = _suggested_destination(student.school_class.name, class_names)
+            return render(request, "library/school_year_placements.html", {
+                "current_year": current, "name": name, "start_date": start_date, "end_date": end_date,
+                "class_names": class_names, "class_names_text": class_names_text,
+                "students": students, "leaves_school": school_year_service.LEAVES_SCHOOL,
+                "open_loans": Loan.objects.filter(return_date__isnull=True).select_related("copy__book", "borrower", "school_class").order_by("borrower__last_name"),
+            })
+    return render(request, "library/school_year_new.html", {
+        "current_year": current, "name": name, "start_date": start_date, "end_date": end_date,
+        "class_names_text": class_names_text, "error": error,
+    })

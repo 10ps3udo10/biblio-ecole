@@ -1,0 +1,57 @@
+{% extends "library/base.html" %}
+
+{% block title %}Répartir les élèves - Shelf-School{% endblock %}
+
+{% block content %}
+
+<header class="borrower-heading"><h1>Nouvelle année {{ name }}</h1></header>
+<p>Étape 2 sur 2 : choisissez la nouvelle classe de chaque élève. Les élèves qui quittent l'école sont archivés avec leur historique.</p>
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="step" value="confirm">
+  <input type="hidden" name="name" value="{{ name }}">
+  <input type="hidden" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+  <input type="hidden" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+  <input type="hidden" name="class_names" value="{{ class_names_text }}">
+
+  {% regroup students by school_class as groups %}
+  {% for group in groups %}
+  <section class="rollover-group">
+    <h2>{{ group.grouper }} <small>({{ group.list|length }} élève{{ group.list|length|pluralize }})</small></h2>
+    <p><label>Toute la classe vers
+      <select data-apply-to="group-{{ forloop.counter }}"><option value="">—</option>{% for class_name in class_names %}<option value="{{ class_name }}">{{ class_name }}</option>{% endfor %}<option value="{{ leaves_school }}">Quitte l'école</option></select>
+    </label></p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Élève</th><th>Nouvelle classe</th></tr></thead>
+      <tbody>{% for student in group.list %}<tr>
+        <td>{{ student.last_name }} {{ student.first_name }}</td>
+        <td><select name="placement_{{ student.pk }}" class="group-{{ forloop.parentloop.counter }}" aria-label="Nouvelle classe de {{ student.full_name }}">
+          <option value=""{% if not student.suggested %} selected{% endif %}>Sans classe pour l'instant</option>
+          {% for class_name in class_names %}<option value="{{ class_name }}"{% if student.suggested == class_name %} selected{% endif %}>{{ class_name }}</option>{% endfor %}
+          <option value="{{ leaves_school }}"{% if student.suggested == leaves_school %} selected{% endif %}>Quitte l'école (archiver)</option>
+        </select></td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  {% empty %}<p>Aucun élève actif dans les classes de {{ current_year }}.</p>
+  {% endfor %}
+
+  {% if open_loans %}
+  <section class="current-loan-panel"><div><span class="eyebrow">À signaler</span><h2>{{ open_loans|length }} emprunt{{ open_loans|length|pluralize }} encore en cours</h2><p>Ils restent ouverts et seront listés dans « Année scolaire » jusqu'à leur retour.</p></div></section>
+  <ul class="plain-list">{% for loan in open_loans %}<li>{{ loan.copy.book.title }} #{{ loan.copy.copy_number }} — {{ loan.borrower.full_name }}{% if loan.school_class %} ({{ loan.school_class }}){% endif %}, depuis le {{ loan.checkout_date }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <div class="actions">
+    <button class="button primary" onclick="return confirm('Commencer l\'année {{ name }} ? Les classes de {{ current_year }} seront désactivées.')"><i data-lucide="check" aria-hidden="true"></i>Commencer l'année {{ name }}</button>
+    <a class="button" href="{% url 'school_year_new' %}">Recommencer</a>
+  </div>
+</form>
+<script>
+document.querySelectorAll("[data-apply-to]").forEach((picker) => {
+  picker.addEventListener("change", () => {
+    if (!picker.value) return;
+    document.querySelectorAll("select." + picker.dataset.applyTo).forEach((select) => { select.value = picker.value; });
+  });
+});
+</script>
+
+{% endblock %}

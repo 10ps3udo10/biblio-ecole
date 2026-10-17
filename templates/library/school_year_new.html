@@ -1,0 +1,21 @@
+{% extends "library/base.html" %}
+
+{% block title %}Nouvelle année scolaire - Shelf-School{% endblock %}
+
+{% block content %}
+
+<header class="borrower-heading"><h1>Nouvelle année scolaire</h1><a class="button" href="{% url 'school_year_overview' %}"><i data-lucide="arrow-left" aria-hidden="true"></i>Année {{ current_year }}</a></header>
+<p>Étape 1 sur 2 : nommez l'année et listez ses classes. Le catalogue et l'historique des emprunts sont conservés.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<section class="configuration-editor">
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="step" value="classes">
+    <p><label for="id_name">Nom de l'année</label><input id="id_name" name="name" value="{{ name }}" required></p>
+    <p><label for="id_start_date">Début</label><input id="id_start_date" type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" required></p>
+    <p><label for="id_end_date">Fin</label><input id="id_end_date" type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" required></p>
+    <p><label for="id_class_names">Classes de la nouvelle année (une par ligne)</label><textarea id="id_class_names" name="class_names" rows="10">{{ class_names_text }}</textarea><small>Reprises de l'année {{ current_year }} ; modifiez-les si besoin.</small></p>
+    <button class="button primary"><i data-lucide="arrow-right" aria-hidden="true"></i>Continuer : répartir les élèves</button>
+  </form>
+</section>
+
+{% endblock %}
