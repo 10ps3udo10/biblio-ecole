@@ -1,11 +1,11 @@
 {% extends "library/base.html" %}
-{% block title %}Import books - Shelf-School{% endblock %}
+{% block title %}Importer des livres - Shelf-School{% endblock %}
 {% block content %}
 <section class="csv-import">
-  <header class="csv-import-heading"><div><h1>Import books</h1><p class="muted">One physical copy per row. UTF-8 CSV.</p></div><a class="button" href="{% url 'download_csv_template' 'books' %}"><i data-lucide="download" aria-hidden="true"></i>Download CSV template</a></header>
+  <header class="csv-import-heading"><div><h1>Importer des livres</h1><p class="muted">Une ligne par exemplaire. CSV en UTF-8.</p></div><a class="button" href="{% url 'download_csv_template' 'books' %}"><i data-lucide="download" aria-hidden="true"></i>Télécharger le modèle CSV</a></header>
   <form class="csv-upload" method="post" enctype="multipart/form-data">
     {% csrf_token %}{{ form.as_p }}
-    <button class="button primary"><i data-lucide="upload" aria-hidden="true"></i>Import books</button>
+    <button class="button primary"><i data-lucide="upload" aria-hidden="true"></i>Importer les livres</button>
   </form>
   {% include "library/csv_field_reference.html" %}
 </section>

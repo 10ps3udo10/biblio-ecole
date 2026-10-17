@@ -22,7 +22,7 @@ def test_thousand_titles_render_only_one_page(catalog_client):
     assert page[0].title == "Book 0000"
     assert page[-1].title == "Book 0049"
     assert response.content.count(b'class="table-select cover-book-select"') == 50
-    assert b"1 to 50 of 1000 titles" in response.content
+    assert "1 à 50 sur 1000 livres".encode() in response.content
     assert b"Book 0050" not in response.content
 
 
@@ -49,6 +49,6 @@ def test_invalid_page_falls_back(catalog_client, requested, expected):
 def test_empty_catalog(catalog_client):
     response = catalog_client.get(reverse("book_list"))
     assert response.status_code == 200
-    assert b"0 titles" in response.content
-    assert b"No books found" in response.content
+    assert "0 livre".encode() in response.content
+    assert "Aucun livre trouvé".encode() in response.content
     assert b'aria-label="Catalog pages"' not in response.content

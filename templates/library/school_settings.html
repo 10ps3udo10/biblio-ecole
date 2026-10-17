@@ -1,22 +1,22 @@
 {% extends "library/base.html" %}
-{% block title %}School settings - Shelf-School{% endblock %}
+{% block title %}Paramètres de l'école - Shelf-School{% endblock %}
 {% block content %}
 <div class="school-settings">
   <header class="settings-heading">
-    <h1>School settings</h1>
-    <button class="button primary" type="submit" form="school-settings-form"><i data-lucide="save" aria-hidden="true"></i>Save school settings</button>
+    <h1>Paramètres de l'école</h1>
+    <button class="button primary" type="submit" form="school-settings-form"><i data-lucide="save" aria-hidden="true"></i>Enregistrer les paramètres</button>
   </header>
   <form id="school-settings-form" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.non_field_errors }}
     <section class="settings-section" aria-labelledby="school-details-title">
-      <h2 id="school-details-title"><i data-lucide="school" aria-hidden="true"></i>School details</h2>
+      <h2 id="school-details-title"><i data-lucide="school" aria-hidden="true"></i>Informations sur l'école</h2>
       <div class="settings-fields">
         {% include "library/settings_field.html" with field=form.school_name %}
         {% include "library/settings_field.html" with field=form.short_name %}
         <div class="settings-field settings-field-wide">
           {{ form.logo.label_tag }}{{ form.logo.errors }}
-          {% if school_profile.logo %}<img class="settings-logo" src="{{ school_profile.logo.url }}" alt="Current school logo">{% endif %}
+          {% if school_profile.logo %}<img class="settings-logo" src="{{ school_profile.logo.url }}" alt="Logo actuel de l'école">{% endif %}
           {{ form.logo }}
         </div>
       </div>
@@ -30,7 +30,7 @@
       </div>
     </section>
     <section class="settings-section" aria-labelledby="school-loans-title">
-      <h2 id="school-loans-title"><i data-lucide="book-open" aria-hidden="true"></i>Borrowing</h2>
+      <h2 id="school-loans-title"><i data-lucide="book-open" aria-hidden="true"></i>Emprunts</h2>
       <div class="settings-fields">
         {% include "library/settings_field.html" with field=form.default_loan_days %}
         {% include "library/settings_field.html" with field=form.label_footer %}
@@ -38,22 +38,22 @@
     </section>
   </form>
   <section class="settings-section" aria-labelledby="borrower-settings-title">
-    <h2 id="borrower-settings-title"><i data-lucide="users-round" aria-hidden="true"></i>Borrowers</h2>
+    <h2 id="borrower-settings-title"><i data-lucide="users-round" aria-hidden="true"></i>Élèves</h2>
     <div class="settings-links">
-      <a class="settings-edit-link" href="{% url 'school_classes' %}" aria-label="Classes"><i data-lucide="graduation-cap" aria-hidden="true"></i><span>Classes</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <a class="settings-edit-link" href="{% url 'school_classes' %}" aria-label="Classes"><i data-lucide="graduation-cap" aria-hidden="true"></i><span>Classes</span><small>Modifier</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
       <a class="settings-edit-link" href="{% url 'school_year_overview' %}" aria-label="Année scolaire"><i data-lucide="calendar-range" aria-hidden="true"></i><span>Année scolaire</span><small>Gérer</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
-      <a class="settings-edit-link" href="{% url 'employee_positions' %}" aria-label="Employee positions"><i data-lucide="briefcase-business" aria-hidden="true"></i><span>Employee positions</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
-      <div class="settings-commands"><a class="button" href="{% url 'import_borrowers' %}"><i data-lucide="upload" aria-hidden="true"></i>Import borrowers CSV</a></div>
+      <a class="settings-edit-link" href="{% url 'employee_positions' %}" aria-label="Fonctions du personnel"><i data-lucide="briefcase-business" aria-hidden="true"></i><span>Fonctions du personnel</span><small>Modifier</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <div class="settings-commands"><a class="button" href="{% url 'import_borrowers' %}"><i data-lucide="upload" aria-hidden="true"></i>Importer des élèves depuis un CSV</a></div>
     </div>
   </section>
   <section class="settings-section" aria-labelledby="settings-access-title">
-    <h2 id="settings-access-title"><i data-lucide="shield-check" aria-hidden="true"></i>Access and data</h2>
+    <h2 id="settings-access-title"><i data-lucide="shield-check" aria-hidden="true"></i>Accès et données</h2>
     <div class="settings-links">
       {% if request.user.is_superuser %}
-      <a class="settings-edit-link" href="{% url 'staff_account_list' %}" aria-label="Manage staff accounts"><i data-lucide="user-cog" aria-hidden="true"></i><span>Manage staff accounts</span><small>Edit</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
-      <a class="settings-edit-link" href="{% url 'admin:index' %}" aria-label="Open Advanced (Django Admin)"><i data-lucide="wrench" aria-hidden="true"></i><span>Advanced (Django Admin)</span><i data-lucide="external-link" aria-hidden="true"></i></a>
+      <a class="settings-edit-link" href="{% url 'staff_account_list' %}" aria-label="Gérer les comptes du personnel"><i data-lucide="user-cog" aria-hidden="true"></i><span>Gérer les comptes du personnel</span><small>Modifier</small><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+      <a class="settings-edit-link" href="{% url 'admin:index' %}" aria-label="Ouvrir l'administration avancée (Django)"><i data-lucide="wrench" aria-hidden="true"></i><span>Administration avancée (Django)</span><i data-lucide="external-link" aria-hidden="true"></i></a>
       {% endif %}
-      <div class="settings-commands"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Download database backup</a></div>
+      <div class="settings-commands"><a class="button" href="{% url 'backup_sqlite' %}"><i data-lucide="database-backup" aria-hidden="true"></i>Télécharger une sauvegarde</a></div>
     </div>
   </section>
 </div>

@@ -34,7 +34,7 @@ def preview_borrower_rows(rows):
 
     for line, row in enumerate(rows, start=2):
         if None in row:
-            raise ValueError(f"Row {line}: Too many columns. Check CSV quoting.")
+            raise ValueError(f"Ligne {line} : trop de colonnes. Vérifiez les guillemets du CSV.")
         text = lambda key: " ".join((row.get(key) or "").split())
         if not any(text(key) for key in row):
             skipped += 1
@@ -42,35 +42,35 @@ def preview_borrower_rows(rows):
 
         first_name, last_name = text("First name"), text("Last name")
         if not first_name or not last_name:
-            raise ValueError(f"Row {line}: First name and Last name are required.")
+            raise ValueError(f"Ligne {line} : les colonnes First name et Last name sont obligatoires.")
         role = text("School role").lower() or Borrower.SchoolRole.STUDENT
         if role not in Borrower.SchoolRole.values:
-            raise ValueError(f"Row {line}: School role must be Employee or Student.")
+            raise ValueError(f"Ligne {line} : School role doit valoir Employee ou Student.")
 
         position = None
         position_name = text("Position")
         class_name = text("Class")
         if role == Borrower.SchoolRole.STUDENT:
             if position_name:
-                raise ValueError(f"Row {line}: Only employees can have a position.")
+                raise ValueError(f"Ligne {line} : seul le personnel peut avoir une fonction.")
             school_class = SchoolClass.objects.filter(school_year=SchoolYear.current(), name__iexact=class_name).first() if class_name else None
             if class_name and school_class is None:
-                raise ValueError(f"Row {line}: Unknown class '{class_name}'. Add it in Settings first.")
+                raise ValueError(f"Ligne {line} : classe « {class_name} » inconnue. Ajoutez-la d'abord dans les paramètres.")
             if school_class and not school_class.active:
-                raise ValueError(f"Row {line}: Class '{class_name}' is inactive.")
+                raise ValueError(f"Ligne {line} : la classe « {class_name} » est inactive.")
         else:
             if class_name:
-                raise ValueError(f"Row {line}: Only students can have a class.")
+                raise ValueError(f"Ligne {line} : seuls les élèves peuvent avoir une classe.")
             school_class = None
             position = EmployeePosition.objects.filter(name__iexact=position_name).first() if position_name else None
             if position_name and position is None:
-                raise ValueError(f"Row {line}: Unknown position '{position_name}'. Add it in Settings first.")
+                raise ValueError(f"Ligne {line} : fonction « {position_name} » inconnue. Ajoutez-la d'abord dans les paramètres.")
             if position and not position.active:
-                raise ValueError(f"Row {line}: Position '{position_name}' is inactive.")
+                raise ValueError(f"Ligne {line} : la fonction « {position_name} » est inactive.")
 
         active_text = text("Active").lower()
         if active_text not in {"", "yes", "true", "1", "no", "false", "0", "inactive"}:
-            raise ValueError(f"Row {line}: Active must be Yes or No.")
+            raise ValueError(f"Ligne {line} : Active doit valoir Yes ou No.")
         school_id = text("School ID") or None
         name_key = (_normalized(first_name), _normalized(last_name))
         school_id_key = _normalized(school_id)
@@ -78,13 +78,13 @@ def preview_borrower_rows(rows):
         reason = ""
         school_id_match = existing.filter(school_id__iexact=school_id).first() if school_id else None
         if school_id_match:
-            reason = f"School ID {school_id} is already assigned to {school_id_match.full_name}."
+            reason = f"L'identifiant école {school_id} est déjà attribué à {school_id_match.full_name}."
         elif school_id_key and school_id_key in school_ids_in_file:
-            reason = f"School ID {school_id} appears more than once in this file."
+            reason = f"L'identifiant école {school_id} apparaît plusieurs fois dans ce fichier."
         elif match:
-            reason = f"A borrower named {match.full_name} already exists ({match.borrower_id})."
+            reason = f"{match.full_name} existe déjà ({match.borrower_id})."
         elif name_key in names_in_file:
-            reason = "This name appears more than once in this file."
+            reason = "Ce nom apparaît plusieurs fois dans ce fichier."
 
         candidate = {
             "line": line,
@@ -126,7 +126,7 @@ def import_borrower_rows(rows):
         try:
             borrower.full_clean(exclude=["borrower_id"])
         except ValidationError as exc:
-            raise ValueError(f"Row {row['line']}: {'; '.join(exc.messages)}") from exc
+            raise ValueError(f"Ligne {row['line']} : {'; '.join(exc.messages)}") from exc
         borrower.save()
         created += 1
     return BorrowerImportResult(created, preview.duplicates, preview.skipped)

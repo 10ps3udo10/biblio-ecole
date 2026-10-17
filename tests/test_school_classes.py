@@ -32,7 +32,7 @@ def test_class_management_preserves_assignments_and_protects_used_classes(client
     assert borrower.school_class.name == "Upper elementary"
     assert not borrower.school_class.active
     response = client.post(edit, {"action": "delete"}, follow=True)
-    assert b"Deactivate it instead" in response.content
+    assert "Désactivez-la plutôt".encode() in response.content
     borrower.school_class = None
     borrower.save()
     client.post(edit, {"action": "delete"})
@@ -62,7 +62,7 @@ def test_class_csv_validation_preservation_and_clearing():
     school_class.save()
     with pytest.raises(ValueError, match="inactive"):
         import_borrower_rows([{**row, "School ID": "new", "First name": "New", "Class": "3A"}])
-    with pytest.raises(ValueError, match="Row 3: Unknown class"):
+    with pytest.raises(ValueError, match="Ligne 3 : classe « Typo » inconnue"):
         import_borrower_rows([{**row, "School ID": "new", "First name": "New"}, {**row, "School ID": "other", "First name": "Other", "Class": "Typo"}])
     assert not Borrower.objects.filter(school_id="new").exists()
     borrower.refresh_from_db()
@@ -86,8 +86,8 @@ def test_single_csv_import_accepts_students_and_employees(client, django_user_mo
     assert client.get("/employees/import/").status_code == 404
     assert client.get("/employees/").status_code == 404
     settings = client.get(reverse("school_settings"))
-    assert b">Employees</a>" not in settings.content
-    assert b"Import borrowers CSV" in settings.content
+    assert ">Personnel</a>".encode() not in settings.content
+    assert "Importer des élèves depuis un CSV".encode() in settings.content
     listing = client.get(reverse("borrower_list"))
-    assert b"Add borrower" in listing.content
+    assert "Ajouter un emprunteur".encode() in listing.content
     assert b"Add employee" not in listing.content

@@ -1,13 +1,13 @@
 {% extends "library/base.html" %}
-{% block title %}{{ book.title }} - Catalog{% endblock %}
+{% block title %}{{ book.title }} - Catalogue{% endblock %}
 {% block content %}
-<p><a href="{% url 'public_catalog' %}">Back to catalog</a></p>
+<p><a href="{% url 'public_catalog' %}">Retour au catalogue</a></p>
 <header class="public-book-heading">
-{% if book.cover_image %}<img src="{{ book.cover_image.url }}" alt="Cover of {{ book.title }}">{% else %}<span class="book-placeholder"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
+{% if book.cover_image %}<img src="{{ book.cover_image.url }}" alt="Couverture de {{ book.title }}">{% else %}<span class="book-placeholder"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
 <div><h1>{{ book.title }}</h1><p>{{ book.authors }}</p>{% if book.publisher %}<p class="muted">{{ book.publisher }}{% if book.publication_year %} · {{ book.publication_year }}{% endif %}</p>{% endif %}<p class="muted">{% if book.isbn13 %}ISBN {{ book.isbn13 }}{% elif book.isbn10 %}ISBN {{ book.isbn10 }}{% endif %}</p></div>
 </header>
 <section class="public-copy-list" aria-labelledby="public-copies-title">
-<h2 id="public-copies-title">Find a copy</h2>
-{% for copy in book.public_copies %}<div class="public-copy-row"><strong>Copy #{{ copy.copy_number }}</strong><span>{{ copy.shelf_location|default:"No shelf assigned" }}</span><span class="status-badge {% if copy.status == 'available' %}active{% else %}inactive{% endif %}">{{ copy.get_status_display }}</span></div>{% endfor %}
+<h2 id="public-copies-title">Trouver un exemplaire</h2>
+{% for copy in book.public_copies %}<div class="public-copy-row"><strong>Exemplaire n°{{ copy.copy_number }}</strong><span>{{ copy.shelf_location|default:"Aucune étagère attribuée" }}</span><span class="status-badge {% if copy.status == 'available' %}active{% else %}inactive{% endif %}">{{ copy.get_status_display }}</span></div>{% endfor %}
 </section>
 {% endblock %}

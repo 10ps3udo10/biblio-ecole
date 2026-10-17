@@ -24,7 +24,7 @@ class UserWorkflowForm(forms.ModelForm):
     class Meta:
         model = UserPreference
         fields = ["start_page", "table_density"]
-        labels = {"start_page": "Start page after login", "table_density": "Table spacing"}
+        labels = {"start_page": "Page d'accueil après la connexion", "table_density": "Espacement des tableaux"}
         widgets = {"table_density": forms.RadioSelect}
 
 
@@ -32,30 +32,30 @@ class StaffAuthenticationForm(AuthenticationForm):
     def confirm_login_allowed(self, user):
         super().confirm_login_allowed(user)
         if not user.is_staff:
-            raise ValidationError("This account does not have Shelf-School staff access.", code="not_staff")
+            raise ValidationError("Ce compte n'a pas accès à Shelf-School.", code="not_staff")
 
 
 class ExistingBorrowerChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, borrower):
-        school_id = f" · School ID {borrower.school_id}" if borrower.school_id else ""
+        school_id = f" · Identifiant école {borrower.school_id}" if borrower.school_id else ""
         return f"{borrower.full_name} · {borrower.borrower_id}{school_id}"
 
 
 class StaffAccountCreationForm(UserCreationForm):
-    first_name = forms.CharField(label="First name", max_length=150)
-    last_name = forms.CharField(label="Last name", max_length=150)
+    first_name = forms.CharField(label="Prénom", max_length=150)
+    last_name = forms.CharField(label="Nom", max_length=150)
     borrower = ExistingBorrowerChoiceField(
-        label="Existing borrower",
+        label="Élève ou personnel existant",
         queryset=Borrower.objects.none(),
         required=False,
-        empty_label="Create a new borrower profile",
-        help_text="Choose the person if they are already in Borrowers.",
+        empty_label="Créer une nouvelle fiche",
+        help_text="Choisissez la personne si elle figure déjà dans la liste des élèves.",
     )
 
     class Meta(UserCreationForm.Meta):
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email")
-        labels = {"username": "Login username"}
+        labels = {"username": "Identifiant de connexion"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,13 +70,13 @@ class StaffAccountCreationForm(UserCreationForm):
 
 
 class StaffAccountEditForm(forms.ModelForm):
-    first_name = forms.CharField(label="First name", max_length=150)
-    last_name = forms.CharField(label="Last name", max_length=150)
+    first_name = forms.CharField(label="Prénom", max_length=150)
+    last_name = forms.CharField(label="Nom", max_length=150)
 
     class Meta:
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email", "is_active")
-        labels = {"username": "Login username"}
+        labels = {"username": "Identifiant de connexion"}
 
     def __init__(self, *args, operator=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,9 +85,9 @@ class StaffAccountEditForm(forms.ModelForm):
     def clean_is_active(self):
         is_active = self.cleaned_data["is_active"]
         if not is_active and self.instance == self.operator:
-            raise ValidationError("You cannot deactivate your own account.")
+            raise ValidationError("Vous ne pouvez pas désactiver votre propre compte.")
         if not is_active and self.instance.is_superuser:
-            raise ValidationError("System administrator accounts cannot be deactivated here.")
+            raise ValidationError("Les comptes administrateur système ne peuvent pas être désactivés ici.")
         return is_active
 
 def default_form_due_date():
@@ -105,7 +105,7 @@ class BookValidationMixin:
             isbn = clean_isbn(cleaned_data.get(field_name))
             cleaned_data[field_name] = isbn
             if isbn and (len(isbn) != length or not is_valid_isbn(isbn)):
-                self.add_error(field_name, f"Enter a valid ISBN-{length}.")
+                self.add_error(field_name, f"Saisissez un ISBN-{length} valide.")
 
         isbn13 = cleaned_data.get("isbn13")
         isbn10 = cleaned_data.get("isbn10")
@@ -119,16 +119,16 @@ class BookValidationMixin:
             if self.instance.pk:
                 matches = matches.exclude(pk=self.instance.pk)
             if matches.exists():
-                raise forms.ValidationError("This ISBN belongs to another cataloged book.")
+                raise forms.ValidationError("Cet ISBN appartient à un autre livre du catalogue.")
         return cleaned_data
 
 
 class BookForm(BookValidationMixin, forms.ModelForm):
     isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
     isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
-    bibliographic_source_url = forms.URLField(label="Bibliographic source URL", required=False, assume_scheme="https")
-    first_copy_shelf = forms.CharField(label="Shelf location", max_length=128, required=False)
-    first_copy_condition = forms.ChoiceField(label="Condition", choices=Copy.Condition.choices, required=False)
+    bibliographic_source_url = forms.URLField(label="Adresse de la source bibliographique", required=False, assume_scheme="https")
+    first_copy_shelf = forms.CharField(label="Emplacement", max_length=128, required=False)
+    first_copy_condition = forms.ChoiceField(label="État", choices=Copy.Condition.choices, required=False)
 
     class Meta:
         model = Book
@@ -155,13 +155,13 @@ class BookForm(BookValidationMixin, forms.ModelForm):
             "needs_information",
             "cover_image",
         ]
-        labels = {"authors": "Contributors"}
+        labels = {"authors": "Auteur(s)"}
 
 
 class BookEditForm(BookValidationMixin, forms.ModelForm):
     isbn13 = forms.CharField(label="ISBN-13", max_length=20, required=False)
     isbn10 = forms.CharField(label="ISBN-10", max_length=20, required=False)
-    bibliographic_source_url = forms.URLField(label="Bibliographic source URL", required=False, assume_scheme="https")
+    bibliographic_source_url = forms.URLField(label="Adresse de la source bibliographique", required=False, assume_scheme="https")
 
     class Meta:
         model = Book
@@ -188,7 +188,7 @@ class BookEditForm(BookValidationMixin, forms.ModelForm):
             "needs_information",
             "cover_image",
         ]
-        labels = {"authors": "Contributors"}
+        labels = {"authors": "Auteur(s)"}
 
 
 class CopyForm(forms.ModelForm):
@@ -218,7 +218,7 @@ class EmployeePositionForm(forms.ModelForm):
     def clean_name(self):
         name = self.cleaned_data["name"].strip()
         if EmployeePosition.objects.filter(name__iexact=name).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError("A position with this name already exists.")
+            raise forms.ValidationError("Une fonction portant ce nom existe déjà.")
         return name
 
 
@@ -231,7 +231,7 @@ class SchoolClassForm(forms.ModelForm):
         name = self.cleaned_data["name"].strip()
         school_year = self.instance.school_year if self.instance.school_year_id else SchoolYear.current()
         if SchoolClass.objects.filter(school_year=school_year, name__iexact=name).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError("A class with this name already exists.")
+            raise forms.ValidationError("Une classe portant ce nom existe déjà.")
         return name
 
 
@@ -243,26 +243,26 @@ class BorrowerForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["position"].queryset = EmployeePosition.objects.filter(Q(active=True) | Q(pk=self.instance.position_id))
-        self.fields["position"].empty_label = "No position set"
+        self.fields["position"].empty_label = "Aucune fonction"
         self.fields["school_class"].queryset = SchoolClass.objects.filter(Q(active=True) | Q(pk=self.instance.school_class_id))
-        self.fields["school_class"].empty_label = "No class assigned"
+        self.fields["school_class"].empty_label = "Aucune classe"
         if self.instance.pk and self.instance.staff_account_id:
             for field_name in ("first_name", "last_name", "email"):
                 self.fields[field_name].disabled = True
                 self.fields[field_name].required = False
-                self.fields[field_name].help_text = "Managed from the linked staff account."
+                self.fields[field_name].help_text = "Géré depuis le compte du personnel associé."
 
     def clean_school_id(self):
         school_id = self.cleaned_data.get("school_id") or None
         if school_id and Borrower.objects.filter(school_id__iexact=school_id).exclude(pk=self.instance.pk).exists():
-            raise ValidationError("This School ID is already assigned to another borrower.")
+            raise ValidationError("Cet identifiant école est déjà attribué à un autre emprunteur.")
         return school_id
 
     def clean(self):
         data = super().clean()
         if data.get("school_role") == Borrower.SchoolRole.STUDENT:
             if data.get("position"):
-                self.add_error("position", "Positions can only be assigned to employees.")
+                self.add_error("position", "Une fonction ne peut être attribuée qu'au personnel.")
         elif data.get("school_role") == Borrower.SchoolRole.EMPLOYEE:
             data["school_class"] = None
         return data
@@ -276,7 +276,7 @@ class BorrowerChoiceField(forms.ModelChoiceField):
 
 
 class LoanBorrowerCorrectionForm(forms.Form):
-    borrower = BorrowerChoiceField(label="Correct borrower", queryset=Borrower.objects.none())
+    borrower = BorrowerChoiceField(label="Emprunteur corrigé", queryset=Borrower.objects.none())
 
     def __init__(self, *args, loan=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -286,7 +286,7 @@ class LoanBorrowerCorrectionForm(forms.Form):
     def clean_borrower(self):
         borrower = self.cleaned_data["borrower"]
         if self.loan and borrower.pk == self.loan.borrower_id:
-            raise forms.ValidationError("Choose a different borrower.")
+            raise forms.ValidationError("Choisissez un autre emprunteur.")
         return borrower
 
 
@@ -308,13 +308,13 @@ class SchoolProfileForm(forms.ModelForm):
     def clean_default_loan_days(self):
         days = self.cleaned_data["default_loan_days"]
         if days < 1 or days > 365:
-            raise forms.ValidationError("Enter a loan period between 1 and 365 days.")
+            raise forms.ValidationError("Saisissez une durée de prêt comprise entre 1 et 365 jours.")
         return days
 
 
 class CheckoutForm(forms.Form):
-    borrower_code = forms.CharField(label="Borrower QR or UUID")
-    copy_code = forms.CharField(label="Copy QR or UUID")
+    borrower_code = forms.CharField(label="QR code ou identifiant de l'emprunteur")
+    copy_code = forms.CharField(label="QR code ou identifiant de l'exemplaire")
     due_date = forms.DateField(
         initial=default_form_due_date,
         widget=forms.DateInput(attrs={"type": "date"}),
@@ -322,25 +322,25 @@ class CheckoutForm(forms.Form):
 
 
 class ReturnForm(forms.Form):
-    copy_code = forms.CharField(label="Copy QR or UUID")
+    copy_code = forms.CharField(label="QR code ou identifiant de l'exemplaire")
 
 
 class PhotoIntakeForm(forms.Form):
     photos = forms.FileField(
-        label="Book photo",
+        label="Photo du livre",
         widget=forms.ClearableFileInput(attrs={"accept": "image/*", "capture": "environment"}),
-        help_text="Use a close-up of the ISBN barcode when possible. Cover-only photos cannot be read without OCR or AI.",
+        help_text="Si possible, photographiez le code-barres ISBN de près. Une photo de la couverture seule ne peut pas être lue.",
     )
     isbn = forms.CharField(label="ISBN", max_length=20, required=False)
-    title = forms.CharField(label="Title", max_length=255, required=False)
+    title = forms.CharField(label="Titre", max_length=255, required=False)
     authors = forms.CharField(label="Author(s)", required=False, widget=forms.Textarea(attrs={"rows": 2}))
-    shelf_location = forms.CharField(label="Shelf location", max_length=128, required=False)
-    condition = forms.ChoiceField(label="Condition", choices=Copy.Condition.choices, initial=Copy.Condition.GOOD)
+    shelf_location = forms.CharField(label="Emplacement", max_length=128, required=False)
+    condition = forms.ChoiceField(label="État", choices=Copy.Condition.choices, initial=Copy.Condition.GOOD)
 
     def clean_isbn(self):
         isbn = clean_isbn(self.cleaned_data.get("isbn"))
         if isbn and not is_valid_isbn(isbn):
-            raise forms.ValidationError("Enter a valid ISBN-10 or ISBN-13.")
+            raise forms.ValidationError("Saisissez un ISBN-10 ou ISBN-13 valide.")
         return isbn
 
 
@@ -349,24 +349,24 @@ class CopyChoiceField(forms.ModelChoiceField):
         details = [copy.book.title]
         if copy.book.authors:
             details.append(copy.book.authors)
-        details.append(f"Copy #{copy.copy_number}")
+        details.append(f"Exemplaire n°{copy.copy_number}")
         isbn = copy.book.isbn13 or copy.book.isbn10
         if isbn:
             details.append(f"ISBN {isbn}")
         if copy.shelf_location:
-            details.append(f"Shelf {copy.shelf_location}")
+            details.append(f"Étagère {copy.shelf_location}")
         return " - ".join(details)
 
 
 class CopyMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, copy):
-        return f"{copy.book.title} - copy #{copy.copy_number}"
+        return f"{copy.book.title} - exemplaire n°{copy.copy_number}"
 
 
 class PhotoCirculationForm(forms.Form):
     class Action(models.TextChoices):
-        CHECKOUT = "checkout", "Check out"
-        CHECKIN = "checkin", "Check in / return"
+        CHECKOUT = "checkout", "Prêter"
+        CHECKIN = "checkin", "Rendre"
 
     action = forms.ChoiceField(
         label="Action",
@@ -374,18 +374,18 @@ class PhotoCirculationForm(forms.Form):
         initial=Action.CHECKOUT,
         widget=forms.RadioSelect,
     )
-    borrower = forms.UUIDField(label="Borrower", widget=forms.HiddenInput)
+    borrower = forms.UUIDField(label="Emprunteur", widget=forms.HiddenInput)
     basket_token = forms.CharField(required=False, widget=forms.HiddenInput)
     book_photo = forms.FileField(
-        label="Book QR or ISBN barcode photo",
+        label="Photo du QR code ou du code-barres ISBN du livre",
         required=False,
         widget=forms.ClearableFileInput(attrs={"accept": "image/*", "capture": "environment"}),
-        help_text="Use the copy QR label when available. ISBN barcode works when there is only one matching copy.",
+        help_text="Utilisez de préférence le QR code de l'étiquette. Le code-barres ISBN ne fonctionne que s'il n'existe qu'un seul exemplaire.",
     )
-    manual_copy = CopyChoiceField(label="Book copy", queryset=Copy.objects.none(), required=False)
-    return_copies = CopyMultipleChoiceField(label="Books to return", queryset=Copy.objects.none(), required=False)
+    manual_copy = CopyChoiceField(label="Exemplaire", queryset=Copy.objects.none(), required=False)
+    return_copies = CopyMultipleChoiceField(label="Livres à rendre", queryset=Copy.objects.none(), required=False)
     due_date = forms.DateField(
-        label="Due date",
+        label="Date de retour prévue",
         required=False,
         initial=default_form_due_date,
         widget=forms.DateInput(attrs={"type": "date"}),
@@ -394,7 +394,7 @@ class PhotoCirculationForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["manual_copy"].queryset = Copy.objects.filter(status=Copy.Status.AVAILABLE).select_related("book").order_by("book__title", "copy_number")
-        self.fields["manual_copy"].empty_label = "Select an exact book copy"
+        self.fields["manual_copy"].empty_label = "Choisissez un exemplaire précis"
         return_copies = Copy.objects.filter(status=Copy.Status.CHECKED_OUT, loans__return_date__isnull=True)
         borrower_id = self.data.get("borrower") if self.is_bound else self.initial.get("borrower")
         try:
@@ -420,18 +420,18 @@ class PhotoCirculationForm(forms.Form):
                 borrowers = borrowers.filter(loans__return_date__isnull=True).distinct()
             borrower = borrowers.filter(pk=borrower_id).first()
             if borrower is None:
-                self.add_error("borrower", "Choose a borrower from the search results.")
+                self.add_error("borrower", "Choisissez un élève dans les résultats de recherche.")
             else:
                 cleaned_data["borrower"] = borrower
         if action == self.Action.CHECKIN and not cleaned_data.get("return_copies"):
-            raise forms.ValidationError("Select at least one borrowed book to return.")
+            raise forms.ValidationError("Sélectionnez au moins un livre emprunté à rendre.")
         if action == self.Action.CHECKOUT and not cleaned_data.get("book_photo") and not cleaned_data.get("manual_copy"):
-            raise forms.ValidationError("Take a book photo or select the book manually.")
+            raise forms.ValidationError("Prenez une photo du livre ou choisissez-le manuellement.")
         return cleaned_data
 
 
 class CsvImportForm(forms.Form):
-    csv_file = forms.FileField(label="CSV file")
+    csv_file = forms.FileField(label="Fichier CSV")
 
 
 class FetchCoversForm(forms.Form):
@@ -439,4 +439,4 @@ class FetchCoversForm(forms.Form):
 
 
 class BorrowerCsvImportForm(forms.Form):
-    csv_file = forms.FileField(label="Borrower CSV file")
+    csv_file = forms.FileField(label="Fichier CSV des élèves")

@@ -61,9 +61,9 @@ def test_account_nav_separates_school_from_personal_settings(client, django_user
     client.force_login(django_user_model.objects.create_user(username="operator", is_staff=True))
     content = client.get(reverse("my_account")).content.decode()
     account_menu = content.split('class="nav-menu account-menu')[1].split("</details>")[0]
-    assert "My account" in account_menu
-    assert "School settings" not in account_menu
-    assert "School settings" in content
+    assert "Mon compte" in account_menu
+    assert "Paramètres de l'école" not in account_menu
+    assert "Paramètres de l'école" in content
 
 
 @pytest.mark.parametrize("start_page", UserPreference.StartPage.values)

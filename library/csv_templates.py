@@ -1,47 +1,47 @@
-BOOK_REQUIRED = (("Title", "The school library book"),)
+BOOK_REQUIRED = (("Title", "Le livre de la bibliothèque"),)
 BOOK_OPTIONAL = (
-    ("Book details", (
-        ("Subtitle", "A story about friendship"),
-        ("Contributors", "Alex Writer; Sam Illustrator"),
+    ("Informations sur le livre", (
+        ("Subtitle", "Une histoire d'amitié"),
+        ("Contributors", "Alex Auteur ; Sam Illustrateur"),
         ("ISBN", "9780306406157"),
-        ("Publisher", "Example Press"),
+        ("Publisher", "Éditions Exemple"),
         ("Publication year", "2024"),
-        ("Language", "English"),
+        ("Language", "Français"),
         ("Pages", "32"),
-        ("Format", "Paperback"),
-        ("Description", "A short description of the book."),
+        ("Format", "Broché"),
+        ("Description", "Une courte description du livre."),
     )),
-    ("School topics and reading", (
-        ("Category", "Science and nature"),
-        ("Topics", "plants; seasons"),
-        ("Suggested Montessori level", "Lower Elementary (6-9)"),
+    ("Thèmes et lecture", (
+        ("Category", "Sciences et nature"),
+        ("Topics", "plantes ; saisons"),
+        ("Suggested Montessori level", "Élémentaire inférieur (6-9)"),
         ("Suggested age range", "6-9"),
-        ("Suggested reading level", "Early reader"),
+        ("Suggested reading level", "Lecteur débutant"),
     )),
-    ("Source and review", (
+    ("Source et vérification", (
         ("Source photo", "photo-001.jpg"),
-        ("Photo position", "top left"),
-        ("Identification confidence", "high, medium, or low"),
-        ("Review notes", "Verify the publisher."),
+        ("Photo position", "en haut à gauche"),
+        ("Identification confidence", "high, medium ou low"),
+        ("Review notes", "Vérifier l'éditeur."),
         ("Bibliographic source URL", "https://example.org/book"),
     )),
 )
 BORROWER_REQUIRED = (
-    ("First name", "Sam"),
-    ("Last name", "Reader"),
+    ("First name", "Samir"),
+    ("Last name", "Lecteur"),
 )
 BORROWER_OPTIONAL = (
-    ("School records", (
-        ("School ID", "Optional student or employee number"),
+    ("Dossier scolaire", (
+        ("School ID", "Numéro d'élève ou de personnel (facultatif)"),
     )),
-    ("School role and assignment", (
-        ("School role", "Student or Employee"),
-        ("Position", "An employee position configured in Settings"),
-        ("Class", "Lower Elementary (6-9)"),
+    ("Rôle et affectation", (
+        ("School role", "Student ou Employee"),
+        ("Position", "Une fonction créée dans les paramètres"),
+        ("Class", "Élémentaire inférieur (6-9)"),
     )),
-    ("Contact and status", (
+    ("Contact et statut", (
         ("Email", "sam@example.org"),
-        ("Active", "Yes or No"),
+        ("Active", "Yes ou No"),
     )),
 )
 

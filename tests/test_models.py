@@ -36,7 +36,7 @@ def test_optional_school_id_is_case_insensitively_unique_in_staff_form():
         "school_role": "student", "active": "on",
     })
     assert not form.is_valid()
-    assert "already assigned" in form.errors["school_id"][0]
+    assert "déjà attribué" in form.errors["school_id"][0]
     edit = BorrowerForm({
         "school_id": "s-100", "first_name": "Ana", "last_name": "Garcia",
         "school_role": "student", "active": "on",

@@ -1,19 +1,19 @@
 {% if books.has_other_pages %}
 <nav class="staff-catalog-pagination" aria-label="{{ label }}">
   {% if books.has_previous %}
-    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page=1" aria-label="First page" title="First page"><i data-lucide="chevrons-left" aria-hidden="true"></i></a>
-    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.previous_page_number }}" aria-label="Previous page" title="Previous page"><i data-lucide="chevron-left" aria-hidden="true"></i></a>
+    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page=1" aria-label="Première page" title="Première page"><i data-lucide="chevrons-left" aria-hidden="true"></i></a>
+    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.previous_page_number }}" aria-label="Page précédente" title="Page précédente"><i data-lucide="chevron-left" aria-hidden="true"></i></a>
   {% else %}
-    <button type="button" disabled aria-label="First page" title="First page"><i data-lucide="chevrons-left" aria-hidden="true"></i></button>
-    <button type="button" disabled aria-label="Previous page" title="Previous page"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+    <button type="button" disabled aria-label="Première page" title="Première page"><i data-lucide="chevrons-left" aria-hidden="true"></i></button>
+    <button type="button" disabled aria-label="Page précédente" title="Page précédente"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
   {% endif %}
-  <span>Page {{ books.number }} of {{ books.paginator.num_pages }}</span>
+  <span>Page {{ books.number }} sur {{ books.paginator.num_pages }}</span>
   {% if books.has_next %}
-    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.next_page_number }}" aria-label="Next page" title="Next page"><i data-lucide="chevron-right" aria-hidden="true"></i></a>
-    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.paginator.num_pages }}" aria-label="Last page" title="Last page"><i data-lucide="chevrons-right" aria-hidden="true"></i></a>
+    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.next_page_number }}" aria-label="Page suivante" title="Page suivante"><i data-lucide="chevron-right" aria-hidden="true"></i></a>
+    <a class="button" href="?q={{ query|urlencode }}&amp;sort={{ sort }}&amp;direction={{ direction }}&amp;page={{ books.paginator.num_pages }}" aria-label="Dernière page" title="Dernière page"><i data-lucide="chevrons-right" aria-hidden="true"></i></a>
   {% else %}
-    <button type="button" disabled aria-label="Next page" title="Next page"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-    <button type="button" disabled aria-label="Last page" title="Last page"><i data-lucide="chevrons-right" aria-hidden="true"></i></button>
+    <button type="button" disabled aria-label="Page suivante" title="Page suivante"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+    <button type="button" disabled aria-label="Dernière page" title="Dernière page"><i data-lucide="chevrons-right" aria-hidden="true"></i></button>
   {% endif %}
 </nav>
 {% endif %}

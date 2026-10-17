@@ -1,6 +1,6 @@
 {% extends "library/base.html" %}
-{% block title %}{{ title }} - School Library{% endblock %}
-{% block content %}<section class="form-panel"><h1>{{ title }}</h1>{% if form.instance.pk %}<p class="muted">Borrower ID <strong>{{ form.instance.borrower_id }}</strong> is assigned by Shelf-School and cannot be changed.</p>{% else %}<p class="muted">Shelf-School will assign the Borrower ID automatically.</p>{% endif %}<form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save</button></form></section>
+{% block title %}{{ title }} - Bibliothèque de l'école{% endblock %}
+{% block content %}<section class="form-panel"><h1>{{ title }}</h1>{% if form.instance.pk %}<p class="muted">Le n° d'emprunteur <strong>{{ form.instance.borrower_id }}</strong> est attribué par Shelf-School et ne peut pas être modifié.</p>{% else %}<p class="muted">Shelf-School attribuera automatiquement le n° d'emprunteur.</p>{% endif %}<form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Enregistrer</button></form></section>
 <script>
 const schoolRole = document.getElementById("id_school_role");
 function showRoleFields() {

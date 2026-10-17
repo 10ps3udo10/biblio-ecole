@@ -1,44 +1,44 @@
 {% extends "library/base.html" %}
-{% block title %}Dashboard - School Library{% endblock %}
+{% block title %}Tableau de bord - Bibliothèque de l'école{% endblock %}
 {% block content %}
 {% if setup_needed and request.user.is_staff %}
 <section class="setup-banner">
-  <div><strong>Finish setting up Shelf-School</strong><span>Add your school identity and default loan period before daily use.</span></div>
-  <a class="button primary" href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>School settings</a>
+  <div><strong>Terminez la configuration de Shelf-School</strong><span>Ajoutez l'identité de votre école et la durée de prêt par défaut avant l'utilisation quotidienne.</span></div>
+  <a class="button primary" href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>Paramètres de l'école</a>
 </section>
 {% endif %}
-<header class="dashboard-heading"><div><span class="eyebrow">Staff overview</span><h1>Overview</h1><p>{{ school_profile.display_name }} · {% now "l, F j" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Circulation desk</a></header>
+<header class="dashboard-heading"><div><span class="eyebrow">Vue du personnel</span><h1>Vue d'ensemble</h1><p>{{ school_profile.display_name }} · {% now "l j F" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Banc de prêt</a></header>
 <section class="dashboard-metrics">
-  <article><span>Catalog titles</span><strong>{{ total_books }}</strong><small>{{ total_copies }} physical copies</small></article>
-  <article><span>Available now</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% of inventory</small></article>
-  <article><span>On loan</span><strong>{{ borrowed_books }}</strong><small>{{ borrowed_percent }}% of inventory</small></article>
+  <article><span>Livres au catalogue</span><strong>{{ total_books }}</strong><small>{{ total_copies }} exemplaires physiques</small></article>
+  <article><span>Disponibles</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% du fonds</small></article>
+  <article><span>Empruntés</span><strong>{{ borrowed_books }}</strong><small>{{ borrowed_percent }}% du fonds</small></article>
   {% if previous_year_open_loans %}<article class="attention"><span>Années précédentes</span><strong>{{ previous_year_open_loans }}</strong><small><a href="{% url 'school_year_overview' %}">Emprunts non rendus à récupérer</a></small></article>{% endif %}
-  <article class="{% if overdue_books %}attention{% endif %}"><span>Overdue</span><strong>{{ overdue_books }}</strong><small>{% if overdue_books %}<a href="{% url 'overdue_loans' %}">Review overdue loans</a>{% else %}Nothing needs attention{% endif %}</small></article>
+  <article class="{% if overdue_books %}attention{% endif %}"><span>En retard</span><strong>{{ overdue_books }}</strong><small>{% if overdue_books %}<a href="{% url 'overdue_loans' %}">Voir les emprunts en retard</a>{% else %}Rien à signaler{% endif %}</small></article>
 </section>
 <section class="dashboard-analytics">
   <div class="circulation-chart-panel">
-    <header><div><span class="eyebrow">Last 7 days</span><h2>Circulation activity</h2></div><div class="chart-legend"><span class="checkout-key">Checkouts</span><span class="return-key">Returns</span></div></header>
-    <div class="circulation-chart" role="img" aria-label="Checkouts and returns during the last seven days">
-      {% for day in circulation_days %}<div class="chart-day"><div class="chart-bars"><span class="checkout-bar" style="--bar-height: {% widthratio day.checkouts max_daily_activity 100 %}%" title="{{ day.checkouts }} checkouts"><b>{{ day.checkouts }}</b></span><span class="return-bar" style="--bar-height: {% widthratio day.returns max_daily_activity 100 %}%" title="{{ day.returns }} returns"><b>{{ day.returns }}</b></span></div><small>{{ day.date|date:"D" }}</small></div>{% endfor %}
+    <header><div><span class="eyebrow">7 derniers jours</span><h2>Activité de prêt</h2></div><div class="chart-legend"><span class="checkout-key">Emprunts</span><span class="return-key">Retours</span></div></header>
+    <div class="circulation-chart" role="img" aria-label="Emprunts et retours des sept derniers jours">
+      {% for day in circulation_days %}<div class="chart-day"><div class="chart-bars"><span class="checkout-bar" style="--bar-height: {% widthratio day.checkouts max_daily_activity 100 %}%" title="{{ day.checkouts }} emprunt(s)"><b>{{ day.checkouts }}</b></span><span class="return-bar" style="--bar-height: {% widthratio day.returns max_daily_activity 100 %}%" title="{{ day.returns }} retour(s)"><b>{{ day.returns }}</b></span></div><small>{{ day.date|date:"D" }}</small></div>{% endfor %}
     </div>
   </div>
   <div class="inventory-panel">
-    <span class="eyebrow">Collection</span><h2>Copy availability</h2>
-    <div class="inventory-bar" aria-label="{{ available_percent }} percent available, {{ borrowed_percent }} percent on loan, {{ unavailable_percent }} percent unavailable"><span class="available" style="width: {{ available_percent }}%"></span><span class="borrowed" style="width: {{ borrowed_percent }}%"></span><span class="unavailable" style="width: {{ unavailable_percent }}%"></span></div>
-    <dl><div><dt><span class="key available"></span>Available</dt><dd>{{ available_copies }}</dd></div><div><dt><span class="key borrowed"></span>On loan</dt><dd>{{ borrowed_books }}</dd></div><div><dt><span class="key unavailable"></span>Damaged or archived</dt><dd>{{ unavailable_copies }}</dd></div></dl>
+    <span class="eyebrow">Collection</span><h2>Disponibilité des exemplaires</h2>
+    <div class="inventory-bar" aria-label="{{ available_percent }} % disponibles, {{ borrowed_percent }} % empruntés, {{ unavailable_percent }} % indisponibles"><span class="available" style="width: {{ available_percent }}%"></span><span class="borrowed" style="width: {{ borrowed_percent }}%"></span><span class="unavailable" style="width: {{ unavailable_percent }}%"></span></div>
+    <dl><div><dt><span class="key available"></span>Disponibles</dt><dd>{{ available_copies }}</dd></div><div><dt><span class="key borrowed"></span>Empruntés</dt><dd>{{ borrowed_books }}</dd></div><div><dt><span class="key unavailable"></span>Abîmés ou retirés</dt><dd>{{ unavailable_copies }}</dd></div></dl>
   </div>
 </section>
 <section class="dashboard-lists">
   <div class="dashboard-list">
-    <h2>Recently added</h2>
+    <h2>Ajoutés récemment</h2>
     <ul class="plain-list">
-      {% for book in recent_books %}<li><a href="{{ book.get_absolute_url }}">{{ book.title }}</a><span>{{ book.authors }}</span></li>{% empty %}<li>No books yet.</li>{% endfor %}
+      {% for book in recent_books %}<li><a href="{{ book.get_absolute_url }}">{{ book.title }}</a><span>{{ book.authors }}</span></li>{% empty %}<li>Aucun livre pour le moment.</li>{% endfor %}
     </ul>
   </div>
   <div class="dashboard-list">
-    <h2>Recent activity</h2>
+    <h2>Activité récente</h2>
     <ul class="plain-list">
-      {% for loan in recent_loans %}<li><a href="{{ loan.copy.get_absolute_url }}">{{ loan.copy.book.title }}</a><span>{{ loan.borrower.full_name }} due {{ loan.due_date }}</span></li>{% empty %}<li>No loans yet.</li>{% endfor %}
+      {% for loan in recent_loans %}<li><a href="{{ loan.copy.get_absolute_url }}">{{ loan.copy.book.title }}</a><span>{{ loan.borrower.full_name }}, à rendre le {{ loan.due_date }}</span></li>{% empty %}<li>Aucun emprunt pour le moment.</li>{% endfor %}
     </ul>
   </div>
 </section>

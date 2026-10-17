@@ -1,35 +1,35 @@
 {% extends "library/base.html" %}
-{% block title %}Books - School Library{% endblock %}
+{% block title %}Livres - Bibliothèque de l'école{% endblock %}
 {% block content %}
 <section class="hero compact">
-  <h1>{% if show_archived %}Livres retirés du catalogue{% else %}Books{% endif %}</h1>
+  <h1>{% if show_archived %}Livres retirés du catalogue{% else %}Livres{% endif %}</h1>
   <div class="actions">
-    <a class="button primary" href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Add from photo</a><a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Add manually</a>
-    <a class="button" href="{% url 'import_books' %}"><i data-lucide="upload" aria-hidden="true"></i>Import CSV</a>
+    <a class="button primary" href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Ajouter depuis une photo</a><a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Ajouter à la main</a>
+    <a class="button" href="{% url 'import_books' %}"><i data-lucide="upload" aria-hidden="true"></i>Importer un CSV</a>
     {% if show_archived %}<a class="button" href="{% url 'book_list' %}"><i data-lucide="library" aria-hidden="true"></i>Catalogue</a>{% else %}<a class="button" href="?archived=1"><i data-lucide="archive" aria-hidden="true"></i>Livres retirés</a>{% endif %}
-    <a class="button" href="{% url 'export_books_csv' %}"><i data-lucide="download" aria-hidden="true"></i>Export CSV</a>
-    <span class="bulk-cover-action"><button class="button" id="fetch-covers" type="submit" form="cover-fetch-form"><i data-lucide="images" aria-hidden="true"></i>Fetch missing covers</button><small id="cover-selection-count" aria-live="polite">0 selected</small></span>
+    <a class="button" href="{% url 'export_books_csv' %}"><i data-lucide="download" aria-hidden="true"></i>Exporter en CSV</a>
+    <span class="bulk-cover-action"><button class="button" id="fetch-covers" type="submit" form="cover-fetch-form"><i data-lucide="images" aria-hidden="true"></i>Récupérer les couvertures manquantes</button><small id="cover-selection-count" aria-live="polite">0 sélectionné</small></span>
   </div>
 </section>
-<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Search title, contributor, topic, level, ISBN, or shelf"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button><i data-lucide="search" aria-hidden="true"></i>Search</button></form>
+<form class="search" method="get"><input name="q" value="{{ query }}" placeholder="Rechercher par titre, auteur, thème, niveau, ISBN ou étagère"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="direction" value="{{ direction }}"><button><i data-lucide="search" aria-hidden="true"></i>Rechercher</button></form>
 <div class="staff-catalog-toolbar">
-  <p class="muted">{% if books.paginator.count %}{{ books.start_index }} to {{ books.end_index }} of {{ books.paginator.count }} titles{% else %}0 titles{% endif %}</p>
-  {% include "library/staff_catalog_pagination.html" with label="Catalog pages" %}
+  <p class="muted">{% if books.paginator.count %}{{ books.start_index }} à {{ books.end_index }} sur {{ books.paginator.count }} livres{% else %}0 livre{% endif %}</p>
+  {% include "library/staff_catalog_pagination.html" with label="Pages du catalogue" %}
 </div>
 <form id="cover-fetch-form" method="post" action="{% url 'fetch_book_covers' %}">
   {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
   <div class="table-wrap">
     <table>
-      <thead><tr><th class="select-cell" scope="col"><input class="table-select" id="select-all-covers" title="Select eligible books on this page" type="checkbox" aria-label="Select eligible books on this page"></th>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
+      <thead><tr><th class="select-cell" scope="col"><input class="table-select" id="select-all-covers" title="Sélectionner les livres concernés sur cette page" type="checkbox" aria-label="Sélectionner les livres concernés sur cette page"></th>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{% if header.direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="sort-link{% if header.active %} active{% endif %}" href="?q={{ query|urlencode }}&amp;sort={{ header.key }}&amp;direction={{ header.next_direction }}">{{ header.label }}{% if header.active %}<span aria-hidden="true">{% if header.direction == "asc" %}&uarr;{% else %}&darr;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead>
       <tbody>
         {% for book in books %}
-          <tr><td class="select-cell">{% if book.cover_fetch_eligible %}<input class="table-select cover-book-select" type="checkbox" name="books" value="{{ book.pk }}" aria-label="Select {{ book.title }}">{% endif %}</td><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} available</td><td>{{ book.copy_count }}</td><td><span class="cover-status {% if book.cover_image %}available{% else %}missing{% endif %}"><i data-lucide="{% if book.cover_image %}image{% elif book.cover_fetch_eligible %}image-off{% else %}barcode{% endif %}" aria-hidden="true"></i>{% if book.cover_image %}Available{% elif book.cover_fetch_eligible %}Missing{% else %}ISBN needed{% endif %}</span></td><td><span class="catalog-status {% if book.needs_information %}incomplete{% else %}complete{% endif %}">{% if book.needs_information %}Needs information{% else %}Complete{% endif %}</span></td></tr>
-        {% empty %}<tr><td colspan="8">No books found.</td></tr>{% endfor %}
+          <tr><td class="select-cell">{% if book.cover_fetch_eligible %}<input class="table-select cover-book-select" type="checkbox" name="books" value="{{ book.pk }}" aria-label="Sélectionner {{ book.title }}">{% endif %}</td><td><a href="{{ book.get_absolute_url }}">{{ book.title }}</a></td><td>{{ book.authors }}</td><td>{{ book.isbn13|default:book.isbn10 }}</td><td>{{ book.available_count }} disponible(s)</td><td>{{ book.copy_count }}</td><td><span class="cover-status {% if book.cover_image %}available{% else %}missing{% endif %}"><i data-lucide="{% if book.cover_image %}image{% elif book.cover_fetch_eligible %}image-off{% else %}barcode{% endif %}" aria-hidden="true"></i>{% if book.cover_image %}Disponible{% elif book.cover_fetch_eligible %}Manquante{% else %}ISBN nécessaire{% endif %}</span></td><td><span class="catalog-status {% if book.needs_information %}incomplete{% else %}complete{% endif %}">{% if book.needs_information %}Fiche à compléter{% else %}Fiche complète{% endif %}</span></td></tr>
+        {% empty %}<tr><td colspan="8">Aucun livre trouvé.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
 </form>
-{% include "library/staff_catalog_pagination.html" with label="Catalog pages, bottom" %}
+{% include "library/staff_catalog_pagination.html" with label="Pages du catalogue, bas de page" %}
 <script>
   (function () {
     const selectAll = document.getElementById("select-all-covers");
@@ -40,7 +40,7 @@
     function updateSelection() {
       const selected = choices.filter((choice) => choice.checked).length;
       button.disabled = selected === 0;
-      count.textContent = selected + " selected on this page";
+      count.textContent = selected + " sélectionné(s) sur cette page";
       selectAll.disabled = choices.length === 0;
       selectAll.checked = choices.length > 0 && selected === choices.length;
       selectAll.indeterminate = selected > 0 && selected < choices.length;

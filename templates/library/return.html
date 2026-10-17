@@ -1,3 +1,3 @@
 {% extends "library/base.html" %}
-{% block title %}Return - School Library{% endblock %}
-{% block content %}<section class="form-panel scan"><h1>Return</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Return copy</button></form></section>{% endblock %}
+{% block title %}Retour - Bibliothèque de l'école{% endblock %}
+{% block content %}<section class="form-panel scan"><h1>Retour</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Rendre l'exemplaire</button></form></section>{% endblock %}

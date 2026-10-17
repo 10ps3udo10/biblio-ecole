@@ -39,7 +39,7 @@ def test_template_download_and_import_round_trip(client, django_user_model, kind
         exported = client.get(reverse("export_books_csv"))
         assert set(next(csv.reader(StringIO(exported.content.decode())))) == set(records[0])
     else:
-        assert b"Import preview" in imported.content
+        assert "Aperçu de l'import".encode() in imported.content
         confirmed = client.post(reverse("import_borrowers"), {"action": "confirm"})
         assert confirmed.status_code == 302
         borrower = Borrower.objects.get(school_id="student-001")
@@ -51,9 +51,9 @@ def test_field_reference_is_preserved_on_upload_errors(client, django_user_model
     client.force_login(django_user_model.objects.create_user(username="operator", is_staff=True))
     response = client.post(reverse(f"import_{kind}"), {})
     assert response.status_code == 200
-    assert b"Download CSV template" in response.content
-    assert b"Required columns" in response.content
-    assert b"Optional columns" in response.content
+    assert "Télécharger le modèle CSV".encode() in response.content
+    assert "Colonnes obligatoires".encode() in response.content
+    assert "Colonnes facultatives".encode() in response.content
     assert response.context["headers"] == csv_columns(kind)["headers"]
 
 

@@ -2,15 +2,15 @@
 {% block title %}{{ title }} - Shelf-School{% endblock %}
 {% block content %}
 <section class="form-panel staff-account-form">
-  <span class="eyebrow">Shelf-School access</span>
+  <span class="eyebrow">Accès à Shelf-School</span>
   <h1>{{ title }}</h1>
-  {% if account %}<p class="muted">{{ account.get_full_name|default:account.username }} · {{ account.username }}</p>{% else %}<p class="muted">Create login access for a person who operates the library.</p>{% endif %}
+  {% if account %}<p class="muted">{{ account.get_full_name|default:account.username }} · {{ account.username }}</p>{% else %}<p class="muted">Créez un accès de connexion pour une personne qui gère la bibliothèque.</p>{% endif %}
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <div class="actions">
-      <button class="button primary"><i data-lucide="{% if is_password_form %}key-round{% else %}save{% endif %}" aria-hidden="true"></i>{% if is_password_form %}Update password{% else %}Save staff account{% endif %}</button>
-      <a class="button" href="{% url 'staff_account_list' %}">Cancel</a>
+      <button class="button primary"><i data-lucide="{% if is_password_form %}key-round{% else %}save{% endif %}" aria-hidden="true"></i>{% if is_password_form %}Mettre à jour le mot de passe{% else %}Enregistrer le compte du personnel{% endif %}</button>
+      <a class="button" href="{% url 'staff_account_list' %}">Annuler</a>
     </div>
   </form>
 </section>

@@ -10,17 +10,17 @@ from django.utils import timezone
 
 class UserPreference(models.Model):
     class Theme(models.TextChoices):
-        SYSTEM = "system", "System"
-        LIGHT = "light", "Light"
-        DARK = "dark", "Dark"
+        SYSTEM = "system", "Système"
+        LIGHT = "light", "Clair"
+        DARK = "dark", "Sombre"
 
     class StartPage(models.TextChoices):
-        OVERVIEW = "dashboard", "Overview"
-        CIRCULATION = "photo_circulation", "Circulation"
-        CATALOG = "book_list", "Catalog"
+        OVERVIEW = "dashboard", "Vue d'ensemble"
+        CIRCULATION = "photo_circulation", "Prêts et retours"
+        CATALOG = "book_list", "Catalogue"
 
     class TableDensity(models.TextChoices):
-        COMFORTABLE = "comfortable", "Comfortable"
+        COMFORTABLE = "comfortable", "Confortable"
         COMPACT = "compact", "Compact"
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_preferences")
@@ -30,20 +30,20 @@ class UserPreference(models.Model):
 
 
 class SchoolProfile(models.Model):
-    school_name = models.CharField(max_length=255, default="School Library")
-    short_name = models.CharField(max_length=80, blank=True)
-    logo = models.ImageField(upload_to="branding/", blank=True)
-    address = models.TextField(blank=True)
-    contact_email = models.EmailField(blank=True)
-    contact_phone = models.CharField(max_length=40, blank=True)
-    default_loan_days = models.PositiveIntegerField(default=14)
-    label_footer = models.CharField(max_length=160, blank=True)
+    school_name = models.CharField(max_length=255, default="Bibliothèque de l'école", verbose_name="Nom de l'école")
+    short_name = models.CharField("Nom court", max_length=80, blank=True)
+    logo = models.ImageField("Logo", upload_to="branding/", blank=True)
+    address = models.TextField("Adresse", blank=True)
+    contact_email = models.EmailField("E-mail de contact", blank=True)
+    contact_phone = models.CharField("Téléphone de contact", max_length=40, blank=True)
+    default_loan_days = models.PositiveIntegerField("Durée de prêt par défaut (jours)", default=14)
+    label_footer = models.CharField("Pied de page des étiquettes", max_length=160, blank=True)
     setup_completed = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "School profile"
-        verbose_name_plural = "School profile"
+        verbose_name = "Profil de l'école"
+        verbose_name_plural = "Profil de l'école"
 
     def __str__(self):
         return self.school_name
@@ -72,38 +72,39 @@ def default_due_date():
 
 class Book(models.Model):
     class IdentificationConfidence(models.TextChoices):
-        HIGH = "high", "High"
-        MEDIUM = "medium", "Medium"
-        LOW = "low", "Low"
+        HIGH = "high", "Élevée"
+        MEDIUM = "medium", "Moyenne"
+        LOW = "low", "Faible"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=255)
-    subtitle = models.CharField(max_length=255, blank=True)
-    authors = models.TextField(blank=True)
+    title = models.CharField("Titre", max_length=255)
+    subtitle = models.CharField("Sous-titre", max_length=255, blank=True)
+    authors = models.TextField("Auteur(s)", blank=True)
     isbn10 = models.CharField("ISBN-10", max_length=10, blank=True)
     isbn13 = models.CharField("ISBN-13", max_length=13, blank=True)
-    publisher = models.CharField(max_length=255, blank=True)
-    publication_year = models.PositiveIntegerField(null=True, blank=True)
-    language = models.CharField(max_length=64, blank=True)
+    publisher = models.CharField("Éditeur", max_length=255, blank=True)
+    publication_year = models.PositiveIntegerField("Année de publication", null=True, blank=True)
+    language = models.CharField("Langue", max_length=64, blank=True)
     page_count = models.PositiveIntegerField("Pages", null=True, blank=True)
-    format = models.CharField(max_length=120, blank=True)
-    category = models.CharField(max_length=160, blank=True)
-    topics = models.TextField(blank=True)
-    description = models.TextField(blank=True)
-    montessori_levels = models.CharField("Suggested Montessori level", max_length=255, blank=True)
-    suggested_age_range = models.CharField(max_length=40, blank=True)
-    suggested_reading_level = models.CharField(max_length=160, blank=True)
+    format = models.CharField("Format", max_length=120, blank=True)
+    category = models.CharField("Catégorie", max_length=160, blank=True)
+    topics = models.TextField("Thèmes", blank=True)
+    description = models.TextField("Description", blank=True)
+    montessori_levels = models.CharField("Niveau Montessori suggéré", max_length=255, blank=True)
+    suggested_age_range = models.CharField("Tranche d'âge suggérée", max_length=40, blank=True)
+    suggested_reading_level = models.CharField("Niveau de lecture suggéré", max_length=160, blank=True)
     identification_confidence = models.CharField(
+        "Fiabilité de l'identification",
         max_length=16,
         choices=IdentificationConfidence.choices,
         blank=True,
     )
-    review_notes = models.TextField(blank=True)
-    bibliographic_source_url = models.URLField(blank=True)
-    needs_information = models.BooleanField(default=False)
+    review_notes = models.TextField("Notes de vérification", blank=True)
+    bibliographic_source_url = models.URLField("Source bibliographique", blank=True)
+    needs_information = models.BooleanField("Fiche à compléter", default=False)
     # Set when the book is removed from the catalogue; copies and loan history are kept.
     archived_on = models.DateField(null=True, blank=True)
-    cover_image = models.FileField(upload_to="covers/", blank=True)
+    cover_image = models.FileField("Couverture", upload_to="covers/", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -132,25 +133,25 @@ class Book(models.Model):
 
 class Copy(models.Model):
     class Status(models.TextChoices):
-        AVAILABLE = "available", "Available"
-        CHECKED_OUT = "checked_out", "Checked out"
-        MISSING = "missing", "Missing"
-        DAMAGED = "damaged", "Damaged"
-        ARCHIVED = "archived", "Archived"
+        AVAILABLE = "available", "Disponible"
+        CHECKED_OUT = "checked_out", "Emprunté"
+        MISSING = "missing", "Perdu"
+        DAMAGED = "damaged", "Abîmé"
+        ARCHIVED = "archived", "Retiré"
 
     class Condition(models.TextChoices):
-        NEW = "new", "New"
-        GOOD = "good", "Good"
-        WORN = "worn", "Worn"
-        DAMAGED = "damaged", "Damaged"
+        NEW = "new", "Neuf"
+        GOOD = "good", "Bon"
+        WORN = "worn", "Usé"
+        DAMAGED = "damaged", "Abîmé"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    book = models.ForeignKey(Book, related_name="copies", on_delete=models.CASCADE)
-    copy_number = models.PositiveIntegerField()
+    book = models.ForeignKey(Book, verbose_name="Livre", related_name="copies", on_delete=models.CASCADE)
+    copy_number = models.PositiveIntegerField("Numéro d'exemplaire")
     qr_code = models.CharField(max_length=128, blank=True)
-    shelf_location = models.CharField(max_length=128, blank=True)
-    condition = models.CharField(max_length=32, choices=Condition.choices, default=Condition.GOOD)
-    status = models.CharField(max_length=32, choices=Status.choices, default=Status.AVAILABLE)
+    shelf_location = models.CharField("Emplacement", max_length=128, blank=True)
+    condition = models.CharField("État", max_length=32, choices=Condition.choices, default=Condition.GOOD)
+    status = models.CharField("Statut", max_length=32, choices=Status.choices, default=Status.AVAILABLE)
     source_photo = models.CharField(max_length=255, blank=True)
     source_position = models.CharField(max_length=255, blank=True)
     # Set when the copy is removed from the catalogue; a borrowed copy is archived on return.
@@ -163,7 +164,7 @@ class Copy(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.book.title} #{self.copy_number}"
+        return f"{self.book.title} n°{self.copy_number}"
 
     def save(self, *args, **kwargs):
         if not self.qr_code:
@@ -183,8 +184,8 @@ class Copy(models.Model):
 
 
 class EmployeePosition(models.Model):
-    name = models.CharField(max_length=120, unique=True)
-    active = models.BooleanField(default=True)
+    name = models.CharField("Nom", max_length=120, unique=True)
+    active = models.BooleanField("Actif", default=True)
 
     class Meta:
         ordering = ["name"]
@@ -228,13 +229,14 @@ class SchoolYear(models.Model):
 
 
 class SchoolClass(models.Model):
-    name = models.CharField(max_length=120)
+    name = models.CharField("Nom", max_length=120)
     school_year = models.ForeignKey(SchoolYear, related_name="classes", null=True, blank=True, on_delete=models.PROTECT)
-    active = models.BooleanField(default=True)
+    active = models.BooleanField("Actif", default=True)
 
     class Meta:
         ordering = ["name"]
-        verbose_name_plural = "school classes"
+        verbose_name = "classe"
+        verbose_name_plural = "classes"
         constraints = [
             models.UniqueConstraint(fields=["school_year", "name"], name="unique_class_name_per_school_year"),
         ]
@@ -263,20 +265,20 @@ class BorrowerIdSequence(models.Model):
 
 class Borrower(models.Model):
     class SchoolRole(models.TextChoices):
-        STUDENT = "student", "Student"
-        EMPLOYEE = "employee", "Employee"
+        STUDENT = "student", "Élève"
+        EMPLOYEE = "employee", "Personnel"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    borrower_id = models.CharField("Borrower ID", max_length=80, unique=True, editable=False)
-    school_id = models.CharField("School ID", max_length=80, unique=True, null=True, blank=True)
-    first_name = models.CharField(max_length=120)
-    last_name = models.CharField(max_length=120)
-    school_class = models.ForeignKey(SchoolClass, verbose_name="Class", null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
-    school_role = models.CharField(max_length=16, choices=SchoolRole.choices, default=SchoolRole.STUDENT)
-    position = models.ForeignKey(EmployeePosition, null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
-    email = models.EmailField(blank=True)
+    borrower_id = models.CharField("N° d'emprunteur", max_length=80, unique=True, editable=False)
+    school_id = models.CharField("Identifiant école", max_length=80, unique=True, null=True, blank=True)
+    first_name = models.CharField("Prénom", max_length=120)
+    last_name = models.CharField("Nom", max_length=120)
+    school_class = models.ForeignKey(SchoolClass, verbose_name="Classe", null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
+    school_role = models.CharField("Rôle", max_length=16, choices=SchoolRole.choices, default=SchoolRole.STUDENT)
+    position = models.ForeignKey(EmployeePosition, verbose_name="Fonction", null=True, blank=True, on_delete=models.PROTECT, related_name="borrowers")
+    email = models.EmailField("E-mail", blank=True)
     qr_code = models.CharField(max_length=128, blank=True)
-    active = models.BooleanField(default=True)
+    active = models.BooleanField("Actif", default=True)
     # Set when a student leaves the school; the record and its loan history are kept.
     archived_on = models.DateField(null=True, blank=True)
     staff_account = models.OneToOneField(
@@ -331,16 +333,16 @@ class Loan(models.Model):
     # Class of the borrower when the loan was made; kept even if the borrower changes class later.
     school_class = models.ForeignKey(
         SchoolClass,
-        verbose_name="Class at checkout",
+        verbose_name="Classe au moment de l'emprunt",
         related_name="loans",
         null=True,
         blank=True,
         on_delete=models.PROTECT,
     )
     school_year = models.ForeignKey(SchoolYear, related_name="loans", null=True, blank=True, on_delete=models.PROTECT)
-    checkout_date = models.DateField(default=timezone.localdate)
-    due_date = models.DateField(default=default_due_date)
-    return_date = models.DateField(null=True, blank=True)
+    checkout_date = models.DateField("Date d'emprunt", default=timezone.localdate)
+    due_date = models.DateField("Date de retour prévue", default=default_due_date)
+    return_date = models.DateField("Date de retour", null=True, blank=True)
 
     class Meta:
         ordering = ["-checkout_date", "-due_date"]
@@ -353,7 +355,7 @@ class Loan(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.copy} to {self.borrower}"
+        return f"{self.copy} emprunté par {self.borrower}"
 
     def save(self, *args, **kwargs):
         if self._state.adding and self.school_class_id is None:

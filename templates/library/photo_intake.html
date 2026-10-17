@@ -1,13 +1,13 @@
 {% extends "library/base.html" %}
-{% block title %}Photo intake - {{ school_profile.display_name }}{% endblock %}
+{% block title %}Ajout par photo - {{ school_profile.display_name }}{% endblock %}
 {% block content %}
 <header class="intake-heading">
   <div>
-    <span class="eyebrow">Catalog a physical copy</span>
-    <h1>Photo intake</h1>
-    <p>Photograph the ISBN barcode to identify the book and create its library copy.</p>
+    <span class="eyebrow">Cataloguer un exemplaire</span>
+    <h1>Ajout par photo</h1>
+    <p>Photographiez le code-barres ISBN pour identifier le livre et créer son exemplaire.</p>
   </div>
-  <a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Enter manually</a>
+  <a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Saisir à la main</a>
 </header>
 
 <form class="intake-workspace" method="post" enctype="multipart/form-data">
@@ -16,62 +16,62 @@
   <section class="capture-column" aria-labelledby="capture-title">
     <div class="section-heading">
       <span class="step-number">1</span>
-      <div><h2 id="capture-title">Photograph the barcode</h2><p>The back cover is usually best. Move close enough to fill the frame with the ISBN barcode.</p></div>
+      <div><h2 id="capture-title">Photographiez le code-barres</h2><p>La quatrième de couverture convient le mieux. Approchez-vous pour que le code-barres ISBN remplisse l'image.</p></div>
     </div>
     {{ form.photos.errors }}
     <div class="photo-capture" id="photo-capture">
       {{ form.photos }}
-      <img id="photo-preview" alt="Selected book photo">
+      <img id="photo-preview" alt="Photo du livre sélectionnée">
       <div class="capture-prompt" id="capture-prompt">
         <span class="camera-mark" aria-hidden="true"></span>
-        <strong>Take or choose a photo</strong>
-        <span>ISBN barcode facing the camera</span>
+        <strong>Prenez ou choisissez une photo</strong>
+        <span>Code-barres ISBN face à l'appareil photo</span>
       </div>
-      <button class="change-photo" id="change-photo" type="button">Change photo</button>
+      <button class="change-photo" id="change-photo" type="button">Changer de photo</button>
     </div>
     <div class="barcode-result" id="barcode-result" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span>
-      <span id="barcode-status">Waiting for a photo</span>
+      <span id="barcode-status">En attente d'une photo</span>
     </div>
     <div class="isbn-field">
       <label for="{{ form.isbn.id_for_label }}">ISBN</label>
       {{ form.isbn }}
       {{ form.isbn.errors }}
-      <p class="isbn-lookup-note">A valid ISBN automatically fills available title and author details from the free Open Library catalog. <span id="metadata-status" aria-live="polite"></span><a id="isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a></p>
+      <p class="isbn-lookup-note">Un ISBN valide remplit automatiquement le titre et l'auteur à partir du catalogue gratuit Open Library. <span id="metadata-status" aria-live="polite"></span><a id="isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Rechercher cet ISBN sur le web</a></p>
     </div>
   </section>
 
   <section class="details-column" aria-labelledby="details-title">
     <div class="section-heading">
       <span class="step-number">2</span>
-      <div><h2 id="details-title">Book details</h2><p>Metadata and cover are downloaded when available.</p></div>
+      <div><h2 id="details-title">Informations sur le livre</h2><p>Les informations et la couverture sont téléchargées lorsqu'elles sont disponibles.</p></div>
     </div>
-    <img class="catalog-cover-preview" id="catalog-cover-preview" alt="Catalog cover from Open Library" hidden>
+    <img class="catalog-cover-preview" id="catalog-cover-preview" alt="Couverture du catalogue Open Library" hidden>
     <div class="field-group">
-      <label for="{{ form.title.id_for_label }}">Title</label>
+      <label for="{{ form.title.id_for_label }}">Titre</label>
       {{ form.title }}
       {{ form.title.errors }}
     </div>
     <div class="field-group">
-      <label for="{{ form.authors.id_for_label }}">Author(s)</label>
+      <label for="{{ form.authors.id_for_label }}">Auteur(s)</label>
       {{ form.authors }}
       {{ form.authors.errors }}
     </div>
     <div class="field-row">
       <div class="field-group">
-        <label for="{{ form.shelf_location.id_for_label }}">Shelf location</label>
+        <label for="{{ form.shelf_location.id_for_label }}">Emplacement</label>
         {{ form.shelf_location }}
         {{ form.shelf_location.errors }}
       </div>
       <div class="field-group">
-        <label for="{{ form.condition.id_for_label }}">Condition</label>
+        <label for="{{ form.condition.id_for_label }}">État</label>
         {{ form.condition }}
         {{ form.condition.errors }}
       </div>
     </div>
     <div class="intake-submit">
-      <button class="button primary intake-primary"><i data-lucide="book-plus" aria-hidden="true"></i>Track this book</button>
-      <span>Creates one physical copy and its QR label.</span>
+      <button class="button primary intake-primary"><i data-lucide="book-plus" aria-hidden="true"></i>Ajouter ce livre</button>
+      <span>Crée un exemplaire et son étiquette QR.</span>
     </div>
   </section>
 </form>
@@ -110,12 +110,12 @@
     if (![10, 13].includes(isbn.length) || isbn === lastLookup) return;
     lastLookup = isbn;
     isbnInput.value = isbn;
-    metadataStatus.textContent = "Looking up ISBN...";
+    metadataStatus.textContent = "Recherche de l'ISBN...";
     webSearch.hidden = true;
     try {
       const response = await fetch(metadataUrl + "?isbn=" + encodeURIComponent(isbn), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "ISBN lookup failed.");
+      if (!response.ok) throw new Error(payload.error || "La recherche de l'ISBN a échoué.");
       if (payload.title && !titleInput.value) titleInput.value = payload.title;
       if (payload.authors && !authorsInput.value) authorsInput.value = payload.authors;
       metadataStatus.textContent = payload.message;
@@ -148,10 +148,10 @@
     preview.classList.add("visible");
     prompt.hidden = true;
     changeButton.classList.add("visible");
-    setStatus("Reading barcode...", "reading");
+    setStatus("Lecture du code-barres...", "reading");
 
     if (!("BarcodeDetector" in window)) {
-      setStatus("Photo ready. The server will read the barcode.", "ready");
+      setStatus("Photo prête. Le serveur lira le code-barres.", "ready");
       return;
     }
     try {
@@ -161,13 +161,13 @@
       const isbn = barcodes.map((item) => normalizeISBN(item.rawValue)).find((value) => value.startsWith("978") || value.startsWith("979"));
       if (isbn) {
         isbnInput.value = isbn;
-        setStatus("ISBN detected: " + isbn, "success");
+        setStatus("ISBN détecté : " + isbn, "success");
         lookupMetadata();
       } else {
-        setStatus("Photo ready. The server will try the barcode again.", "ready");
+        setStatus("Photo prête. Le serveur essaiera de relire le code-barres.", "ready");
       }
     } catch (error) {
-      setStatus("Photo ready. The server will try the barcode.", "ready");
+      setStatus("Photo prête. Le serveur essaiera de lire le code-barres.", "ready");
     }
   }
   fileInput.addEventListener("input", handlePhotoSelection);

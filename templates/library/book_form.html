@@ -4,7 +4,7 @@
 <section class="form-panel book-entry">
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    <div class="book-form-heading"><div><h1>{{ title }}</h1>{% if is_edit %}<p class="muted">Correct the catalog details for this title.</p>{% else %}<p class="muted">Start with an ISBN to fill available details and cover automatically.</p>{% endif %}</div><button class="button primary" id="save-book"><i data-lucide="save" aria-hidden="true"></i>Save book</button></div>
+    <div class="book-form-heading"><div><h1>{{ title }}</h1>{% if is_edit %}<p class="muted">Corrigez les informations de ce livre.</p>{% else %}<p class="muted">Commencez par l'ISBN pour remplir automatiquement les informations et la couverture.</p>{% endif %}</div><button class="button primary" id="save-book"><i data-lucide="save" aria-hidden="true"></i>Enregistrer le livre</button></div>
     {{ form.non_field_errors }}
     {% include "library/includes/form_field.html" with field=form.isbn13 %}
     {% include "library/includes/form_field.html" with field=form.isbn10 %}
@@ -18,7 +18,7 @@
     {% if form.first_copy_condition %}{% include "library/includes/form_field.html" with field=form.first_copy_condition %}{% endif %}
     {% include "library/includes/form_field.html" with field=form.cover_image %}
     <details class="optional-metadata"{% if is_edit %} open{% endif %}>
-      <summary>More details</summary>
+      <summary>Plus de détails</summary>
       <div>
         {% include "library/includes/form_field.html" with field=form.page_count %}
         {% include "library/includes/form_field.html" with field=form.format %}
@@ -35,7 +35,7 @@
       </div>
     </details>
     <p class="isbn-entry-status" id="isbn-entry-status" aria-live="polite"></p>
-    <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Search the web for this ISBN</a>
+    <a id="book-isbn-web-search" href="#" target="_blank" rel="noreferrer" hidden>Rechercher cet ISBN sur le web</a>
   </form>
 </section>
 <script>
@@ -63,7 +63,7 @@
   let lookupSequence = 0;
   function setWaiting(waiting) {
     saveButton.disabled = waiting;
-    saveButton.textContent = waiting ? "Waiting for book details..." : "Save book";
+    saveButton.textContent = waiting ? "Recherche des informations du livre..." : "Enregistrer le livre";
     saveButton.setAttribute("aria-busy", String(waiting));
   }
 
@@ -78,7 +78,7 @@
       const response = await fetch(metadataUrl + "?isbn=" + encodeURIComponent(isbn), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
       if (sequence !== lookupSequence) return;
-      if (!response.ok) throw new Error(payload.error || "ISBN lookup failed.");
+      if (!response.ok) throw new Error(payload.error || "La recherche de l'ISBN a échoué.");
       Object.entries(fieldMap).forEach(([key, id]) => {
         const input = document.getElementById(id);
         if (input && payload[key] && !input.value) input.value = payload[key];
@@ -104,7 +104,7 @@
       const isbn = input.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
       if ([10, 13].includes(isbn.length) && isbn !== lastLookup) {
         const sequence = ++lookupSequence;
-        status.textContent = "Waiting for book details...";
+        status.textContent = "Recherche des informations du livre...";
         status.dataset.state = "waiting";
         webSearch.hidden = true;
         setWaiting(true);
@@ -119,7 +119,7 @@
       const isbn = input.value.replace(/[^0-9Xx]/g, "").slice(0, 13);
       if ([10, 13].includes(isbn.length) && isbn !== lastLookup) {
         const sequence = ++lookupSequence;
-        status.textContent = "Waiting for book details...";
+        status.textContent = "Recherche des informations du livre...";
         status.dataset.state = "waiting";
         webSearch.hidden = true;
         setWaiting(true);

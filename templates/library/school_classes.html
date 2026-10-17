@@ -1,17 +1,17 @@
 {% extends "library/base.html" %}
 {% block title %}Classes - Shelf-School{% endblock %}
 {% block content %}
-<header class="borrower-heading"><h1>Classes</h1><a class="button" href="{% url 'school_settings' %}"><i data-lucide="arrow-left" aria-hidden="true"></i>Settings</a></header>
+<header class="borrower-heading"><h1>Classes</h1><a class="button" href="{% url 'school_settings' %}"><i data-lucide="arrow-left" aria-hidden="true"></i>Paramètres</a></header>
 <section class="configuration-editor">
-  <h2>{% if school_class %}Edit class{% else %}Add class{% endif %}</h2>
-  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Save class</button>{% if school_class %} <a class="button" href="{% url 'school_classes' %}">Cancel</a>{% endif %}</form>
+  <h2>{% if school_class %}Modifier la classe{% else %}Ajouter une classe{% endif %}</h2>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="button primary"><i data-lucide="save" aria-hidden="true"></i>Enregistrer la classe</button>{% if school_class %} <a class="button" href="{% url 'school_classes' %}">Annuler</a>{% endif %}</form>
 </section>
 <div class="table-wrap"><table>
-  <thead><tr><th><a href="?sort=name">Class</a></th><th><a href="?sort=active">Status</a></th><th><a href="?sort=assigned">Assigned students</a></th><th>Actions</th></tr></thead>
+  <thead><tr><th><a href="?sort=name">Classe</a></th><th><a href="?sort=active">Statut</a></th><th><a href="?sort=assigned">Élèves de la classe</a></th><th>Actions</th></tr></thead>
   <tbody>{% for item in classes %}<tr>
     <td>{{ item.name }}</td><td>{% if item.active %}Active{% else %}Inactive{% endif %}</td><td>{{ item.assigned }}</td>
-    <td><div class="actions"><a class="button" href="{% url 'class_label_sheet' item.pk %}" aria-label="Planche de QR codes {{ item.name }}" title="Planche de QR codes {{ item.name }}"><i data-lucide="printer" aria-hidden="true"></i></a><a class="button" href="{% url 'school_class_edit' item.pk %}" aria-label="Edit {{ item.name }}" title="Edit {{ item.name }}"><i data-lucide="pencil" aria-hidden="true"></i></a>
-    {% if not item.assigned %}<form method="post" action="{% url 'school_class_edit' item.pk %}">{% csrf_token %}<button name="action" value="delete" aria-label="Delete {{ item.name }}" title="Delete {{ item.name }}"><i data-lucide="trash-2" aria-hidden="true"></i></button></form>{% endif %}</div></td>
-  </tr>{% empty %}<tr><td colspan="4">No classes.</td></tr>{% endfor %}</tbody>
+    <td><div class="actions"><a class="button" href="{% url 'class_label_sheet' item.pk %}" aria-label="Planche de QR codes {{ item.name }}" title="Planche de QR codes {{ item.name }}"><i data-lucide="printer" aria-hidden="true"></i></a><a class="button" href="{% url 'school_class_edit' item.pk %}" aria-label="Modifier {{ item.name }}" title="Modifier {{ item.name }}"><i data-lucide="pencil" aria-hidden="true"></i></a>
+    {% if not item.assigned %}<form method="post" action="{% url 'school_class_edit' item.pk %}">{% csrf_token %}<button name="action" value="delete" aria-label="Supprimer {{ item.name }}" title="Supprimer {{ item.name }}"><i data-lucide="trash-2" aria-hidden="true"></i></button></form>{% endif %}</div></td>
+  </tr>{% empty %}<tr><td colspan="4">Aucune classe.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

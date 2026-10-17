@@ -102,7 +102,7 @@ def import_catalog_rows(rows):
         placeholder = not title
         if placeholder:
             source = ", ".join(value for value in (source_photo, source_position) if value)
-            title = f"Unidentified book ({source or result.rows_seen})"
+            title = f"Livre non identifié ({source or result.rows_seen})"
             result.placeholder_titles += 1
 
         raw_isbn = _text(row, "ISBN")

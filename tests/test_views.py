@@ -32,10 +32,10 @@ def test_public_circulation_desk_does_not_require_admin_login(client):
     response = client.get(reverse("photo_circulation"))
 
     assert response.status_code == 200
-    assert b"Borrow or return a book" in response.content
+    assert "Emprunter ou rendre un livre".encode() in response.content
     assert b'href="/staff/login/"' in response.content
-    assert b"Staff login" in response.content
-    assert b"The photo is read once and never saved" in response.content
+    assert "Connexion du personnel".encode() in response.content
+    assert "La photo est lue une seule fois".encode() in response.content
     assert b"https://mrueda.github.io/shelf-school/" in response.content
 
 
@@ -47,9 +47,9 @@ def test_staff_login_is_separate_from_django_admin_and_rejects_nonstaff(client, 
     rejected = client.post(reverse("staff_login"), {"username": "borrower-only", "password": "secret"})
     django_admin = client.get(reverse("admin:login"))
 
-    assert b"Staff login" in page.content
-    assert b"Borrowers do not sign in" in page.content
-    assert b"does not have Shelf-School staff access" in rejected.content
+    assert "Connexion du personnel".encode() in page.content
+    assert "Les élèves ne se connectent pas".encode() in page.content
+    assert "pas accès à Shelf-School".encode() in rejected.content
     assert b"Django Admin - Shelf-School" in django_admin.content
 
 
@@ -60,12 +60,12 @@ def test_settings_separates_school_borrowers_and_access(client, django_user_mode
 
     response = client.get(reverse("school_settings"))
 
-    assert b"School details" in response.content
-    assert b"Access and data" in response.content
+    assert "Informations sur l'école".encode() in response.content
+    assert "Accès et données".encode() in response.content
     assert b'aria-label="Classes"' in response.content
-    assert b'aria-label="Employee positions"' in response.content
-    assert b"Manage staff accounts" in response.content
-    assert b"Open Advanced (Django Admin)" in response.content
+    assert 'aria-label="Fonctions du personnel"'.encode() in response.content
+    assert "Gérer les comptes du personnel".encode() in response.content
+    assert "Ouvrir l'administration avancée (Django)".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -100,7 +100,7 @@ def test_system_administrator_links_and_synchronizes_matching_borrower(client, d
     assert borrower.school_id == "school-lrueda"
     assert borrower.full_name == account.get_full_name() == "Luis Rueda"
     assert borrower.email == account.email == "lrueda@example.org"
-    assert b"Staff account lrueda created and linked to the existing borrower" in response.content
+    assert "Compte du personnel lrueda créé et associé à la fiche existante".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -226,7 +226,7 @@ def test_catalog_cover_fetch_selection_requires_a_valid_isbn(logged_in_client):
     eligibility = {book.pk: book.cover_fetch_eligible for book in response.context["books"]}
 
     assert eligibility == {eligible.pk: True, no_isbn.pk: False}
-    assert b"ISBN needed" in response.content
+    assert "ISBN nécessaire".encode() in response.content
     assert response.content.count(b'class="table-select cover-book-select"') == 1
 
 
@@ -271,7 +271,7 @@ def test_staff_fetches_only_missing_covers_for_selected_books(logged_in_client, 
         assert cover.read() == b"downloaded cover"
     with existing.cover_image.open("rb") as cover:
         assert cover.read() == b"existing cover"
-    assert b"1 downloaded, 1 unavailable, 1 without a valid ISBN, 1 already present" in response.content
+    assert "1 téléchargée(s), 1 introuvable(s), 1 sans ISBN valide, 1 déjà présente(s)".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -279,7 +279,7 @@ def test_cover_fetch_requires_a_selected_book(logged_in_client):
     response = logged_in_client.post(reverse("fetch_book_covers"), follow=True)
 
     assert response.status_code == 200
-    assert b"Select at least one book with a missing cover." in response.content
+    assert "Sélectionnez au moins un livre sans couverture.".encode() in response.content
 
 
 @pytest.mark.django_db
@@ -357,7 +357,7 @@ def test_csv_import_and_export(logged_in_client):
     assert book.needs_information is False
     assert book.copies.order_by("copy_number").first().source_position == "left"
     unidentified = Book.objects.exclude(pk=book.pk).get()
-    assert unidentified.title == "Unidentified book (photo-2.jpg, top right)"
+    assert unidentified.title == "Livre non identifié (photo-2.jpg, top right)"
     assert unidentified.needs_information is True
 
     export_response = logged_in_client.get(reverse("export_books_csv"))
@@ -482,7 +482,7 @@ def test_valid_isbn_without_free_metadata_is_explained(logged_in_client, monkeyp
     assert is_valid_isbn("9798302434630")
     assert response.status_code == 200
     assert response.json()["source"] == "none"
-    assert "ISBN is valid" in response.json()["message"]
+    assert "Cet ISBN est valide" in response.json()["message"]
     assert "9798302434630" in response.json()["search_url"]
 
 
@@ -594,7 +594,7 @@ def test_book_edit_rejects_isbn_used_by_another_book(logged_in_client):
     )
 
     assert response.status_code == 200
-    assert b"belongs to another cataloged book" in response.content
+    assert "appartient à un autre livre du catalogue".encode() in response.content
     book.refresh_from_db()
     assert book.isbn13 == ""
 
@@ -642,7 +642,7 @@ def test_manual_book_form_rejects_invalid_dashed_isbn(logged_in_client):
     )
 
     assert response.status_code == 200
-    assert b"Enter a valid ISBN-13" in response.content
+    assert "Saisissez un ISBN-13 valide".encode() in response.content
     assert not Book.objects.filter(title="Invalid ISBN").exists()
 
 
@@ -695,7 +695,7 @@ def test_photo_intake_requires_isbn_or_title_after_failed_barcode_read(logged_in
     )
 
     assert response.status_code == 200
-    assert b"No ISBN barcode was detected" in response.content
+    assert "Aucun code-barres ISBN".encode() in response.content
     assert Book.objects.count() == 0
 
 
@@ -884,7 +884,7 @@ def test_manual_checkout_choices_show_only_useful_metadata_for_available_copies(
 
     assert [value for value, _label in choices] == ["", available.id]
     label = choices[1][1]
-    assert label == "Clean option - Named Contributor - Copy #1 - ISBN 9780316381994"
+    assert label == "Clean option - Named Contributor - Exemplaire n°1 - ISBN 9780316381994"
     assert "no shelf" not in label.lower()
     assert "available" not in label.lower()
 
@@ -924,7 +924,7 @@ def test_borrower_can_checkout_multiple_books_in_one_atomic_basket(client):
         follow=True,
     )
 
-    assert b"Checked out 2 books to Basket Reader." in confirmed.content
+    assert "2 livres prêtés à Basket Reader.".encode() in confirmed.content
     assert Loan.objects.filter(borrower=borrower, copy__in=[first, second], return_date__isnull=True).count() == 2
 
 
@@ -953,7 +953,7 @@ def test_multi_book_checkout_rolls_back_if_one_copy_becomes_unavailable(client):
 
     response = client.post(reverse("photo_circulation"), {"confirmation_token": token}, follow=True)
 
-    assert b"no longer available" in response.content
+    assert "plus disponible pour un prêt".encode() in response.content
     assert not Loan.objects.filter(copy=first).exists()
     first.refresh_from_db()
     assert first.status == Copy.Status.AVAILABLE
@@ -982,7 +982,7 @@ def test_checkout_basket_rejects_duplicate_and_allows_removal(client):
             "basket_token": scan.context["basket_token"],
         },
     )
-    assert b"already in the checkout basket" in duplicate.content
+    assert "déjà dans le panier".encode() in duplicate.content
 
     second_review = client.post(
         reverse("photo_circulation"),
@@ -1019,7 +1019,7 @@ def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
     assert page.status_code == 200
     assert b"wrong - Wrong Student" in page.content
     assert b"correct - Correct Student - 3B" in page.content
-    assert b"Changed the borrower" in response.content
+    assert "remplacé par".encode() in response.content
     loan.refresh_from_db()
     assert loan.borrower == correct
     assert loan.school_class == correct.school_class
@@ -1049,7 +1049,7 @@ def test_photo_circulation_rejects_checkin_for_wrong_borrower(logged_in_client):
     )
 
     assert response.status_code == 200
-    assert b"Select a valid choice" in response.content
+    assert "Sélectionnez un choix valide".encode() in response.content
     copy.refresh_from_db()
     assert copy.status == Copy.Status.CHECKED_OUT
 
@@ -1141,8 +1141,8 @@ def test_staff_can_preview_and_add_borrowers_without_updating_existing(logged_in
     response = logged_in_client.post(reverse("import_borrowers"), {"csv_file": csv_file})
 
     assert response.status_code == 200
-    assert b"1 ready to add" in response.content
-    assert b"1 possible duplicate" in response.content
+    assert "1 prêt à ajouter".encode() in response.content
+    assert "1 doublon possible".encode() in response.content
     response = logged_in_client.post(reverse("import_borrowers"), {"action": "confirm"})
     assert response.status_code == 302
     assert Borrower.objects.count() == 3

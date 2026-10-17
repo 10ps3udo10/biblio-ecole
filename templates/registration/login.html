@@ -1,19 +1,19 @@
 {% extends "library/base.html" %}
-{% block title %}Staff login - Shelf-School{% endblock %}
+{% block title %}Connexion du personnel - Shelf-School{% endblock %}
 {% block content %}
 <section class="staff-login-panel" aria-labelledby="staff-login-title">
   <div class="staff-login-heading">
     <span><i data-lucide="lock-keyhole" aria-hidden="true"></i></span>
-    <div><p class="eyebrow">Library operations</p><h1 id="staff-login-title">Staff login</h1><p>For people who manage the Shelf-School library.</p></div>
+    <div><p class="eyebrow">Gestion de la bibliothèque</p><h1 id="staff-login-title">Connexion du personnel</h1><p>Pour les personnes qui gèrent la bibliothèque Shelf-School.</p></div>
   </div>
   <form method="post">
     {% csrf_token %}
     {{ form.non_field_errors }}
-    <p><label for="{{ form.username.id_for_label }}">Username</label>{{ form.username }}{{ form.username.errors }}</p>
-    <p><label for="{{ form.password.id_for_label }}">Password</label>{{ form.password }}{{ form.password.errors }}</p>
+    <p><label for="{{ form.username.id_for_label }}">Identifiant</label>{{ form.username }}{{ form.username.errors }}</p>
+    <p><label for="{{ form.password.id_for_label }}">Mot de passe</label>{{ form.password }}{{ form.password.errors }}</p>
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-    <button class="button primary"><i data-lucide="log-in" aria-hidden="true"></i>Sign in</button>
+    <button class="button primary"><i data-lucide="log-in" aria-hidden="true"></i>Se connecter</button>
   </form>
-  <p class="staff-login-boundary"><i data-lucide="contact" aria-hidden="true"></i><span><strong>Borrowers do not sign in.</strong> Students and teachers select their name at the circulation desk.</span></p>
+  <p class="staff-login-boundary"><i data-lucide="contact" aria-hidden="true"></i><span><strong>Les élèves ne se connectent pas.</strong> Élèves et enseignants choisissent leur nom au banc de prêt.</span></p>
 </section>
 {% endblock %}

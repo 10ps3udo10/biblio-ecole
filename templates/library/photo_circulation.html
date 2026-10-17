@@ -3,34 +3,34 @@
 {% block content %}
 <header class="desk-heading">
   <span class="eyebrow">{{ school_profile.display_name }}</span>
-  <h1>Borrow or return a book</h1>
+  <h1>Emprunter ou rendre un livre</h1>
 </header>
 
 {% if receipt %}
 <section class="desk-receipt" aria-labelledby="receipt-title">
   <div class="receipt-check"><i data-lucide="check" aria-hidden="true"></i></div>
-  <span class="eyebrow">{% if receipt.action == "checkout" %}Checkout complete{% else %}Return complete{% endif %}</span>
-  <h2 id="receipt-title">All set, {{ receipt.borrower }}.</h2>
-  <p>{{ receipt.books|length }} book{{ receipt.books|length|pluralize }} {% if receipt.action == "checkout" %}borrowed{% else %}returned{% endif %}{% if receipt.due_date %} · Due {{ receipt.due_date }}{% endif %}</p>
+  <span class="eyebrow">{% if receipt.action == "checkout" %}Emprunt terminé{% else %}Retour terminé{% endif %}</span>
+  <h2 id="receipt-title">C'est fait, {{ receipt.borrower }}.</h2>
+  <p>{{ receipt.books|length }} livre{{ receipt.books|length|pluralize }} {% if receipt.action == "checkout" %}emprunté{{ receipt.books|length|pluralize }}{% else %}rendu{{ receipt.books|length|pluralize }}{% endif %}{% if receipt.due_date %} · À rendre le {{ receipt.due_date }}{% endif %}</p>
   <div class="receipt-books">
   {% for book in receipt.books %}
     <div class="confirmation-book-row">
       {% if book.cover %}<img class="desk-book-cover" src="{{ book.cover }}" alt="" width="48" height="64">{% else %}<span class="desk-book-cover cover-fallback"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
-      <span class="desk-book-details"><strong>{{ book.title }}</strong><small>Copy #{{ book.copy_number }}</small></span>
+      <span class="desk-book-details"><strong>{{ book.title }}</strong><small>Exemplaire n°{{ book.copy_number }}</small></span>
     </div>
   {% endfor %}
   </div>
   <div class="receipt-actions">
-    <a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-right" aria-hidden="true"></i>Next borrower</a>
-    <a class="button" href="{% url 'photo_circulation' %}?borrower={{ receipt.borrower_id }}&amp;action={{ receipt.action }}">Same borrower</a>
+    <a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-right" aria-hidden="true"></i>Élève suivant</a>
+    <a class="button" href="{% url 'photo_circulation' %}?borrower={{ receipt.borrower_id }}&amp;action={{ receipt.action }}">Même élève</a>
   </div>
 </section>
 {% else %}
 {% if has_borrowers or confirmation %}
-<ol class="desk-progress" id="desk-progress" aria-label="Circulation progress">
-  <li{% if not confirmation %} class="active"{% else %} class="complete"{% endif %}><span>1</span>Borrower</li>
-  <li{% if confirmation %} class="complete"{% endif %}><span>2</span>Books</li>
-  <li{% if confirmation %} class="active"{% endif %}><span>3</span>Confirm</li>
+<ol class="desk-progress" id="desk-progress" aria-label="Progression du prêt">
+  <li{% if not confirmation %} class="active"{% else %} class="complete"{% endif %}><span>1</span>Élève</li>
+  <li{% if confirmation %} class="complete"{% endif %}><span>2</span>Livres</li>
+  <li{% if confirmation %} class="active"{% endif %}><span>3</span>Confirmation</li>
 </ol>
 {% endif %}
 
@@ -39,103 +39,103 @@
   <form method="post" class="confirmation-form">
     {% csrf_token %}
     <input type="hidden" name="confirmation_token" value="{{ confirmation_token }}">
-    <div class="confirmation-person"><i data-lucide="user-round" aria-hidden="true"></i><span><small>{% if action == "checkout" %}Borrowing for{% else %}Returning for{% endif %}</small><strong>{{ borrower.full_name }}</strong></span></div>
+    <div class="confirmation-person"><i data-lucide="user-round" aria-hidden="true"></i><span><small>{% if action == "checkout" %}Emprunt pour{% else %}Retour pour{% endif %}</small><strong>{{ borrower.full_name }}</strong></span></div>
     <div class="confirmation-book-list">
-    <span class="eyebrow">{% if action == "checkout" %}Checkout basket{% else %}Books selected{% endif %}</span>
-    <h2>{{ copies|length }} book{{ copies|length|pluralize }} {% if action == "checkout" %}ready to check out{% else %}to return{% endif %}</h2>
+    <span class="eyebrow">{% if action == "checkout" %}Panier d'emprunt{% else %}Livres sélectionnés{% endif %}</span>
+    <h2>{{ copies|length }} livre{{ copies|length|pluralize }} {% if action == "checkout" %}prêt{{ copies|length|pluralize }} à emprunter{% else %}à rendre{% endif %}</h2>
     {% for selected_copy in copies %}
     <div class="confirmation-book-row">
       {% if selected_copy.book.cover_image %}<img class="desk-book-cover" src="{{ selected_copy.book.cover_image.url }}" alt="" width="48" height="64">{% else %}<span class="desk-book-cover cover-fallback"><i data-lucide="book-open" aria-hidden="true"></i></span>{% endif %}
-      <span class="desk-book-details"><strong>{{ selected_copy.book.title }}</strong><small>Copy #{{ selected_copy.copy_number }}{% if selected_copy.shelf_location %} · {{ selected_copy.shelf_location }}{% endif %}</small></span>
-      {% if action == "checkout" %}<button class="remove-basket-book" name="remove_copy_id" value="{{ selected_copy.id }}" title="Remove {{ selected_copy.book.title }}" aria-label="Remove {{ selected_copy.book.title }}"><i data-lucide="x" aria-hidden="true"></i></button>{% endif %}
+      <span class="desk-book-details"><strong>{{ selected_copy.book.title }}</strong><small>Exemplaire n°{{ selected_copy.copy_number }}{% if selected_copy.shelf_location %} · {{ selected_copy.shelf_location }}{% endif %}</small></span>
+      {% if action == "checkout" %}<button class="remove-basket-book" name="remove_copy_id" value="{{ selected_copy.id }}" title="Retirer {{ selected_copy.book.title }}" aria-label="Retirer {{ selected_copy.book.title }}"><i data-lucide="x" aria-hidden="true"></i></button>{% endif %}
     </div>
     {% endfor %}
     </div>
     <dl class="transaction-summary">
-      {% if action == "checkout" %}<div><dt>Due date</dt><dd>{{ due_date }}</dd></div>{% endif %}
+      {% if action == "checkout" %}<div><dt>Date de retour prévue</dt><dd>{{ due_date }}</dd></div>{% endif %}
     </dl>
     <div class="confirmation-actions">
-      <button class="button primary confirm-transaction" name="intent" value="confirm"><i data-lucide="circle-check" aria-hidden="true"></i>{% if action == "checkout" %}Borrow{% else %}Return{% endif %} {{ copies|length }} book{{ copies|length|pluralize }}</button>
-      {% if action == "checkout" %}<button class="button" name="intent" value="add_another"><i data-lucide="book-plus" aria-hidden="true"></i>Add another book</button>{% endif %}
-      <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Cancel</a>
+      <button class="button primary confirm-transaction" name="intent" value="confirm"><i data-lucide="circle-check" aria-hidden="true"></i>{% if action == "checkout" %}Emprunter{% else %}Rendre{% endif %} {{ copies|length }} livre{{ copies|length|pluralize }}</button>
+      {% if action == "checkout" %}<button class="button" name="intent" value="add_another"><i data-lucide="book-plus" aria-hidden="true"></i>Ajouter un autre livre</button>{% endif %}
+      <a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="x" aria-hidden="true"></i>Annuler</a>
     </div>
   </form>
 </section>
 {% else %}
 {% if not has_borrowers %}
-<section class="empty-desk"><h2>Circulation is not ready</h2><p>A staff member must add at least one borrower before books can be checked out.</p></section>
+<section class="empty-desk"><h2>Le prêt n'est pas encore prêt</h2><p>Un membre du personnel doit ajouter au moins un élève avant de pouvoir prêter des livres.</p></section>
 {% else %}
 <form class="circulation-desk" method="post" enctype="multipart/form-data" data-basket-count="{{ basket_count|default:0 }}">
   {% csrf_token %}
   {{ form.basket_token }}
   {{ form.non_field_errors }}
-  <section class="desk-controls" aria-label="Transaction details"{% if resume_checkout or form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
+  <section class="desk-controls" aria-label="Détails de l'opération"{% if resume_checkout or form.non_field_errors or form.book_photo.errors or form.manual_copy.errors or form.return_copies.errors %} hidden{% endif %}>
     <div class="desk-section-heading">
       <span class="desk-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-      <div><span class="eyebrow">Welcome to the library</span><h2>Who is borrowing?</h2></div>
+      <div><span class="eyebrow">Bienvenue à la bibliothèque</span><h2>Qui emprunte ?</h2></div>
     </div>
     <div class="control-block mode-block">
-      <span class="control-label">Choose an action</span>
+      <span class="control-label">Choisissez une action</span>
       <div class="mode-switch">{{ form.action }}</div>
       {{ form.action.errors }}
     </div>
 
     <div class="control-block borrower-block">
-      <label class="control-label" id="borrower-label" for="borrower-search">Choose your name</label>
+      <label class="control-label" id="borrower-label" for="borrower-search">Choisissez votre nom</label>
       {{ form.borrower }}
       <div class="borrower-search-field">
         <i data-lucide="search" aria-hidden="true"></i>
-        <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Type at least 2 letters" value="{% if selected_borrower %}{{ selected_borrower.borrower_id }} - {{ selected_borrower.full_name }}{% endif %}">
+        <input id="borrower-search" type="search" role="combobox" aria-autocomplete="list" aria-controls="borrower-results" aria-expanded="false" autocomplete="off" placeholder="Saisissez au moins 2 lettres" value="{% if selected_borrower %}{{ selected_borrower.borrower_id }} - {{ selected_borrower.full_name }}{% endif %}">
         <div id="borrower-results" class="borrower-results" role="listbox" hidden></div>
       </div>
-      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Type part of your name, Borrower ID, or School ID.</p>
+      <p id="borrower-search-status" class="borrower-search-status" aria-live="polite">Saisissez une partie de votre nom, de votre n° d'emprunteur ou de votre identifiant école.</p>
       {{ form.borrower.errors }}
     </div>
-    <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continue</button>
+    <button class="button primary continue-circulation" id="continue-circulation" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i>Continuer</button>
   </section>
 
   <section class="desk-scan" aria-labelledby="scan-title"{% if not resume_checkout and not form.non_field_errors and not form.book_photo.errors and not form.manual_copy.errors and not form.return_copies.errors %} hidden{% endif %}>
-    <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button"><i data-lucide="refresh-cw" aria-hidden="true"></i>Change</button></div>
-    {% if basket_copies %}<div class="checkout-basket-preview"><strong>{{ basket_count }} selected</strong><span>{% for selected_copy in basket_copies %}{{ selected_copy.book.title }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></div>{% endif %}
+    <div class="session-strip"><strong id="session-summary"></strong><button id="change-session" type="button"><i data-lucide="refresh-cw" aria-hidden="true"></i>Changer</button></div>
+    {% if basket_copies %}<div class="checkout-basket-preview"><strong>{{ basket_count }} sélectionné(s)</strong><span>{% for selected_copy in basket_copies %}{{ selected_copy.book.title }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></div>{% endif %}
     <div class="desk-section-heading scan-heading">
       <span class="desk-section-icon"><i data-lucide="book-open" aria-hidden="true"></i></span>
-      <div><span class="eyebrow">Step 2</span><h2 id="scan-title">Choose the book</h2></div>
+      <div><span class="eyebrow">Étape 2</span><h2 id="scan-title">Choisissez le livre</h2></div>
     </div>
     {{ form.book_photo.errors }}
-    <div class="identification-switch" id="identification-switch" role="tablist" aria-label="Book identification method">
-      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="true"><i data-lucide="search" aria-hidden="true"></i>Find manually</button>
-      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="false"><i data-lucide="camera" aria-hidden="true"></i>Take photo</button>
+    <div class="identification-switch" id="identification-switch" role="tablist" aria-label="Méthode d'identification du livre">
+      <button type="button" role="tab" id="manual-method-tab" aria-controls="manual-method" aria-selected="true"><i data-lucide="search" aria-hidden="true"></i>Chercher à la main</button>
+      <button type="button" role="tab" id="photo-method-tab" aria-controls="photo-method" aria-selected="false"><i data-lucide="camera" aria-hidden="true"></i>Prendre une photo</button>
     </div>
     <div id="photo-method" class="identification-method" role="tabpanel" aria-labelledby="photo-method-tab" hidden>
       <div class="book-scan-target" id="book-scan-target">
         {{ form.book_photo }}
-        <img id="scan-preview" alt="Selected book code photo">
+        <img id="scan-preview" alt="Photo du code du livre sélectionnée">
         <div class="scan-prompt" id="scan-prompt">
           <i class="scan-illustration" data-lucide="scan-line" aria-hidden="true"></i>
-          <strong>Take a photo</strong>
-          <span>Point the camera at the book label</span>
+          <strong>Prenez une photo</strong>
+          <span>Pointez l'appareil photo vers l'étiquette du livre</span>
         </div>
-        <button class="change-photo" id="change-scan-photo" type="button">Change photo</button>
+        <button class="change-photo" id="change-scan-photo" type="button">Changer de photo</button>
       </div>
       <div class="barcode-result" id="circulation-barcode-result" aria-live="polite">
-        <span class="status-dot" aria-hidden="true"></span><span id="barcode-status">Waiting for a book</span>
+        <span class="status-dot" aria-hidden="true"></span><span id="barcode-status">En attente d'un livre</span>
       </div>
-      <p class="photo-privacy"><i data-lucide="shield-check" aria-hidden="true"></i>The photo is read once and never saved.</p>
+      <p class="photo-privacy"><i data-lucide="shield-check" aria-hidden="true"></i>La photo est lue une seule fois et n'est jamais enregistrée.</p>
     </div>
     <div id="manual-method" class="identification-method manual-book-search" role="tabpanel" aria-labelledby="manual-method-tab">
-      <label class="control-label" for="copy-filter">Search title, contributor, ISBN, shelf, or copy number</label>
-      <input id="copy-filter" type="search" placeholder="Start typing to filter books" autocomplete="off">
+      <label class="control-label" for="copy-filter">Rechercher par titre, auteur, ISBN, étagère ou numéro d'exemplaire</label>
+      <input id="copy-filter" type="search" placeholder="Commencez à écrire pour filtrer les livres" autocomplete="off">
       {{ form.manual_copy }}
       {{ form.manual_copy.errors }}
-      <p>Only books ready to borrow are shown. Select the exact physical copy.</p>
+      <p>Seuls les livres disponibles sont affichés. Choisissez l'exemplaire exact.</p>
     </div>
     <div id="return-method" class="return-book-list" hidden>
-      <p class="return-guidance">Select one or more books this borrower is returning.</p>
+      <p class="return-guidance">Sélectionnez un ou plusieurs livres que cet élève rend.</p>
       <div id="return-loan-options"></div>
-      <p id="no-return-loans" class="empty-return" hidden>This borrower has no books to return.</p>
+      <p id="no-return-loans" class="empty-return" hidden>Cet élève n'a aucun livre à rendre.</p>
       {{ form.return_copies.errors }}
     </div>
-    <button class="button primary identify-book" id="identify-book"><i data-lucide="scan-search" aria-hidden="true"></i><span id="identify-book-label">Identify book</span></button>
+    <button class="button primary identify-book" id="identify-book"><i data-lucide="scan-search" aria-hidden="true"></i><span id="identify-book-label">Identifier le livre</span></button>
   </section>
 </form>
 {% endif %}
@@ -211,7 +211,7 @@
     borrowerId.value = "";
     borrowerSearch.value = "";
     closeBorrowerResults();
-    borrowerSearchStatus.textContent = "Type part of your name, Borrower ID, or School ID.";
+    borrowerSearchStatus.textContent = "Saisissez une partie de votre nom, de votre n° d'emprunteur ou de votre identifiant école.";
   }
 
   function formatBorrower(item) {
@@ -223,7 +223,7 @@
     borrowerId.value = item.id;
     borrowerSearch.value = formatBorrower(item);
     borrowerSearch.setCustomValidity("");
-    borrowerSearchStatus.textContent = item.name + " selected.";
+    borrowerSearchStatus.textContent = item.name + " sélectionné(e).";
     closeBorrowerResults();
   }
 
@@ -241,10 +241,10 @@
     borrowerId.value = "";
     if (query.length < 2) {
       closeBorrowerResults();
-      borrowerSearchStatus.textContent = "Type at least 2 letters.";
+      borrowerSearchStatus.textContent = "Saisissez au moins 2 lettres.";
       return;
     }
-    borrowerSearchStatus.textContent = "Searching...";
+    borrowerSearchStatus.textContent = "Recherche en cours...";
     try {
       const response = await fetch(borrowerSearchUrl + "?q=" + encodeURIComponent(query) + "&action=" + encodeURIComponent(currentAction()), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
@@ -261,13 +261,13 @@
         borrowerResults.append(option);
         return option;
       });
-      borrowerSearchStatus.textContent = resultOptions.length ? resultOptions.length + " matching borrower" + (resultOptions.length === 1 ? "." : "s.") : "No matching borrowers.";
+      borrowerSearchStatus.textContent = resultOptions.length ? resultOptions.length + (resultOptions.length === 1 ? " élève correspondant." : " élèves correspondants.") : "Aucun élève correspondant.";
       borrowerResults.hidden = resultOptions.length === 0;
       borrowerSearch.setAttribute("aria-expanded", String(resultOptions.length > 0));
       activeResult = -1;
     } catch (error) {
       closeBorrowerResults();
-      borrowerSearchStatus.textContent = "Borrower search is unavailable. Try again.";
+      borrowerSearchStatus.textContent = "La recherche est indisponible. Réessayez.";
     }
   }
 
@@ -284,8 +284,8 @@
   });
 
   function updateMode(clearSelection) {
-    borrowerLabelElement.textContent = "Choose your name";
-    document.querySelector(".desk-controls h2").textContent = currentAction() === "checkin" ? "Who is returning?" : "Who is borrowing?";
+    borrowerLabelElement.textContent = "Choisissez votre nom";
+    document.querySelector(".desk-controls h2").textContent = currentAction() === "checkin" ? "Qui rend un livre ?" : "Qui emprunte ?";
     if (clearSelection) clearBorrower();
   }
   actionInputs.forEach((input) => input.addEventListener("change", function () { updateMode(true); }));
@@ -293,18 +293,18 @@
 
   function showScan() {
     if (!borrowerId.value) {
-      borrowerSearch.setCustomValidity("Choose your name from the search results first.");
+      borrowerSearch.setCustomValidity("Choisissez d'abord votre nom dans les résultats de la recherche.");
       borrowerSearch.reportValidity();
       return;
     }
     borrowerSearch.setCustomValidity("");
     const returning = currentAction() === "checkin";
-    const action = returning ? "Return" : "Check out";
-    sessionSummary.textContent = action + " · " + borrowerSearch.value + (basketCount ? " · " + basketCount + " selected" : "");
+    const action = returning ? "Retour" : "Emprunt";
+    sessionSummary.textContent = action + " · " + borrowerSearch.value + (basketCount ? " · " + basketCount + " sélectionné(s)" : "");
     identificationSwitch.hidden = returning;
     returnMethod.hidden = !returning;
-    scanTitle.textContent = returning ? "Choose books to return" : basketCount ? "Add another book" : "Choose the book";
-    identifyButtonLabel.textContent = returning ? "Review return" : basketCount ? "Add to checkout" : "Identify book";
+    scanTitle.textContent = returning ? "Choisissez les livres à rendre" : basketCount ? "Ajouter un autre livre" : "Choisissez le livre";
+    identifyButtonLabel.textContent = returning ? "Vérifier le retour" : basketCount ? "Ajouter à l'emprunt" : "Identifier le livre";
     if (returning) {
       fileInput.disabled = true;
       copySelect.disabled = true;
@@ -344,7 +344,7 @@
     fileInput.disabled = manual;
     copySelect.disabled = !manual;
     identifyButton.disabled = false;
-    identifyButtonLabel.textContent = basketCount ? "Add to checkout" : manual ? "Review book" : "Identify book";
+    identifyButtonLabel.textContent = basketCount ? "Ajouter à l'emprunt" : manual ? "Vérifier le livre" : "Identifier le livre";
     photoMethodTab.setAttribute("aria-selected", String(!manual));
     manualMethodTab.setAttribute("aria-selected", String(manual));
     (manual ? copyFilter : fileInput).focus();
@@ -358,14 +358,14 @@
     const selectedValues = new Set(Array.from(document.querySelectorAll("input[name='return_copies']:checked")).map((input) => input.value));
     returnOptions.replaceChildren();
     noReturnLoans.hidden = true;
-    noReturnLoans.textContent = "This borrower has no books to return.";
-    returnOptions.textContent = "Loading borrowed books...";
+    noReturnLoans.textContent = "Cet élève n'a aucun livre à rendre.";
+    returnOptions.textContent = "Chargement des livres empruntés...";
     identifyButton.disabled = true;
     try {
       const response = await fetch(borrowerLoansUrl.replace("00000000-0000-0000-0000-000000000000", borrowerId.value), {headers: {"Accept": "application/json"}});
       const payload = await response.json();
       if (borrowerId.value !== requestedBorrower || currentAction() !== "checkin") return;
-      if (!response.ok) throw new Error("Could not load loans");
+      if (!response.ok) throw new Error("Impossible de charger les emprunts");
       returnOptions.replaceChildren();
       const loans = payload.loans;
     loans.forEach((loan) => {
@@ -380,7 +380,7 @@
       const details = document.createElement("span");
       details.innerHTML = "<strong></strong><small></small>";
       details.querySelector("strong").textContent = loan.title;
-      details.querySelector("small").textContent = "Copy #" + loan.copy_number + " · Due " + loan.due_date;
+      details.querySelector("small").textContent = "Exemplaire n°" + loan.copy_number + " · À rendre le " + loan.due_date;
       const cover = document.createElement(loan.cover_url ? "img" : "span");
       cover.className = "desk-book-cover" + (loan.cover_url ? "" : " cover-fallback");
       if (loan.cover_url) {
@@ -401,7 +401,7 @@
     } catch (error) {
       if (borrowerId.value !== requestedBorrower) return;
       returnOptions.replaceChildren();
-      noReturnLoans.textContent = "Borrowed books could not be loaded. Try again.";
+      noReturnLoans.textContent = "Les livres empruntés n'ont pas pu être chargés. Réessayez.";
       noReturnLoans.hidden = false;
     }
   }
@@ -409,7 +409,7 @@
   function updateReturnSelection() {
     const count = returnOptions.querySelectorAll("input:checked").length;
     identifyButton.disabled = count === 0;
-    identifyButtonLabel.textContent = count ? "Review " + count + " book" + (count === 1 ? "" : "s") : "Select books to return";
+    identifyButtonLabel.textContent = count ? "Vérifier " + count + (count === 1 ? " livre" : " livres") : "Sélectionnez les livres à rendre";
   }
 
   function setStatus(message, state) {
@@ -423,18 +423,18 @@
     preview.classList.add("visible");
     prompt.hidden = true;
     changeButton.classList.add("visible");
-    setStatus("Reading book label...", "reading");
+    setStatus("Lecture de l'étiquette du livre...", "reading");
     if (!("BarcodeDetector" in window)) {
-      setStatus("Photo ready. Shelf-School will read it next.", "ready");
+      setStatus("Photo prête. Shelf-School la lira ensuite.", "ready");
       return;
     }
     try {
       const detector = new BarcodeDetector({ formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
       const bitmap = await createImageBitmap(file);
       const barcodes = await detector.detect(bitmap);
-      setStatus(barcodes.length ? "Book label detected" : "Photo ready. Shelf-School will try again.", barcodes.length ? "success" : "ready");
+      setStatus(barcodes.length ? "Étiquette du livre détectée" : "Photo prête. Shelf-School va réessayer.", barcodes.length ? "success" : "ready");
     } catch (error) {
-      setStatus("Photo ready. Shelf-School will read it next.", "ready");
+      setStatus("Photo prête. Shelf-School la lira ensuite.", "ready");
     }
   }
   changeButton.addEventListener("click", function () { fileInput.click(); });

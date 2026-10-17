@@ -46,7 +46,7 @@ def test_positions_can_be_renamed_deactivated_and_not_deleted_when_used(client, 
     with pytest.raises(ProtectedError):
         borrower.position.delete()
     response = client.post(reverse("employee_position_edit", args=[position.pk]), {"action": "delete"}, follow=True)
-    assert b"Deactivate it instead" in response.content
+    assert "Désactivez-la plutôt".encode() in response.content
 
 
 def test_inactive_position_can_be_retained_but_not_assigned():
@@ -84,7 +84,7 @@ def test_csv_bad_position_rolls_back_all_rows():
         {"School ID": "one", "First name": "A", "Last name": "Reader", "Position": "Teacher"},
         {"School ID": "two", "First name": "B", "Last name": "Reader", "Position": "Typo"},
     ]
-    with pytest.raises(ValueError, match="Row 3: Unknown position"):
+    with pytest.raises(ValueError, match="Ligne 3 : fonction « Typo » inconnue"):
         import_borrower_rows([{**row, "School role": "Employee"} for row in rows])
     assert not Borrower.objects.exists()
     assert not EmployeePosition.objects.filter(name="Typo").exists()
@@ -99,7 +99,7 @@ def test_borrower_csv_imports_employees_and_is_protected(client, django_user_mod
         "borrowers.csv", b"First name,Last name,School role,Position,School ID\nPat,Reader,Employee,Librarian,new\n",
     )})
     assert response.status_code == 200
-    assert b"Import preview" in response.content
+    assert "Aperçu de l'import".encode() in response.content
     response = client.post(url, {"action": "confirm"})
     assert response.status_code == 302
     borrower = Borrower.objects.get(school_id="new")

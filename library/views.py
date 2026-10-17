@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 
 def _require_system_administrator(request):
     if not request.user.is_superuser:
-        raise PermissionDenied("Only a system administrator can manage staff accounts.")
+        raise PermissionDenied("Seul un administrateur système peut gérer les comptes du personnel.")
 
 
 def _uuid_from_code(value, prefix):
@@ -77,7 +77,7 @@ def _uuid_from_code(value, prefix):
     if ":" in value:
         found_prefix, value = value.split(":", 1)
         if found_prefix.upper() != prefix:
-            raise ValueError(f"Expected {prefix} code")
+            raise ValueError(f"Code {prefix} attendu")
     return uuid.UUID(value.strip())
 
 
@@ -113,11 +113,11 @@ def _copy_from_photo(uploaded_file, action):
             isbn = candidate
             break
     if not isbn:
-        raise ValueError("No copy QR or ISBN barcode was detected in the photo.")
+        raise ValueError("Aucun QR code d'exemplaire ni code-barres ISBN n'a été détecté sur la photo.")
 
     books = Book.objects.filter(Q(isbn13=isbn) | Q(isbn10=isbn)).distinct()
     if not books.exists():
-        raise ValueError(f"No cataloged book has ISBN {isbn}.")
+        raise ValueError(f"Aucun livre du catalogue n'a l'ISBN {isbn}.")
     copies = Copy.objects.select_related("book").filter(book__in=books)
     if action == PhotoCirculationForm.Action.CHECKOUT:
         copies = copies.filter(status=Copy.Status.AVAILABLE)
@@ -127,29 +127,29 @@ def _copy_from_photo(uploaded_file, action):
     if count == 1:
         return copies.get()
     if count == 0:
-        raise ValueError(f"No matching copy is available for ISBN {isbn}.")
-    raise ValueError(f"ISBN {isbn} matches multiple copies. Use the copy QR label for circulation.")
+        raise ValueError(f"Aucun exemplaire correspondant n'est disponible pour l'ISBN {isbn}.")
+    raise ValueError(f"L'ISBN {isbn} correspond à plusieurs exemplaires. Utilisez le QR code de l'étiquette.")
 
 
 def _perform_circulation(copy, borrower, action, due_date=None):
     if action == PhotoCirculationForm.Action.CHECKOUT:
         if copy.status != Copy.Status.AVAILABLE or copy.loans.filter(return_date__isnull=True).exists():
-            raise ValueError("This copy is no longer available for check out.")
+            raise ValueError("Cet exemplaire n'est plus disponible pour un prêt.")
         Loan.objects.create(copy=copy, borrower=borrower, due_date=due_date or default_form_due_date())
         copy.status = Copy.Status.CHECKED_OUT
         copy.save(update_fields=["status"])
-        return f"Checked out {copy.book.title} to {borrower.full_name}."
+        return f"{copy.book.title} prêté à {borrower.full_name}."
 
     loan = copy.loans.filter(return_date__isnull=True).select_related("borrower").first()
     if loan is None:
-        raise ValueError("This copy no longer has an active loan to check in.")
+        raise ValueError("Cet exemplaire n'a plus d'emprunt en cours à rendre.")
     if loan.borrower_id != borrower.id:
-        raise ValueError("This copy is checked out to a different borrower.")
+        raise ValueError("Cet exemplaire est emprunté par un autre emprunteur.")
     loan.return_date = timezone.localdate()
     loan.save(update_fields=["return_date"])
     copy.status = Copy.Status.ARCHIVED if copy.archived_on else Copy.Status.AVAILABLE
     copy.save(update_fields=["status"])
-    return f"Checked in {copy.book.title} from {borrower.full_name}."
+    return f"{copy.book.title} rendu par {borrower.full_name}."
 
 
 def _circulation_payload(token):
@@ -157,11 +157,11 @@ def _circulation_payload(token):
     action = payload.get("action")
     copy_ids = payload.get("copy_ids")
     if action not in PhotoCirculationForm.Action.values:
-        raise ValueError("That circulation confirmation is invalid.")
+        raise ValueError("Cette confirmation n'est pas valide.")
     if not isinstance(copy_ids, list) or not copy_ids or len(copy_ids) > MAX_CHECKOUT_BOOKS:
-        raise ValueError("That circulation confirmation is invalid.")
+        raise ValueError("Cette confirmation n'est pas valide.")
     if len(copy_ids) != len(set(copy_ids)):
-        raise ValueError("The same book appears more than once.")
+        raise ValueError("Le même livre apparaît plusieurs fois.")
     return payload
 
 
@@ -171,7 +171,7 @@ def _ordered_copies(copy_ids, *, lock=False):
         copies = copies.select_for_update()
     by_id = {str(copy.id): copy for copy in copies.filter(pk__in=copy_ids)}
     if len(by_id) != len(copy_ids):
-        raise ValueError("One of the selected books no longer exists.")
+        raise ValueError("Un des livres sélectionnés n'existe plus.")
     return [by_id[copy_id] for copy_id in copy_ids]
 
 
@@ -365,13 +365,13 @@ def book_list(request):
             "next_direction": "desc" if sort == key and direction == "asc" else "asc",
         }
         for key, label in (
-            ("title", "Title"),
-            ("author", "Contributors"),
+            ("title", "Titre"),
+            ("author", "Auteur(s)"),
             ("isbn", "ISBN"),
-            ("availability", "Availability"),
-            ("copies", "Copies"),
-            ("cover", "Cover"),
-            ("catalog_status", "Catalog status"),
+            ("availability", "Disponibilité"),
+            ("copies", "Exemplaires"),
+            ("cover", "Couverture"),
+            ("catalog_status", "Fiche"),
         )
     ]
     return render(
@@ -392,7 +392,7 @@ def fetch_book_covers(request):
         require_https=request.is_secure(),
     ) else reverse("book_list")
     if not form.is_valid():
-        messages.error(request, "Select at least one book with a missing cover.")
+        messages.error(request, "Sélectionnez au moins un livre sans couverture.")
         return redirect(redirect_to)
 
     counts = {"downloaded": 0, "unavailable": 0, "without_isbn": 0, "existing": 0, "failed": 0}
@@ -418,14 +418,14 @@ def fetch_book_covers(request):
             counts["failed"] += 1
 
     summary = [
-        f'{counts["downloaded"]} downloaded',
-        f'{counts["unavailable"]} unavailable',
-        f'{counts["without_isbn"]} without a valid ISBN',
-        f'{counts["existing"]} already present',
+        f'{counts["downloaded"]} téléchargée(s)',
+        f'{counts["unavailable"]} introuvable(s)',
+        f'{counts["without_isbn"]} sans ISBN valide',
+        f'{counts["existing"]} déjà présente(s)',
     ]
     if counts["failed"]:
-        summary.append(f'{counts["failed"]} failed')
-    messages.success(request, f'Cover fetch complete: {", ".join(summary)}.')
+        summary.append(f'{counts["failed"]} en échec')
+    messages.success(request, f'Recherche des couvertures terminée : {", ".join(summary)}.')
     return redirect(redirect_to)
 
 
@@ -470,7 +470,7 @@ def book_detail(request, pk):
                     "direction": copy_direction if copy_sort == key else "",
                     "next_direction": "desc" if copy_sort == key and copy_direction == "asc" else "asc",
                 }
-                for key, label in (("copy", "Copy"), ("status", "Status"), ("shelf", "Shelf"), ("condition", "Condition"))
+                for key, label in (("copy", "Exemplaire"), ("status", "Statut"), ("shelf", "Étagère"), ("condition", "État"))
             ],
         },
     )
@@ -530,7 +530,7 @@ def delete_book_photo(request, pk):
         book.cover_image.delete(save=False)
         book.cover_image = ""
         book.save(update_fields=["cover_image", "updated_at"])
-        messages.success(request, "Stored book photo deleted.")
+        messages.success(request, "La photo enregistrée du livre a été supprimée.")
     return redirect(book)
 
 
@@ -539,7 +539,7 @@ def delete_book_photo(request, pk):
 def isbn_metadata(request):
     isbn = clean_isbn(request.GET.get("isbn"))
     if not is_valid_isbn(isbn):
-        return JsonResponse({"error": "This is not a valid ISBN-10 or ISBN-13."}, status=400)
+        return JsonResponse({"error": "Ce n'est pas un ISBN-10 ou ISBN-13 valide."}, status=400)
 
     existing = Book.objects.filter(Q(isbn13=isbn) | Q(isbn10=isbn)).first()
     if existing:
@@ -548,22 +548,22 @@ def isbn_metadata(request):
                 "source": "catalog",
                 "title": existing.title,
                 "authors": existing.authors,
-                "message": "This ISBN is already cataloged. Tracking it will add another physical copy.",
+                "message": "Cet ISBN est déjà dans le catalogue. L'enregistrer ajoutera un autre exemplaire.",
             }
         )
 
     try:
         metadata = lookup_book_by_isbn(isbn)
     except MetadataLookupError:
-        return JsonResponse({"error": "Free ISBN metadata is temporarily unavailable."}, status=503)
+        return JsonResponse({"error": "Les informations gratuites sur les ISBN sont momentanément indisponibles."}, status=503)
     if not metadata:
         return JsonResponse(
             {
                 "source": "none",
                 "title": "",
                 "authors": "",
-                "message": "This ISBN is valid, but no free catalog metadata was found. It will be saved; enter the title and author manually.",
-                "search_url": f"https://www.google.com/search?q={quote_plus(chr(34) + isbn + chr(34) + ' book')}",
+                "message": "Cet ISBN est valide, mais aucune information n'a été trouvée. Il sera enregistré ; saisissez le titre et l'auteur à la main.",
+                "search_url": f"https://www.google.com/search?q={quote_plus(chr(34) + isbn + chr(34) + ' livre')}",
             }
         )
     return JsonResponse(
@@ -577,7 +577,7 @@ def isbn_metadata(request):
             "language": metadata.get("language", ""),
             "description": metadata.get("description", ""),
             "cover_url": metadata.get("cover_url", ""),
-            "message": "Book details filled from the free Open Library catalog.",
+            "message": "Informations du livre remplies depuis le catalogue gratuit Open Library.",
         }
     )
 
@@ -599,11 +599,11 @@ def book_create(request):
                 shelf_location=form.cleaned_data.get("first_copy_shelf", ""),
                 condition=form.cleaned_data.get("first_copy_condition") or Copy.Condition.GOOD,
             )
-            messages.success(request, "Book and first copy added.")
+            messages.success(request, "Livre et premier exemplaire ajoutés.")
             return redirect(book)
     else:
         form = BookForm(initial={"first_copy_condition": Copy.Condition.GOOD})
-    return render(request, "library/book_form.html", {"form": form, "title": "Add book", "is_edit": False})
+    return render(request, "library/book_form.html", {"form": form, "title": "Ajouter un livre", "is_edit": False})
 
 
 @staff_member_required(login_url="staff_login")
@@ -613,11 +613,11 @@ def book_edit(request, pk):
         form = BookEditForm(request.POST, request.FILES, instance=book)
         if form.is_valid():
             book = form.save()
-            messages.success(request, "Book details updated.")
+            messages.success(request, "Informations du livre mises à jour.")
             return redirect(book)
     else:
         form = BookEditForm(instance=book)
-    return render(request, "library/book_form.html", {"form": form, "title": "Edit book", "is_edit": True})
+    return render(request, "library/book_form.html", {"form": form, "title": "Modifier le livre", "is_edit": True})
 
 
 @staff_member_required(login_url="staff_login")
@@ -641,7 +641,7 @@ def photo_intake(request):
                     shelf_location=form.cleaned_data.get("shelf_location", ""),
                     condition=form.cleaned_data.get("condition") or Copy.Condition.GOOD,
                 )
-                messages.success(request, f"Added copy #{copy.copy_number} to the existing title. Print its QR label before shelving.")
+                messages.success(request, f"Exemplaire n°{copy.copy_number} ajouté au livre existant. Imprimez son étiquette QR avant de le ranger.")
                 return redirect(copy)
 
             metadata = {}
@@ -649,10 +649,10 @@ def photo_intake(request):
                 try:
                     metadata = lookup_book_by_isbn(isbn)
                 except MetadataLookupError:
-                    messages.warning(request, "The book was tracked, but free ISBN metadata lookup was unavailable.")
+                    messages.warning(request, "Le livre a été enregistré, mais la recherche gratuite d'informations par ISBN est indisponible.")
 
             if not isbn and not form.cleaned_data.get("title"):
-                form.add_error(None, "No ISBN barcode was detected. Enter the ISBN or title, or retake a close-up photo of the ISBN barcode.")
+                form.add_error(None, "Aucun code-barres ISBN n'a été détecté. Saisissez l'ISBN ou le titre, ou reprenez une photo du code-barres de plus près.")
                 return render(request, "library/photo_intake.html", {"form": form})
 
             title = form.cleaned_data.get("title") or metadata.get("title") or f"ISBN {isbn}"
@@ -677,7 +677,7 @@ def photo_intake(request):
                 shelf_location=form.cleaned_data.get("shelf_location", ""),
                 condition=form.cleaned_data.get("condition") or Copy.Condition.GOOD,
             )
-            messages.success(request, "Photo intake created a tracked copy. Print its QR label before shelving.")
+            messages.success(request, "Un exemplaire a été créé à partir de la photo. Imprimez son étiquette QR avant de le ranger.")
             return redirect(copy)
     else:
         form = PhotoIntakeForm()
@@ -694,7 +694,7 @@ def add_copy(request, book_pk):
             copy.book = book
             copy.copy_number = _next_copy_number(book)
             copy.save()
-            messages.success(request, "Copy added.")
+            messages.success(request, "Exemplaire ajouté.")
             return redirect(copy)
     else:
         form = CopyForm(initial={"condition": Copy.Condition.GOOD, "status": Copy.Status.AVAILABLE})
@@ -708,7 +708,7 @@ def copy_edit(request, pk):
         form = CopyEditForm(request.POST, instance=copy)
         if form.is_valid():
             copy = form.save()
-            messages.success(request, "Copy details updated.")
+            messages.success(request, "Informations de l'exemplaire mises à jour.")
             return redirect(copy)
     else:
         form = CopyEditForm(instance=copy)
@@ -750,7 +750,7 @@ def correct_loan_borrower(request, pk):
                 )
                 new_borrower = form.cleaned_data["borrower"]
                 if locked_loan.borrower_id == new_borrower.id:
-                    form.add_error("borrower", "Choose a different borrower.")
+                    form.add_error("borrower", "Choisissez un autre emprunteur.")
                 else:
                     previous_name = locked_loan.borrower.full_name
                     locked_loan.borrower = new_borrower
@@ -758,7 +758,7 @@ def correct_loan_borrower(request, pk):
                     locked_loan.save(update_fields=["borrower", "school_class"])
                     messages.success(
                         request,
-                        f"Changed the borrower for {locked_loan.copy.book.title} from {previous_name} to {new_borrower.full_name}.",
+                        f"Emprunteur de « {locked_loan.copy.book.title} » modifié : {previous_name} remplacé par {new_borrower.full_name}.",
                     )
                     return redirect(locked_loan.copy)
     else:
@@ -832,10 +832,10 @@ def borrower_list(request):
             "next_direction": "desc" if sort == key and direction == "asc" else "asc",
         }
         for key, label in (
-            ("borrower", "Borrower"),
-            ("class", "Class / Position"),
-            ("loans", "Current loans"),
-            ("status", "Status"),
+            ("borrower", "Emprunteur"),
+            ("class", "Classe / Fonction"),
+            ("loans", "Emprunts en cours"),
+            ("status", "Statut"),
         )
     ]
     return render(
@@ -878,11 +878,11 @@ def borrower_create(request):
         form = BorrowerForm(request.POST)
         if form.is_valid():
             borrower = form.save()
-            messages.success(request, "Borrower added.")
+            messages.success(request, "Emprunteur ajouté.")
             return redirect(borrower)
     else:
         form = BorrowerForm(initial={"active": True, "school_role": Borrower.SchoolRole.STUDENT})
-    return render(request, "library/borrower_form.html", {"form": form, "title": "Add borrower"})
+    return render(request, "library/borrower_form.html", {"form": form, "title": "Ajouter un emprunteur"})
 
 
 @staff_member_required(login_url="staff_login")
@@ -892,11 +892,11 @@ def borrower_edit(request, pk):
         form = BorrowerForm(request.POST, instance=borrower)
         if form.is_valid():
             borrower = form.save()
-            messages.success(request, "Borrower details updated.")
+            messages.success(request, "Informations de l'emprunteur mises à jour.")
             return redirect(borrower)
     else:
         form = BorrowerForm(instance=borrower)
-    return render(request, "library/borrower_form.html", {"form": form, "title": "Edit borrower"})
+    return render(request, "library/borrower_form.html", {"form": form, "title": "Modifier l'emprunteur"})
 
 
 @require_GET
@@ -967,10 +967,10 @@ def photo_circulation(request):
             try:
                 payload = _circulation_payload(confirmation_token)
                 if payload["action"] != PhotoCirculationForm.Action.CHECKOUT:
-                    raise ValueError("Only checkout supports adding another book.")
+                    raise ValueError("Seul un prêt permet d'ajouter un autre livre.")
                 borrower = Borrower.objects.get(pk=payload["borrower_id"], active=True)
                 if len(payload["copy_ids"]) >= MAX_CHECKOUT_BOOKS:
-                    raise ValueError(f"A checkout can contain at most {MAX_CHECKOUT_BOOKS} books.")
+                    raise ValueError(f"Un prêt peut contenir au maximum {MAX_CHECKOUT_BOOKS} livres.")
                 form = PhotoCirculationForm(
                     initial={
                         "action": payload["action"],
@@ -980,9 +980,9 @@ def photo_circulation(request):
                 )
                 return _checkout_scan(request, form, payload)
             except signing.BadSignature:
-                messages.error(request, "That checkout basket expired. Start the checkout again.")
+                messages.error(request, "Ce panier a expiré. Recommencez le prêt.")
             except (Borrower.DoesNotExist, KeyError, ValueError) as exc:
-                messages.error(request, str(exc) or "That checkout basket is no longer valid.")
+                messages.error(request, str(exc) or "Ce panier n'est plus valide.")
             return redirect("photo_circulation")
 
         remove_copy_id = request.POST.get("remove_copy_id")
@@ -990,13 +990,13 @@ def photo_circulation(request):
             try:
                 payload = _circulation_payload(confirmation_token)
                 if payload["action"] != PhotoCirculationForm.Action.CHECKOUT:
-                    raise ValueError("Books can only be removed from a checkout basket.")
+                    raise ValueError("On ne peut retirer des livres que d'un panier de prêt.")
                 borrower = Borrower.objects.get(pk=payload["borrower_id"], active=True)
                 if remove_copy_id not in payload["copy_ids"]:
-                    raise ValueError("That book is not in this checkout basket.")
+                    raise ValueError("Ce livre n'est pas dans ce panier.")
                 payload["copy_ids"] = [copy_id for copy_id in payload["copy_ids"] if copy_id != remove_copy_id]
                 if not payload["copy_ids"]:
-                    messages.info(request, "The checkout basket is empty.")
+                    messages.info(request, "Le panier est vide.")
                     next_url = reverse("photo_circulation")
                     return redirect(f"{next_url}?borrower={borrower.id}&action={payload['action']}")
                 form = PhotoCirculationForm(
@@ -1008,9 +1008,9 @@ def photo_circulation(request):
                 )
                 return _checkout_confirmation(request, form, payload)
             except signing.BadSignature:
-                messages.error(request, "That checkout basket expired. Start the checkout again.")
+                messages.error(request, "Ce panier a expiré. Recommencez le prêt.")
             except (Borrower.DoesNotExist, KeyError, ValueError) as exc:
-                messages.error(request, str(exc) or "That checkout basket is no longer valid.")
+                messages.error(request, str(exc) or "Ce panier n'est plus valide.")
             return redirect("photo_circulation")
 
         if confirmation_token:
@@ -1019,7 +1019,7 @@ def photo_circulation(request):
                 action = payload["action"]
                 borrower = Borrower.objects.get(pk=payload["borrower_id"])
                 if action == PhotoCirculationForm.Action.CHECKOUT and not borrower.active:
-                    raise ValueError("This borrower is no longer active.")
+                    raise ValueError("Cet emprunteur n'est plus actif.")
                 due_date = payload.get("due_date") or None
                 with transaction.atomic():
                     copies = _ordered_copies(payload["copy_ids"], lock=True)
@@ -1027,16 +1027,16 @@ def photo_circulation(request):
                         _perform_circulation(selected_copy, borrower, action, due_date)
                     if action == PhotoCirculationForm.Action.CHECKOUT:
                         if len(copies) == 1:
-                            success_message = f"Checked out {copies[0].book.title} to {borrower.full_name}."
+                            success_message = f"{copies[0].book.title} prêté à {borrower.full_name}."
                         else:
-                            success_message = f"Checked out {len(copies)} books to {borrower.full_name}."
+                            success_message = f"{len(copies)} livres prêtés à {borrower.full_name}."
                     else:
-                        success_message = f"Returned {len(copies)} book{'s' if len(copies) != 1 else ''} for {borrower.full_name}."
+                        success_message = f"{len(copies)} livre{'s' if len(copies) > 1 else ''} rendu{'s' if len(copies) > 1 else ''} par {borrower.full_name}."
             except signing.BadSignature:
-                messages.error(request, "That circulation confirmation expired. Please scan the book again.")
+                messages.error(request, "Cette confirmation a expiré. Scannez à nouveau le livre.")
                 return redirect("photo_circulation")
             except (Borrower.DoesNotExist, Copy.DoesNotExist, KeyError, ValueError) as exc:
-                messages.error(request, str(exc) or "The circulation record changed. Please scan the book again.")
+                messages.error(request, str(exc) or "L'emprunt a changé. Scannez à nouveau le livre.")
                 return redirect("photo_circulation")
             messages.success(request, success_message)
             request.session["circulation_receipt"] = {
@@ -1062,7 +1062,7 @@ def photo_circulation(request):
                 for selected_copy in return_copies:
                     loan = selected_copy.active_loan
                     if loan is None or loan.borrower_id != borrower.id:
-                        form.add_error("return_copies", "One of these books is not checked out to the selected borrower.")
+                        form.add_error("return_copies", "L'un de ces livres n'est pas emprunté par l'emprunteur sélectionné.")
                         return render(request, "library/photo_circulation.html", _circulation_context(form))
                 token = signing.dumps(
                     {
@@ -1091,11 +1091,11 @@ def photo_circulation(request):
                 try:
                     basket_payload = _circulation_payload(basket_token)
                     if basket_payload["action"] != action or basket_payload["borrower_id"] != str(borrower.id):
-                        raise ValueError("The checkout basket belongs to a different transaction.")
+                        raise ValueError("Ce panier appartient à une autre opération.")
                     if len(basket_payload["copy_ids"]) >= MAX_CHECKOUT_BOOKS:
-                        raise ValueError(f"A checkout can contain at most {MAX_CHECKOUT_BOOKS} books.")
+                        raise ValueError(f"Un prêt peut contenir au maximum {MAX_CHECKOUT_BOOKS} livres.")
                 except signing.BadSignature:
-                    form.add_error(None, "That checkout basket expired. Start the checkout again.")
+                    form.add_error(None, "Ce panier a expiré. Recommencez le prêt.")
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
                 except (KeyError, ValueError) as exc:
                     form.add_error(None, str(exc))
@@ -1112,24 +1112,24 @@ def photo_circulation(request):
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
 
             if action == PhotoCirculationForm.Action.CHECKOUT and copy.status != Copy.Status.AVAILABLE:
-                form.add_error("book_photo", "This copy is not available for check out.")
+                form.add_error("book_photo", "Cet exemplaire n'est pas disponible pour un prêt.")
                 if basket_payload:
                     return _checkout_scan(request, form, basket_payload)
                 return render(request, "library/photo_circulation.html", _circulation_context(form))
             loan = copy.active_loan
             if action == PhotoCirculationForm.Action.CHECKIN:
                 if loan is None:
-                    form.add_error("book_photo", "This copy has no active loan to check in.")
+                    form.add_error("book_photo", "Cet exemplaire n'a pas d'emprunt en cours à rendre.")
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
                 if loan.borrower_id != borrower.id:
-                    form.add_error("borrower", "This copy is checked out to a different borrower.")
+                    form.add_error("borrower", "Cet exemplaire est emprunté par un autre emprunteur.")
                     return render(request, "library/photo_circulation.html", _circulation_context(form))
 
             due_date = form.cleaned_data.get("due_date") or default_form_due_date()
             if action == PhotoCirculationForm.Action.CHECKOUT:
                 copy_ids = list(basket_payload["copy_ids"]) if basket_payload else []
                 if str(copy.id) in copy_ids:
-                    form.add_error("manual_copy" if form.cleaned_data.get("manual_copy") else "book_photo", "This book is already in the checkout basket.")
+                    form.add_error("manual_copy" if form.cleaned_data.get("manual_copy") else "book_photo", "Ce livre est déjà dans le panier.")
                     return _checkout_scan(request, form, basket_payload)
                 copy_ids.append(str(copy.id))
                 payload = {
@@ -1206,12 +1206,12 @@ def return_copy(request):
                 copy = get_object_or_404(Copy.objects.select_for_update().select_related("book"), pk=copy_id)
                 loan = copy.active_loan
                 if loan is None:
-                    raise ValueError("This copy has no active loan.")
+                    raise ValueError("Cet exemplaire n'a pas d'emprunt en cours.")
                 _perform_circulation(copy, loan.borrower, PhotoCirculationForm.Action.CHECKIN)
         except ValueError as exc:
             form.add_error(None, str(exc))
         else:
-            messages.success(request, f"Returned {copy.book.title}.")
+            messages.success(request, f"{copy.book.title} rendu.")
             return redirect(copy)
     return render(request, "library/return.html", {"form": form})
 
@@ -1220,14 +1220,14 @@ def return_copy(request):
 def label(request, kind, pk):
     if kind == "copy":
         obj = get_object_or_404(Copy.objects.select_related("book"), pk=pk)
-        title = f"{obj.book.title} #{obj.copy_number}"
+        title = f"{obj.book.title} n°{obj.copy_number}"
         payload = obj.qr_code
     elif kind == "borrower":
         obj = get_object_or_404(Borrower, pk=pk)
         title = obj.full_name
         payload = obj.qr_code
     else:
-        raise Http404("Unknown label type")
+        raise Http404("Type d'étiquette inconnu")
     return render(request, "library/label.html", {"title": title, "payload": payload, "qr_svg": mark_safe(svg_qr(payload))})
 
 
@@ -1240,18 +1240,18 @@ def import_books(request):
                 wrapper = TextIOWrapper(form.cleaned_data["csv_file"].file, encoding="utf-8-sig")
                 reader = csv.DictReader(wrapper)
                 if not reader.fieldnames or "Title" not in reader.fieldnames:
-                    raise ValueError("CSV must include a Title column.")
+                    raise ValueError("Le CSV doit contenir une colonne Title.")
                 result = import_catalog_rows(reader)
             except (UnicodeDecodeError, csv.Error, ValueError) as exc:
                 form.add_error("csv_file", str(exc))
             else:
-                physical_label = "physical book" if result.copies_created == 1 else "physical books"
-                title_label = "title" if result.titles_created == 1 else "titles"
+                physical_label = "livre physique" if result.copies_created == 1 else "livres physiques"
+                title_label = "titre" if result.titles_created == 1 else "titres"
                 messages.success(
                     request,
-                    f"Catalog import complete: {result.copies_created} {physical_label}, "
-                    f"{result.titles_created} {title_label} created, {result.titles_matched} duplicate copies matched, "
-                    f"{result.placeholder_titles} unidentified title, {result.existing_rows_skipped} existing rows skipped.",
+                    f"Import du catalogue terminé : {result.copies_created} {physical_label}, "
+                    f"{result.titles_created} {title_label} créé(s), {result.titles_matched} exemplaire(s) ajouté(s) à un titre existant, "
+                    f"{result.placeholder_titles} titre(s) non identifié(s), {result.existing_rows_skipped} ligne(s) déjà présente(s) ignorée(s).",
                 )
                 return redirect("book_list")
     else:
@@ -1263,7 +1263,7 @@ def import_books(request):
 @require_GET
 def download_csv_template(request, kind):
     if kind not in {"books", "borrowers"}:
-        raise Http404("Unknown import template.")
+        raise Http404("Modèle d'import inconnu.")
     output = StringIO()
     csv.writer(output).writerow(csv_columns(kind)["headers"])
     response = HttpResponse("\ufeff" + output.getvalue(), content_type="text/csv; charset=utf-8")
@@ -1303,7 +1303,7 @@ def export_books_csv(request):
 def backup_sqlite(request):
     database = settings.DATABASES["default"]
     if database["ENGINE"] != "django.db.backends.sqlite3":
-        raise Http404("SQLite backup is only available when using SQLite.")
+        raise Http404("La sauvegarde SQLite n'est disponible qu'avec SQLite.")
     snapshot = tempfile.TemporaryFile()
     try:
         with tempfile.TemporaryDirectory() as directory:
@@ -1326,14 +1326,14 @@ def employee_positions(request, pk=None):
         try:
             position.delete()
         except ProtectedError:
-            messages.error(request, "This position is assigned to employees. Deactivate it instead.")
+            messages.error(request, "Cette fonction est attribuée à du personnel. Désactivez-la plutôt.")
         else:
-            messages.success(request, "Position deleted.")
+            messages.success(request, "Fonction supprimée.")
         return redirect("employee_positions")
     form = EmployeePositionForm(request.POST if request.method == "POST" else None, instance=position)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, "Employee position saved.")
+        messages.success(request, "Fonction enregistrée.")
         return redirect("employee_positions")
     sort = request.GET.get("sort", "name")
     if sort not in {"name", "active", "assigned"}:
@@ -1351,14 +1351,14 @@ def school_classes(request, pk=None):
         try:
             school_class.delete()
         except ProtectedError:
-            messages.error(request, "This class is assigned to students. Deactivate it instead.")
+            messages.error(request, "Cette classe est attribuée à des élèves. Désactivez-la plutôt.")
         else:
-            messages.success(request, "Class deleted.")
+            messages.success(request, "Classe supprimée.")
         return redirect("school_classes")
     form = SchoolClassForm(request.POST if request.method == "POST" else None, instance=school_class)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, "Class saved.")
+        messages.success(request, "Classe enregistrée.")
         return redirect("school_classes")
     sort = request.GET.get("sort", "name")
     if sort not in {"name", "active", "assigned"}:
@@ -1381,23 +1381,23 @@ def my_account(request):
             appearance = UserPreferenceForm(request.POST, instance=preference)
             if appearance.is_valid():
                 appearance.save()
-                messages.success(request, "Appearance saved.")
+                messages.success(request, "Apparence enregistrée.")
                 return redirect("my_account")
         elif action == "workflow":
             workflow = UserWorkflowForm(request.POST, instance=preference)
             if workflow.is_valid():
                 workflow.save()
-                messages.success(request, "Preferences saved.")
+                messages.success(request, "Préférences enregistrées.")
                 return redirect("my_account")
         elif action == "password":
             password = PasswordChangeForm(request.user, request.POST)
             if password.is_valid():
                 user = password.save()
                 update_session_auth_hash(request, user)
-                messages.success(request, "Password changed.")
+                messages.success(request, "Mot de passe modifié.")
                 return redirect("my_account")
         else:
-            return HttpResponse("Unknown account action.", status=400)
+            return HttpResponse("Action de compte inconnue.", status=400)
     password.fields["old_password"].widget.attrs.pop("autofocus", None)
     return render(request, "library/my_account.html", {"appearance_form": appearance, "workflow_form": workflow, "password_form": password})
 
@@ -1411,7 +1411,7 @@ def school_settings(request):
             profile = form.save(commit=False)
             profile.setup_completed = True
             profile.save()
-            messages.success(request, "School settings saved.")
+            messages.success(request, "Paramètres de l'école enregistrés.")
             return redirect("school_settings")
     else:
         form = SchoolProfileForm(instance=profile)
@@ -1437,11 +1437,11 @@ def staff_account_create(request):
             generated_profile.delete()
             existing_borrower.staff_account = account
             existing_borrower.save()
-            messages.success(request, f"Staff account {account.username} created and linked to the existing borrower.")
+            messages.success(request, f"Compte du personnel {account.username} créé et associé à la fiche existante.")
         else:
-            messages.success(request, f"Staff account {account.username} and borrower profile created.")
+            messages.success(request, f"Compte du personnel {account.username} et fiche d'emprunteur créés.")
         return redirect("staff_account_list")
-    return render(request, "library/staff_account_form.html", {"form": form, "title": "Add staff account"})
+    return render(request, "library/staff_account_form.html", {"form": form, "title": "Ajouter un compte du personnel"})
 
 
 @staff_member_required(login_url="staff_login")
@@ -1451,12 +1451,12 @@ def staff_account_edit(request, pk):
     form = StaffAccountEditForm(request.POST or None, instance=account, operator=request.user)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, f"Staff account {account.username} updated.")
+        messages.success(request, f"Compte du personnel {account.username} mis à jour.")
         return redirect("staff_account_list")
     return render(
         request,
         "library/staff_account_form.html",
-        {"form": form, "title": "Edit staff account", "account": account},
+        {"form": form, "title": "Modifier le compte du personnel", "account": account},
     )
 
 
@@ -1469,12 +1469,12 @@ def staff_account_password(request, pk):
         form.save()
         if account == request.user:
             update_session_auth_hash(request, account)
-        messages.success(request, f"Password updated for {account.username}.")
+        messages.success(request, f"Mot de passe de {account.username} mis à jour.")
         return redirect("staff_account_list")
     return render(
         request,
         "library/staff_account_form.html",
-        {"form": form, "title": "Reset staff password", "account": account, "is_password_form": True},
+        {"form": form, "title": "Réinitialiser le mot de passe", "account": account, "is_password_form": True},
     )
 
 
@@ -1488,13 +1488,13 @@ def import_borrowers(request):
             if action == "confirm":
                 stored = request.session.get("borrower_import_preview") or {}
                 if stored.get("user_id") != request.user.pk or not stored.get("rows"):
-                    raise ValueError("The import preview expired. Upload the CSV again.")
+                    raise ValueError("L'aperçu de l'import a expiré. Envoyez à nouveau le CSV.")
                 result = import_borrower_rows(stored["rows"])
                 request.session.pop("borrower_import_preview", None)
                 messages.success(
                     request,
-                    f"Borrowers imported: {result.created} created, "
-                    f"{len(result.duplicates)} possible duplicates not imported, {result.skipped} blank rows skipped.",
+                    f"Élèves importés : {result.created} créé(s), "
+                    f"{len(result.duplicates)} doublon(s) possible(s) non importé(s), {result.skipped} ligne(s) vide(s) ignorée(s).",
                 )
                 return redirect("borrower_list")
             if not form.is_valid():
@@ -1503,7 +1503,7 @@ def import_borrowers(request):
             reader = csv.DictReader(wrapper)
             required = {"First name", "Last name"}
             if not required.issubset(set(reader.fieldnames or [])):
-                raise ValueError("CSV must include First name and Last name columns.")
+                raise ValueError("Le CSV doit contenir les colonnes First name et Last name.")
             rows = list(reader)
             preview = preview_borrower_rows(rows)
             request.session["borrower_import_preview"] = {"user_id": request.user.pk, "rows": rows}
@@ -1544,12 +1544,12 @@ def overdue_loans(request):
             "next_direction": "desc" if sort == key and direction == "asc" else "asc",
         }
         for key, label in (
-            ("due", "Due"),
-            ("book", "Book"),
-            ("copy", "Copy"),
-            ("borrower", "Borrower"),
-            ("borrower_id", "Borrower ID"),
-            ("class", "Class"),
+            ("due", "À rendre le"),
+            ("book", "Livre"),
+            ("copy", "Exemplaire"),
+            ("borrower", "Emprunteur"),
+            ("borrower_id", "N° d'emprunteur"),
+            ("class", "Classe"),
         )
     ]
     return render(request, "library/overdue_loans.html", {"loans": loans, "sort_headers": sort_headers})
@@ -1559,7 +1559,7 @@ def overdue_loans(request):
 def overdue_loans_csv(request):
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Book", "Copy", "Borrower ID", "Borrower", "Class", "Checked out", "Due date"])
+    writer.writerow(["Livre", "Exemplaire", "N° d'emprunteur", "Emprunteur", "Classe", "Date d'emprunt", "Date de retour prévue"])
     loans = Loan.objects.filter(
         return_date__isnull=True,
         due_date__lt=timezone.localdate(),

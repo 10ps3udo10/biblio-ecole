@@ -10,8 +10,8 @@ def test_missing_shelf_has_clear_label(client):
     Copy.objects.create(book=book, copy_number=1, shelf_location="")
     for url in [reverse("public_catalog"), reverse("public_book", args=[book.pk])]:
         response = client.get(url)
-        assert b"No shelf assigned" in response.content
-        assert b"Location not set" not in response.content
+        assert "Aucune étagère attribuée".encode() in response.content
+        assert "Emplacement non défini".encode() not in response.content
 
 
 def test_public_catalog_shows_status_and_location_without_borrower_data(client):
@@ -28,10 +28,10 @@ def test_public_catalog_shows_status_and_location_without_borrower_data(client):
         assert b"private@example.org" not in response.content
         assert b"PRIVATE NOTES" not in response.content
         assert borrower.qr_payload.encode() not in response.content
-        assert b"Loan history" not in response.content
+        assert "Historique des emprunts".encode() not in response.content
     detail = client.get(reverse("public_book", args=[book.pk]))
     assert b"Green section" in detail.content
-    assert b"Checked out" in detail.content
+    assert "Emprunté".encode() in detail.content
     assert available.qr_payload.encode() not in detail.content
     assert client.get(reverse("copy_detail", args=[available.pk])).status_code == 302
 

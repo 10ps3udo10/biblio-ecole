@@ -20,8 +20,8 @@ def test_preview_holds_back_existing_and_in_file_duplicates():
     assert len(preview.rows) == 1
     assert len(preview.duplicates) == 3
     assert existing.borrower_id in preview.duplicates[0]["reason"]
-    assert "already assigned" in preview.duplicates[1]["reason"]
-    assert "more than once" in preview.duplicates[2]["reason"]
+    assert "déjà attribué" in preview.duplicates[1]["reason"]
+    assert "plusieurs fois" in preview.duplicates[2]["reason"]
 
 
 def test_create_only_import_never_changes_existing_borrower():
@@ -45,7 +45,7 @@ def test_import_confirmation_requires_a_preview_for_the_same_staff_user(client, 
     client.force_login(first)
     response = client.post(reverse("import_borrowers"), {"action": "confirm"})
     assert response.status_code == 200
-    assert b"preview expired" in response.content
+    assert "a expiré".encode() in response.content
 
     session = client.session
     session["borrower_import_preview"] = {
@@ -55,5 +55,5 @@ def test_import_confirmation_requires_a_preview_for_the_same_staff_user(client, 
     session.save()
     client.force_login(second)
     response = client.post(reverse("import_borrowers"), {"action": "confirm"})
-    assert b"preview expired" in response.content
+    assert "a expiré".encode() in response.content
     assert not Borrower.objects.filter(first_name="New", last_name="Reader").exists()
