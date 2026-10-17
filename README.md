@@ -1,3 +1,6 @@
+> **biblio-ecole** — fork de Shelf-School adapté à une école primaire française.
+> Voir [NOTICE.md](NOTICE.md) pour le projet d'origine et la licence (MIT).
+
 <div align="center">
   <a href="https://github.com/mrueda/shelf-school">
     <img src="docs-site/static/img/shelf-school-logo.svg" width="180" alt="Shelf-School logo">
