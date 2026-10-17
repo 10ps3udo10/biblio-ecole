@@ -720,7 +720,8 @@ def correct_loan_borrower(request, pk):
                 else:
                     previous_name = locked_loan.borrower.full_name
                     locked_loan.borrower = new_borrower
-                    locked_loan.save(update_fields=["borrower"])
+                    locked_loan.school_class_id = new_borrower.school_class_id
+                    locked_loan.save(update_fields=["borrower", "school_class"])
                     messages.success(
                         request,
                         f"Changed the borrower for {locked_loan.copy.book.title} from {previous_name} to {new_borrower.full_name}.",

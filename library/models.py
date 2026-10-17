@@ -279,6 +279,15 @@ class Loan(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     copy = models.ForeignKey(Copy, related_name="loans", on_delete=models.PROTECT)
     borrower = models.ForeignKey(Borrower, related_name="loans", on_delete=models.PROTECT)
+    # Class of the borrower when the loan was made; kept even if the borrower changes class later.
+    school_class = models.ForeignKey(
+        SchoolClass,
+        verbose_name="Class at checkout",
+        related_name="loans",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
     checkout_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(default=default_due_date)
     return_date = models.DateField(null=True, blank=True)
@@ -295,6 +304,11 @@ class Loan(models.Model):
 
     def __str__(self):
         return f"{self.copy} to {self.borrower}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.school_class_id is None:
+            self.school_class_id = self.borrower.school_class_id
+        super().save(*args, **kwargs)
 
     @property
     def is_active(self):

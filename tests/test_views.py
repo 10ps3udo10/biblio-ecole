@@ -1113,6 +1113,7 @@ def test_staff_can_correct_borrower_on_active_loan(logged_in_client):
     assert b"Changed the borrower" in response.content
     loan.refresh_from_db()
     assert loan.borrower == correct
+    assert loan.school_class == correct.school_class
 
 
 @pytest.mark.django_db
