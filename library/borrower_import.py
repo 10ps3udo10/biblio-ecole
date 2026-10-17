@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Borrower, EmployeePosition, SchoolClass
+from .models import Borrower, EmployeePosition, SchoolClass, SchoolYear
 
 
 @dataclass
@@ -53,7 +53,7 @@ def preview_borrower_rows(rows):
         if role == Borrower.SchoolRole.STUDENT:
             if position_name:
                 raise ValueError(f"Row {line}: Only employees can have a position.")
-            school_class = SchoolClass.objects.filter(name__iexact=class_name).first() if class_name else None
+            school_class = SchoolClass.objects.filter(school_year=SchoolYear.current(), name__iexact=class_name).first() if class_name else None
             if class_name and school_class is None:
                 raise ValueError(f"Row {line}: Unknown class '{class_name}'. Add it in Settings first.")
             if school_class and not school_class.active:
@@ -119,7 +119,7 @@ def import_borrower_rows(rows):
             last_name=row["last_name"],
             school_role=row["school_role"],
             position=EmployeePosition.objects.filter(name__iexact=row.get("position", "")).first(),
-            school_class=SchoolClass.objects.filter(name__iexact=row.get("school_class", "")).first(),
+            school_class=SchoolClass.objects.filter(school_year=SchoolYear.current(), name__iexact=row.get("school_class", "")).first(),
             email=row.get("email", ""),
             active=row.get("active", True),
         )

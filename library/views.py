@@ -54,7 +54,7 @@ from .forms import (
     default_form_due_date,
 )
 from .catalog_import import import_catalog_rows
-from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass, UserPreference
+from .models import Book, Borrower, Copy, Loan, SchoolProfile, EmployeePosition, SchoolClass, SchoolYear, UserPreference
 from .csv_templates import csv_columns
 from .borrower_import import import_borrower_rows, preview_borrower_rows
 from .photo_intake import MetadataLookupError, clean_isbn, decode_barcodes_from_image, decode_isbn_from_image, download_cover_by_isbn, is_valid_isbn, lookup_book_by_isbn
@@ -1336,7 +1336,7 @@ def school_classes(request, pk=None):
         sort = "name"
     return render(request, "library/school_classes.html", {
         "form": form, "school_class": school_class,
-        "classes": SchoolClass.objects.annotate(assigned=Count("borrowers")).order_by(sort, "pk"),
+        "classes": SchoolClass.objects.filter(school_year=SchoolYear.current()).annotate(assigned=Count("borrowers")).order_by(sort, "pk"),
     })
 
 

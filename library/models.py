@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import models, transaction
@@ -189,16 +189,59 @@ class EmployeePosition(models.Model):
         return self.name
 
 
+def school_year_bounds(day):
+    """Return (name, start, end) of the school year containing day; years start on September 1."""
+    first_year = day.year if day.month >= 9 else day.year - 1
+    return f"{first_year}-{first_year + 1}", date(first_year, 9, 1), date(first_year + 1, 8, 31)
+
+
+class SchoolYear(models.Model):
+    name = models.CharField(max_length=20, unique=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_current = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-start_date"]
+        constraints = [
+            models.UniqueConstraint(fields=["is_current"], condition=Q(is_current=True), name="single_current_school_year"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def current(cls):
+        year = cls.objects.filter(is_current=True).first()
+        if year:
+            return year
+        name, start, end = school_year_bounds(timezone.localdate())
+        with transaction.atomic():
+            year, _ = cls.objects.get_or_create(name=name, defaults={"start_date": start, "end_date": end})
+            year.is_current = True
+            year.save(update_fields=["is_current"])
+        return year
+
+
 class SchoolClass(models.Model):
-    name = models.CharField(max_length=120, unique=True)
+    name = models.CharField(max_length=120)
+    school_year = models.ForeignKey(SchoolYear, related_name="classes", null=True, blank=True, on_delete=models.PROTECT)
     active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name"]
         verbose_name_plural = "school classes"
+        constraints = [
+            models.UniqueConstraint(fields=["school_year", "name"], name="unique_class_name_per_school_year"),
+        ]
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self.school_year_id is None:
+            self.school_year = SchoolYear.current()
+        super().save(*args, **kwargs)
 
 
 class BorrowerIdSequence(models.Model):
@@ -230,6 +273,8 @@ class Borrower(models.Model):
     email = models.EmailField(blank=True)
     qr_code = models.CharField(max_length=128, blank=True)
     active = models.BooleanField(default=True)
+    # Set when a student leaves the school; the record and its loan history are kept.
+    archived_on = models.DateField(null=True, blank=True)
     staff_account = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -288,6 +333,7 @@ class Loan(models.Model):
         blank=True,
         on_delete=models.PROTECT,
     )
+    school_year = models.ForeignKey(SchoolYear, related_name="loans", null=True, blank=True, on_delete=models.PROTECT)
     checkout_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(default=default_due_date)
     return_date = models.DateField(null=True, blank=True)
@@ -308,6 +354,8 @@ class Loan(models.Model):
     def save(self, *args, **kwargs):
         if self._state.adding and self.school_class_id is None:
             self.school_class_id = self.borrower.school_class_id
+        if self._state.adding and self.school_year_id is None:
+            self.school_year = SchoolYear.current()
         super().save(*args, **kwargs)
 
     @property

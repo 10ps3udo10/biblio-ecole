@@ -9,7 +9,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Book, Borrower, Copy, SchoolProfile, EmployeePosition, SchoolClass, UserPreference
+from .models import Book, Borrower, Copy, SchoolProfile, EmployeePosition, SchoolClass, SchoolYear, UserPreference
 from .photo_intake import clean_isbn, is_valid_isbn
 
 
@@ -229,7 +229,8 @@ class SchoolClassForm(forms.ModelForm):
 
     def clean_name(self):
         name = self.cleaned_data["name"].strip()
-        if SchoolClass.objects.filter(name__iexact=name).exclude(pk=self.instance.pk).exists():
+        school_year = self.instance.school_year if self.instance.school_year_id else SchoolYear.current()
+        if SchoolClass.objects.filter(school_year=school_year, name__iexact=name).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError("A class with this name already exists.")
         return name
 
