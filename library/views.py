@@ -147,7 +147,7 @@ def _perform_circulation(copy, borrower, action, due_date=None):
         raise ValueError("This copy is checked out to a different borrower.")
     loan.return_date = timezone.localdate()
     loan.save(update_fields=["return_date"])
-    copy.status = Copy.Status.AVAILABLE
+    copy.status = Copy.Status.ARCHIVED if copy.archived_on else Copy.Status.AVAILABLE
     copy.save(update_fields=["status"])
     return f"Checked in {copy.book.title} from {borrower.full_name}."
 
@@ -231,9 +231,9 @@ def _circulation_context(form, **extra):
 @staff_member_required(login_url="staff_login")
 def dashboard(request):
     active_loans = Loan.objects.filter(return_date__isnull=True)
-    total_copies = Copy.objects.count()
+    total_copies = Copy.objects.exclude(status=Copy.Status.ARCHIVED).count()
     available_copies = Copy.objects.filter(status=Copy.Status.AVAILABLE).count()
-    unavailable_copies = Copy.objects.filter(status__in=[Copy.Status.DAMAGED, Copy.Status.ARCHIVED]).count()
+    unavailable_copies = Copy.objects.filter(status=Copy.Status.DAMAGED).count()
     today = timezone.localdate()
     circulation_days = []
     for days_ago in range(6, -1, -1):
@@ -249,7 +249,7 @@ def dashboard(request):
         [item["checkouts"] for item in circulation_days] + [item["returns"] for item in circulation_days] + [1]
     )
     context = {
-        "total_books": Book.objects.count(),
+        "total_books": Book.objects.filter(archived_on__isnull=True).count(),
         "total_copies": total_copies,
         "available_copies": available_copies,
         "unavailable_copies": unavailable_copies,
@@ -328,7 +328,8 @@ def book_list(request):
         sort = "title"
     if direction not in {"asc", "desc"}:
         direction = "asc"
-    books = Book.objects.annotate(
+    show_archived = request.GET.get("archived") == "1"
+    books = Book.objects.filter(archived_on__isnull=not show_archived).annotate(
         copy_count=Count("copies"),
         available_count=Count("copies", filter=Q(copies__status=Copy.Status.AVAILABLE)),
     )
@@ -376,7 +377,7 @@ def book_list(request):
     return render(
         request,
         "library/book_list.html",
-        {"books": books, "query": query, "sort": sort, "direction": direction, "sort_headers": sort_headers},
+        {"books": books, "query": query, "sort": sort, "direction": direction, "sort_headers": sort_headers, "show_archived": show_archived},
     )
 
 
@@ -475,19 +476,50 @@ def book_detail(request, pk):
     )
 
 
+def _archive_copy(copy, today):
+    """Remove a copy from the catalogue; a borrowed copy stays on loan and is archived when returned."""
+    copy.archived_on = copy.archived_on or today
+    if not copy.loans.filter(return_date__isnull=True).exists():
+        copy.status = Copy.Status.ARCHIVED
+    copy.save(update_fields=["archived_on", "status"])
+
+
+def _confirm_removal(request, target, active_loans):
+    return render(request, "library/remove_confirm.html", {"target": target, "active_loans": active_loans})
+
+
 @staff_member_required(login_url="staff_login")
 @require_POST
 def delete_book(request, pk):
-    book = get_object_or_404(Book, pk=pk)
-    loans = Loan.objects.filter(copy__book=book)
-    if loans.filter(return_date__isnull=True).exists():
-        messages.error(request, "This book cannot be deleted while a copy is checked out.")
-        return redirect(book)
-    title = book.title
-    loans.delete()
-    book.delete()
-    messages.success(request, f"Deleted {title}, its copies, and its loan history.")
-    return redirect("book_list")
+    """Retire un livre du catalogue sans rien effacer ; un livre emprunté demande une confirmation."""
+    with transaction.atomic():
+        book = get_object_or_404(Book.objects.select_for_update(), pk=pk)
+        active_loans = Loan.objects.filter(copy__book=book, return_date__isnull=True).select_related("copy", "borrower")
+        if active_loans.exists() and request.POST.get("confirm_borrowed") != "1":
+            return _confirm_removal(request, book, active_loans)
+        today = timezone.localdate()
+        book.archived_on = today
+        book.save(update_fields=["archived_on"])
+        for copy in book.copies.select_for_update():
+            _archive_copy(copy, today)
+    messages.success(request, f"« {book.title} » est retiré du catalogue. Son historique d'emprunts est conservé.")
+    return redirect(book)
+
+
+@staff_member_required(login_url="staff_login")
+@require_POST
+def restore_book(request, pk):
+    with transaction.atomic():
+        book = get_object_or_404(Book.objects.select_for_update(), pk=pk)
+        book.archived_on = None
+        book.save(update_fields=["archived_on"])
+        for copy in book.copies.select_for_update().filter(archived_on__isnull=False):
+            copy.archived_on = None
+            if copy.status == Copy.Status.ARCHIVED:
+                copy.status = Copy.Status.AVAILABLE
+            copy.save(update_fields=["archived_on", "status"])
+    messages.success(request, f"« {book.title} » est de retour dans le catalogue.")
+    return redirect(book)
 
 
 @staff_member_required(login_url="staff_login")
@@ -737,20 +769,15 @@ def correct_loan_borrower(request, pk):
 @staff_member_required(login_url="staff_login")
 @require_POST
 def delete_copy(request, pk):
+    """Retire un exemplaire du catalogue sans effacer son historique."""
     with transaction.atomic():
         copy = get_object_or_404(Copy.objects.select_for_update().select_related("book"), pk=pk)
-        book = Book.objects.select_for_update().get(pk=copy.book_id)
-        if copy.loans.filter(return_date__isnull=True).exists():
-            messages.error(request, "This copy cannot be deleted while it is checked out.")
-            return redirect(copy)
-        if Copy.objects.filter(book=book).count() <= 1:
-            messages.error(request, "The last copy cannot be deleted separately. Delete the book instead.")
-            return redirect(copy)
-        copy_number = copy.copy_number
-        copy.loans.all().delete()
-        copy.delete()
-    messages.success(request, f"Deleted copy #{copy_number} of {book.title} and its loan history.")
-    return redirect(book)
+        active_loans = copy.loans.filter(return_date__isnull=True).select_related("copy", "borrower")
+        if active_loans.exists() and request.POST.get("confirm_borrowed") != "1":
+            return _confirm_removal(request, copy, active_loans)
+        _archive_copy(copy, timezone.localdate())
+    messages.success(request, f"L'exemplaire n°{copy.copy_number} de « {copy.book.title} » est retiré. Son historique est conservé.")
+    return redirect(copy.book)
 
 
 @staff_member_required(login_url="staff_login")

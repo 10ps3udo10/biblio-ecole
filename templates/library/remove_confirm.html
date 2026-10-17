@@ -1,0 +1,22 @@
+{% extends "library/base.html" %}
+
+{% block title %}Retirer du catalogue - Shelf-School{% endblock %}
+
+{% block content %}
+
+<section class="current-loan-panel" role="alert">
+  <div><span class="eyebrow">Attention</span>
+    <h1>{% if target.copy_number %}L'exemplaire n°{{ target.copy_number }} de « {{ target.book.title }} »{% else %}« {{ target.title }} »{% endif %} est emprunté</h1>
+    <p>Le retirer du catalogue ne clôt pas l'emprunt : il restera en cours jusqu'au retour du livre, puis l'exemplaire sera archivé. L'historique est conservé.</p>
+  </div>
+</section>
+<ul class="plain-list">{% for loan in active_loans %}<li>Exemplaire n°{{ loan.copy.copy_number }} — <a href="{{ loan.borrower.get_absolute_url }}">{{ loan.borrower.full_name }}</a>, emprunté le {{ loan.checkout_date }}</li>{% endfor %}</ul>
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="confirm_borrowed" value="1">
+  <div class="actions">
+    <button class="button danger"><i data-lucide="archive" aria-hidden="true"></i>Retirer quand même</button>
+    <a class="button" href="{{ target.get_absolute_url }}">Annuler</a>
+  </div>
+</form>
+
+{% endblock %}

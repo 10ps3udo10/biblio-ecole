@@ -101,6 +101,8 @@ class Book(models.Model):
     review_notes = models.TextField(blank=True)
     bibliographic_source_url = models.URLField(blank=True)
     needs_information = models.BooleanField(default=False)
+    # Set when the book is removed from the catalogue; copies and loan history are kept.
+    archived_on = models.DateField(null=True, blank=True)
     cover_image = models.FileField(upload_to="covers/", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -151,6 +153,8 @@ class Copy(models.Model):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.AVAILABLE)
     source_photo = models.CharField(max_length=255, blank=True)
     source_position = models.CharField(max_length=255, blank=True)
+    # Set when the copy is removed from the catalogue; a borrowed copy is archived on return.
+    archived_on = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["book__title", "copy_number"]

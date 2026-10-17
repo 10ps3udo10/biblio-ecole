@@ -521,52 +521,6 @@ def test_deleting_book_removes_stored_intake_photo(tmp_path, settings):
 
 
 @pytest.mark.django_db
-def test_staff_can_delete_book_without_loan_history(logged_in_client, tmp_path, settings):
-    settings.MEDIA_ROOT = tmp_path
-    book = Book.objects.create(
-        title="Delete this title",
-        cover_image=SimpleUploadedFile("delete-me.jpg", b"cover", content_type="image/jpeg"),
-    )
-    Copy.objects.create(book=book, copy_number=1)
-    stored_name = book.cover_image.name
-    storage = book.cover_image.storage
-
-    response = logged_in_client.post(reverse("delete_book", args=[book.id]))
-
-    assert response.status_code == 302
-    assert not Book.objects.filter(pk=book.id).exists()
-    assert not storage.exists(stored_name)
-
-
-@pytest.mark.django_db
-def test_returned_book_and_loan_history_can_be_deleted(logged_in_client):
-    book = Book.objects.create(title="Delete returned history")
-    copy = Copy.objects.create(book=book, copy_number=1)
-    borrower = Borrower.objects.create(borrower_id="history", first_name="History", last_name="Reader")
-    Loan.objects.create(copy=copy, borrower=borrower, return_date=timezone.localdate())
-
-    response = logged_in_client.post(reverse("delete_book", args=[book.id]))
-
-    assert response.status_code == 302
-    assert not Book.objects.filter(pk=book.id).exists()
-    assert not Loan.objects.filter(copy_id=copy.id).exists()
-
-
-@pytest.mark.django_db
-def test_checked_out_book_cannot_be_deleted(logged_in_client):
-    book = Book.objects.create(title="Currently checked out")
-    copy = Copy.objects.create(book=book, copy_number=1, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(borrower_id="active", first_name="Active", last_name="Reader")
-    Loan.objects.create(copy=copy, borrower=borrower)
-
-    response = logged_in_client.post(reverse("delete_book", args=[book.id]), follow=True)
-
-    assert response.status_code == 200
-    assert Book.objects.filter(pk=book.id).exists()
-    assert b"cannot be deleted while a copy is checked out" in response.content
-
-
-@pytest.mark.django_db
 def test_staff_can_edit_book_copy_and_borrower(logged_in_client):
     book = Book.objects.create(title="Original title", isbn13="9780316381994")
     copy = Copy.objects.create(book=book, copy_number=1, shelf_location="Old")
@@ -709,51 +663,6 @@ def test_checked_out_copy_edit_cannot_change_circulation_status(logged_in_client
     assert copy.shelf_location == "New shelf"
     assert copy.condition == Copy.Condition.WORN
     assert copy.status == Copy.Status.CHECKED_OUT
-
-
-@pytest.mark.django_db
-def test_staff_can_delete_one_of_multiple_copies_and_its_returned_history(logged_in_client):
-    book = Book.objects.create(title="Several physical copies")
-    first = Copy.objects.create(book=book, copy_number=1)
-    second = Copy.objects.create(book=book, copy_number=2)
-    borrower = Borrower.objects.create(borrower_id="copy-history", first_name="Copy", last_name="History")
-    Loan.objects.create(copy=second, borrower=borrower, return_date=timezone.localdate())
-
-    response = logged_in_client.post(reverse("delete_copy", args=[second.id]), follow=True)
-
-    assert response.status_code == 200
-    assert Book.objects.filter(pk=book.id).exists()
-    assert Copy.objects.filter(pk=first.id).exists()
-    assert not Copy.objects.filter(pk=second.id).exists()
-    assert not Loan.objects.filter(copy_id=second.id).exists()
-    assert b"Deleted copy #2 of Several physical copies" in response.content
-
-
-@pytest.mark.django_db
-def test_checked_out_copy_cannot_be_deleted(logged_in_client):
-    book = Book.objects.create(title="Loaned duplicate")
-    Copy.objects.create(book=book, copy_number=1)
-    loaned = Copy.objects.create(book=book, copy_number=2, status=Copy.Status.CHECKED_OUT)
-    borrower = Borrower.objects.create(borrower_id="copy-active", first_name="Active", last_name="Copy")
-    Loan.objects.create(copy=loaned, borrower=borrower)
-
-    response = logged_in_client.post(reverse("delete_copy", args=[loaned.id]), follow=True)
-
-    assert response.status_code == 200
-    assert Copy.objects.filter(pk=loaned.id).exists()
-    assert b"cannot be deleted while it is checked out" in response.content
-
-
-@pytest.mark.django_db
-def test_last_copy_must_be_deleted_with_book(logged_in_client):
-    book = Book.objects.create(title="Only physical copy")
-    copy = Copy.objects.create(book=book, copy_number=1)
-
-    response = logged_in_client.post(reverse("delete_copy", args=[copy.id]), follow=True)
-
-    assert response.status_code == 200
-    assert Copy.objects.filter(pk=copy.id).exists()
-    assert b"last copy cannot be deleted separately" in response.content
 
 
 @pytest.mark.django_db

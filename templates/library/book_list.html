@@ -2,10 +2,11 @@
 {% block title %}Books - School Library{% endblock %}
 {% block content %}
 <section class="hero compact">
-  <h1>Books</h1>
+  <h1>{% if show_archived %}Livres retirés du catalogue{% else %}Books{% endif %}</h1>
   <div class="actions">
     <a class="button primary" href="{% url 'photo_intake' %}"><i data-lucide="camera" aria-hidden="true"></i>Add from photo</a><a class="button" href="{% url 'book_create' %}"><i data-lucide="keyboard" aria-hidden="true"></i>Add manually</a>
     <a class="button" href="{% url 'import_books' %}"><i data-lucide="upload" aria-hidden="true"></i>Import CSV</a>
+    {% if show_archived %}<a class="button" href="{% url 'book_list' %}"><i data-lucide="library" aria-hidden="true"></i>Catalogue</a>{% else %}<a class="button" href="?archived=1"><i data-lucide="archive" aria-hidden="true"></i>Livres retirés</a>{% endif %}
     <a class="button" href="{% url 'export_books_csv' %}"><i data-lucide="download" aria-hidden="true"></i>Export CSV</a>
     <span class="bulk-cover-action"><button class="button" id="fetch-covers" type="submit" form="cover-fetch-form"><i data-lucide="images" aria-hidden="true"></i>Fetch missing covers</button><small id="cover-selection-count" aria-live="polite">0 selected</small></span>
   </div>

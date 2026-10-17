@@ -20,6 +20,7 @@ urlpatterns = [
     path("books/<uuid:pk>/", views.book_detail, name="book_detail"),
     path("books/<uuid:pk>/edit/", views.book_edit, name="book_edit"),
     path("books/<uuid:pk>/delete/", views.delete_book, name="delete_book"),
+    path("books/<uuid:pk>/restore/", views.restore_book, name="restore_book"),
     path("books/<uuid:pk>/photo/delete/", views.delete_book_photo, name="delete_book_photo"),
     path("books/<uuid:book_pk>/copies/add/", views.add_copy, name="add_copy"),
     path("copies/<uuid:pk>/", views.copy_detail, name="copy_detail"),
