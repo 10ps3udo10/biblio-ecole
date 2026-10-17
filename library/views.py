@@ -1661,3 +1661,53 @@ def school_year_new(request):
         "current_year": current, "name": name, "start_date": start_date, "end_date": end_date,
         "class_names_text": class_names_text, "error": error,
     })
+
+
+LABEL_COLUMNS, LABEL_ROWS = 3, 8  # A4 sheet of 70 x 37 mm stickers
+LABELS_PER_SHEET = LABEL_COLUMNS * LABEL_ROWS
+
+
+def _render_label_sheets(request, heading, back_url, items):
+    try:
+        start = min(max(int(request.GET.get("start", 1)), 1), LABELS_PER_SHEET)
+    except ValueError:
+        start = 1
+    cells = [None] * (start - 1) + items
+    sheets = [cells[index:index + LABELS_PER_SHEET] for index in range(0, len(cells), LABELS_PER_SHEET)]
+    return render(request, "library/label_sheet.html", {
+        "heading": heading, "back_url": back_url, "sheets": sheets, "label_count": len(items),
+        "start": start, "positions": range(1, LABELS_PER_SHEET + 1),
+    })
+
+
+@staff_member_required(login_url="staff_login")
+def class_label_sheet(request, pk):
+    school_class = get_object_or_404(SchoolClass, pk=pk)
+    students = school_class.borrowers.filter(active=True).order_by("last_name", "first_name")
+    items = [
+        {"title": student.first_name, "emphasis": student.last_name.upper(), "subtitle": school_class.name, "qr_svg": mark_safe(svg_qr(student.qr_code))}
+        for student in students
+    ]
+    return _render_label_sheets(request, f"QR codes de la classe {school_class}", reverse("school_classes"), items)
+
+
+@staff_member_required(login_url="staff_login")
+def copy_label_sheet(request):
+    copies = Copy.objects.exclude(status=Copy.Status.ARCHIVED).select_related("book").order_by("book__title", "copy_number")
+    book = get_object_or_404(Book, pk=request.GET["book"]) if request.GET.get("book") else None
+    if book:
+        copies = copies.filter(book=book)
+    else:
+        copy_ids = []
+        for value in request.GET.getlist("copy"):
+            try:
+                copy_ids.append(uuid.UUID(value))
+            except ValueError:
+                continue
+        copies = copies.filter(pk__in=copy_ids)
+    items = [
+        {"title": copy.book.title, "emphasis": "", "subtitle": f"Exemplaire n°{copy.copy_number}", "qr_svg": mark_safe(svg_qr(copy.qr_code))}
+        for copy in copies
+    ]
+    back_url = book.get_absolute_url() if book else reverse("book_list")
+    return _render_label_sheets(request, f"Étiquettes : {book.title}" if book else "Étiquettes de livres", back_url, items)

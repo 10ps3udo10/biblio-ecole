@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ heading }}</title>
+  <style>
+    /* Planche A4 de 3 x 8 étiquettes de 70 x 37 mm, sans marge (ex. Avery 3475, Apli 1273). */
+    :root { --label-width: 70mm; --label-height: 37mm; --sheet-top: 0.5mm; }
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #17202a; background: #e9edf1; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; background: #ffffff; border-bottom: 1px solid #cfd6dd; }
+    .toolbar h1 { margin: 0 auto 0 0; font-size: 1.1rem; }
+    .toolbar a, .toolbar button { font: inherit; padding: 8px 14px; border: 1px solid #9aa6b2; border-radius: 6px; background: #ffffff; color: inherit; text-decoration: none; cursor: pointer; }
+    .toolbar button.primary { background: #0b5cad; border-color: #0b5cad; color: #ffffff; }
+    .toolbar p { flex-basis: 100%; margin: 0; color: #4a5763; font-size: .9rem; }
+    .sheet { width: 210mm; height: 297mm; margin: 16px auto; padding-top: var(--sheet-top); background: #ffffff; display: grid;
+      grid-template-columns: repeat(3, var(--label-width)); grid-auto-rows: var(--label-height); align-content: start; overflow: hidden; }
+    .label { display: grid; grid-template-columns: 30mm 1fr; align-items: center; gap: 2mm; padding: 2.5mm 3mm; overflow: hidden; outline: 1px dashed #cfd6dd; }
+    .label svg { width: 30mm; height: 30mm; display: block; }
+    .label .text { min-width: 0; }
+    .label strong { display: block; font-size: 12pt; line-height: 1.15; overflow-wrap: anywhere; }
+    .label .emphasis { display: block; font-size: 10pt; font-weight: 700; letter-spacing: .02em; overflow-wrap: anywhere; }
+    .label .title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 10pt; font-weight: 700; line-height: 1.2; }
+    .label small { display: block; margin-top: 1.5mm; font-size: 8pt; color: #4a5763; }
+    @media print {
+      body { background: none; }
+      .toolbar { display: none; }
+      .sheet { margin: 0; break-after: page; }
+      .sheet:last-child { break-after: auto; }
+      .label { outline: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>{{ heading }} ({{ label_count }})</h1>
+    <form method="get">
+      {% for key, values in request.GET.lists %}{% if key != "start" %}{% for value in values %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}{% endif %}{% endfor %}
+      <label>Commencer à l'étiquette
+        <select name="start" onchange="this.form.submit()">{% for position in positions %}<option value="{{ position }}"{% if position == start %} selected{% endif %}>{{ position }}</option>{% endfor %}</select>
+      </label>
+    </form>
+    <a href="{{ back_url }}">Retour</a>
+    <button class="primary" type="button" onclick="window.print()">Imprimer</button>
+    <p>Imprimez à 100 % (« taille réelle », sans ajustement à la page). Pour une planche déjà entamée, choisissez la première étiquette libre (numérotées de gauche à droite, ligne par ligne).</p>
+  </div>
+  {% for sheet in sheets %}
+  <div class="sheet">
+    {% for item in sheet %}
+    <div class="label">{% if item %}
+      {{ item.qr_svg }}
+      <div class="text">
+        {% if item.emphasis %}<strong>{{ item.title }}</strong><span class="emphasis">{{ item.emphasis }}</span>{% else %}<span class="title">{{ item.title }}</span>{% endif %}
+        <small>{{ item.subtitle }}</small>
+      </div>
+    {% endif %}</div>
+    {% endfor %}
+  </div>
+  {% empty %}
+  <p class="toolbar">Aucune étiquette à imprimer.</p>
+  {% endfor %}
+</body>
+</html>

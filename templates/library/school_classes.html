@@ -10,7 +10,7 @@
   <thead><tr><th><a href="?sort=name">Class</a></th><th><a href="?sort=active">Status</a></th><th><a href="?sort=assigned">Assigned students</a></th><th>Actions</th></tr></thead>
   <tbody>{% for item in classes %}<tr>
     <td>{{ item.name }}</td><td>{% if item.active %}Active{% else %}Inactive{% endif %}</td><td>{{ item.assigned }}</td>
-    <td><div class="actions"><a class="button" href="{% url 'school_class_edit' item.pk %}" aria-label="Edit {{ item.name }}" title="Edit {{ item.name }}"><i data-lucide="pencil" aria-hidden="true"></i></a>
+    <td><div class="actions"><a class="button" href="{% url 'class_label_sheet' item.pk %}" aria-label="Planche de QR codes {{ item.name }}" title="Planche de QR codes {{ item.name }}"><i data-lucide="printer" aria-hidden="true"></i></a><a class="button" href="{% url 'school_class_edit' item.pk %}" aria-label="Edit {{ item.name }}" title="Edit {{ item.name }}"><i data-lucide="pencil" aria-hidden="true"></i></a>
     {% if not item.assigned %}<form method="post" action="{% url 'school_class_edit' item.pk %}">{% csrf_token %}<button name="action" value="delete" aria-label="Delete {{ item.name }}" title="Delete {{ item.name }}"><i data-lucide="trash-2" aria-hidden="true"></i></button></form>{% endif %}</div></td>
   </tr>{% empty %}<tr><td colspan="4">No classes.</td></tr>{% endfor %}</tbody>
 </table></div>
