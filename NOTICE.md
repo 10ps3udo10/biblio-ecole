@@ -5,8 +5,9 @@ de Manuel Rueda : https://github.com/mrueda/shelf-school
 
 - Version de départ : 0.1.0-dev, commit `c1cd4ca48481ef5d5cced1f1f863426b03af2d86`
   (tag local `upstream-base`).
-- Licence : MIT. Le fichier `LICENSE` d'origine est conservé sans modification
-  et s'applique au code d'origine comme aux modifications de ce fork.
+- Licence : MIT. Le fichier `LICENSE` d'origine est conservé ; seule une ligne
+  de copyright pour les modifications de ce fork y a été ajoutée. La même
+  licence s'applique au code d'origine et aux modifications.
 
 Modifications principales apportées par ce fork : gestion des années
 scolaires, classe enregistrée au moment de l'emprunt, planches de QR codes
