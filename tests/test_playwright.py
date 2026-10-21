@@ -383,7 +383,7 @@ def test_librarian_can_checkout_and_return_copy_in_browser(page, live_server, dj
             assert abs((item_box["y"] + item_box["height"] / 2) - (icon_box["y"] + icon_box["height"] / 2)) < 1
     page.get_by_text("Bibliothèque", exact=True).click()
     library_menu = page.locator("nav details").filter(has=page.locator("summary", has_text="Bibliothèque"))
-    expect(library_menu.get_by_role("link")).to_have_text(["Vue d'ensemble", "Catalogue", "Élèves", "En retard", "Paramètres de l'école"])
+    expect(library_menu.get_by_role("link")).to_have_text(["Vue d'ensemble", "Borne photo (élèves)", "Catalogue", "Élèves", "En retard", "Paramètres de l'école"])
     expect(library_menu.get_by_role("separator")).to_be_visible()
     expect(page.get_by_role("link", name="Catalogue", exact=True)).to_be_visible()
     expect(page.get_by_role("link", name="Élèves", exact=True)).to_be_visible()
@@ -630,7 +630,11 @@ def test_admin_can_delete_one_physical_copy_in_browser(page, live_server, django
     expect(page.get_by_text("L'exemplaire n°2 de « Duplicate classroom title » est retiré")).to_be_visible()
     expect(page.get_by_role("heading", name="Duplicate classroom title")).to_be_visible()
     assert Copy.objects.filter(pk=first.id).exists()
-    assert not Copy.objects.filter(pk=second.id).exists()
+    second.refresh_from_db()
+    assert second.archived_on is not None
+    assert second.status == Copy.Status.ARCHIVED
+    first.refresh_from_db()
+    assert first.archived_on is None
 
 
 @pytest.mark.django_db(transaction=True)
@@ -889,3 +893,89 @@ def test_system_admin_links_and_synchronizes_matching_borrower_in_browser(
     page.get_by_role("link", name="Annuler", exact=True).click()
     staff_row.get_by_role("link", name="Réinitialiser le mot de passe de lrueda", exact=True).click()
     expect(page.get_by_role("heading", name="Réinitialiser le mot de passe")).to_be_visible()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("width", [390, 1440])
+def test_desk_scanner_checkout_and_return_in_browser(page, live_server, django_user_model, width):
+    django_user_model.objects.create_user(username="desk", password="secret", is_staff=True)
+    borrower = Borrower.objects.create(borrower_id="mia", first_name="Mia", last_name="Lopez", school_class=SchoolClass.objects.get_or_create(name="3B")[0])
+    book = Book.objects.create(title="Scanner book")
+    copy = Copy.objects.create(book=book, copy_number=1)
+    other = Copy.objects.create(book=book, copy_number=2)
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(f"{live_server.url}/staff/login/?next=/pret/")
+    page.locator("input[name=username]").fill("desk")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Se connecter", exact=True).click()
+    scan = page.locator("#desk-code")
+    expect(scan).to_be_focused()
+    page.evaluate("window.__marker = 1")
+
+    def scan_code(code):
+        page.keyboard.type(code, delay=5)
+        page.keyboard.press("Enter")
+
+    def assert_ready():
+        expect(scan).to_be_focused()
+        expect(scan).to_have_value("")
+        assert page.evaluate("window.__marker") == 1
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+    scan_code(borrower.qr_code)
+    expect(page.locator(".desk-outcome")).to_contain_text("scannez le livre")
+    assert_ready()
+    scan_code(copy.qr_code)
+    expect(page.locator(".desk-outcome.success")).to_contain_text("Prêt enregistré")
+    assert_ready()
+    assert Loan.objects.filter(copy=copy, borrower=borrower, return_date__isnull=True).count() == 1
+    page.screenshot(path=f"/tmp/biblio-desk-{width}.png", full_page=True)
+
+    # Same copy right away: ignored as a duplicate scan (30 s window), loan stays open.
+    scan_code(copy.qr_code)
+    expect(page.locator(".desk-outcome.info")).to_contain_text("déjà enregistré")
+    assert_ready()
+    assert Loan.objects.get(copy=copy).return_date is None
+
+    # Another loan moves the duplicate guard away, then scanning the first copy returns it.
+    scan_code(borrower.qr_code)
+    expect(page.locator(".desk-outcome")).to_contain_text("scannez le livre")
+    scan_code(other.qr_code)
+    expect(page.locator(".desk-outcome.success")).to_contain_text("Prêt enregistré")
+    assert_ready()
+    scan_code(copy.qr_code)
+    expect(page.locator(".desk-outcome.success")).to_contain_text("Retour enregistré")
+    assert_ready()
+    assert Loan.objects.get(copy=copy).return_date is not None
+    assert Loan.objects.get(copy=other).return_date is None
+
+    scan_code("COPY:00000000-0000-0000-0000-000000000000")
+    expect(page.locator(".desk-outcome.error")).to_contain_text("Étiquette inconnue")
+    assert_ready()
+    page.screenshot(path=f"/tmp/biblio-desk-{width}-error.png", full_page=True)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_label_sheet_layout_in_browser(page, live_server, django_user_model):
+    django_user_model.objects.create_user(username="labels", password="secret", is_staff=True)
+    school_class = SchoolClass.objects.get_or_create(name="CE2")[0]
+    for number in range(25):
+        Borrower.objects.create(borrower_id=f"kid{number}", first_name=f"Élève{number}", last_name=f"Nom{number}", school_class=school_class)
+    page.set_viewport_size({"width": 1200, "height": 900})
+    page.goto(f"{live_server.url}/staff/login/?next=/labels/class/{school_class.pk}/")
+    page.locator("input[name=username]").fill("labels")
+    page.locator("input[name=password]").fill("secret")
+    page.get_by_role("button", name="Se connecter", exact=True).click()
+    page.emulate_media(media="print")
+    sheets = page.locator(".sheet")
+    expect(sheets).to_have_count(2)
+    assert [sheets.nth(i).locator(".label:has(svg)").count() for i in range(2)] == [24, 1]
+    mm = 96 / 25.4
+    for index, expected in enumerate([24, 1]):
+        labels = sheets.nth(index).locator(".label")
+        assert labels.count() == expected
+        for i in range(expected):
+            box = labels.nth(i).bounding_box()
+            assert abs(box["width"] - 70 * mm) <= 1 and abs(box["height"] - 37 * mm) <= 1, (index, i, box)
+    page.pdf(path="/tmp/biblio-planche.pdf", format="A4", print_background=True)
+    page.screenshot(path="/tmp/biblio-planche.png", full_page=True)
