@@ -50,7 +50,7 @@ python manage.py makemigrations --check --dry-run
   (`templates/library/label_sheet.html`, constantes `LABEL_COLUMNS/ROWS` dans `views.py`).
 - Tests : pytest + pytest-django, objets créés directement avec l'ORM.
   Les critères de validation du cahier des charges (tests 1 à 8) vivent dans
-  `tests/test_cahier_des_charges.py` (en cours de rédaction).
+  `tests/test_cahier_des_charges.py`.
 - Un commit par fonctionnalité, message en français (Conventional Commits),
   tests verts à chaque commit. Toute modification de modèle vient avec sa
   migration ; les migrations qui transforment des données ont un test.
