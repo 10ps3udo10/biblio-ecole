@@ -76,12 +76,12 @@ def test_login_uses_personal_start_page_but_respects_safe_next(client, django_us
         assert response.url == destination
 
 
-def test_login_defaults_to_overview_and_public_link_does_not_override_it(client, django_user_model):
+def test_login_defaults_to_scanner_desk_and_public_link_does_not_override_it(client, django_user_model):
     content = client.get(reverse("photo_circulation")).content.decode()
     assert f'href="{reverse("staff_login")}"' in content
     user = django_user_model.objects.create_user(username="operator", password="secret", is_staff=True)
     response = client.post(reverse("staff_login"), {"username": "operator", "password": "secret"})
-    assert response.url == reverse("dashboard")
+    assert response.url == reverse("desk")
     assert not UserPreference.objects.filter(user=user).exists()
 
 

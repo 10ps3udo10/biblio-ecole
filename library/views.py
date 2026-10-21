@@ -1711,3 +1711,50 @@ def copy_label_sheet(request):
     ]
     back_url = book.get_absolute_url() if book else reverse("book_list")
     return _render_label_sheets(request, f"Étiquettes : {book.title}" if book else "Étiquettes de livres", back_url, items)
+
+
+@staff_member_required(login_url="staff_login")
+def desk(request):
+    """Écran principal de l'enseignante : prêt et retour à la douchette."""
+    from . import desk as desk_service
+
+    scanner = desk_service.Desk(request.session)
+    outcome = None
+    found_borrowers = found_books = None
+    if request.method == "POST":
+        if request.POST.get("action") == "clear":
+            scanner.clear()
+            outcome = {"level": "info", "text": "Élève désélectionné."}
+        elif request.POST.get("action") == "return":
+            try:
+                outcome = scanner.return_copy(uuid.UUID(request.POST.get("copy", "")))
+            except ValueError:
+                outcome = {"level": "error", "text": "Exemplaire inconnu."}
+        else:
+            text = request.POST.get("code", "").strip()
+            if text:
+                try:
+                    outcome = scanner.scan(text)
+                except ValueError as exc:
+                    outcome = {"level": "error", "text": str(exc)}
+                if outcome is None:
+                    found_borrowers, found_books = desk_service.search(text)
+                    if not found_borrowers and not found_books:
+                        outcome = {"level": "error", "text": f"Aucun élève ni livre ne correspond à « {text} »."}
+        scanner.save()
+    elif request.GET.get("q", "").strip():
+        found_borrowers, found_books = desk_service.search(request.GET["q"].strip())
+        if not found_borrowers and not found_books:
+            outcome = {"level": "error", "text": f"Aucun élève ni livre ne correspond à « {request.GET['q'].strip()} »."}
+    borrower = scanner.borrower
+    scanner.save()
+    return render(request, "library/desk.html", {
+        "outcome": outcome,
+        "borrower": borrower,
+        "borrower_label": desk_service.describe(borrower) if borrower else "",
+        "borrower_loans": borrower.loans.filter(return_date__isnull=True).select_related("copy__book") if borrower else [],
+        "found_borrowers": found_borrowers,
+        "found_books": found_books,
+        "log": scanner.log,
+        "timeout_minutes": desk_service.BORROWER_TIMEOUT_SECONDS // 60,
+    })

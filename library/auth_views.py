@@ -12,5 +12,5 @@ class StaffLoginView(LoginView):
     def get_default_redirect_url(self):
         start_page = UserPreference.objects.filter(user=self.request.user).values_list("start_page", flat=True).first()
         if start_page not in UserPreference.StartPage.values:
-            start_page = UserPreference.StartPage.OVERVIEW
+            start_page = UserPreference.StartPage.DESK
         return reverse(start_page)

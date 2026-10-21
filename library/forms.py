@@ -315,10 +315,8 @@ class SchoolProfileForm(forms.ModelForm):
 class CheckoutForm(forms.Form):
     borrower_code = forms.CharField(label="QR code ou identifiant de l'emprunteur")
     copy_code = forms.CharField(label="QR code ou identifiant de l'exemplaire")
-    due_date = forms.DateField(
-        initial=default_form_due_date,
-        widget=forms.DateInput(attrs={"type": "date"}),
-    )
+    # Due date is computed from the school's loan period; never typed by hand.
+    due_date = forms.DateField(required=False, widget=forms.HiddenInput)
 
 
 class ReturnForm(forms.Form):

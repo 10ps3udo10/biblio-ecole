@@ -7,7 +7,8 @@
   <a class="button primary" href="{% url 'school_settings' %}"><i data-lucide="settings" aria-hidden="true"></i>Paramètres de l'école</a>
 </section>
 {% endif %}
-<header class="dashboard-heading"><div><span class="eyebrow">Vue du personnel</span><h1>Vue d'ensemble</h1><p>{{ school_profile.display_name }} · {% now "l j F" %}</p></div><a class="button primary" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Banc de prêt</a></header>
+<header class="dashboard-heading"><div><span class="eyebrow">Vue du personnel</span><h1>Vue d'ensemble</h1><p>{{ school_profile.display_name }} · {% now "l j F" %}</p></div><div class="actions"><a class="button primary" href="{% url 'desk' %}"><i data-lucide="scan-barcode" aria-hidden="true"></i>Prêt / retour</a><a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="camera" aria-hidden="true"></i>Borne photo</a></div></header>
+<form class="dashboard-search" method="get" action="{% url 'desk' %}" role="search"><label for="dashboard-q">Rechercher un livre ou un élève</label><input id="dashboard-q" type="search" name="q" placeholder="Titre, nom ou prénom"><button class="button"><i data-lucide="search" aria-hidden="true"></i>Rechercher</button></form>
 <section class="dashboard-metrics">
   <article><span>Livres au catalogue</span><strong>{{ total_books }}</strong><small>{{ total_copies }} exemplaires physiques</small></article>
   <article><span>Disponibles</span><strong>{{ available_copies }}</strong><small>{{ available_percent }}% du fonds</small></article>

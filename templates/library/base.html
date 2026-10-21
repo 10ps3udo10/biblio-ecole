@@ -19,11 +19,12 @@
       <span class="brand-lockup"><strong>Shelf-School</strong><span aria-hidden="true"></span><small>{{ school_profile.display_name }}</small></span>
     </a>
     {% if request.user.is_authenticated %}<nav>
-      <a class="nav-circulation{% if request.resolver_match.url_name == 'photo_circulation' or request.resolver_match.url_name == 'circulation_alias' %} active{% endif %}" href="{% url 'photo_circulation' %}"><i data-lucide="arrow-left-right" aria-hidden="true"></i>Circulation</a>
+      <a class="nav-circulation{% if request.resolver_match.url_name == 'desk' %} active{% endif %}" href="{% url 'desk' %}"><i data-lucide="scan-barcode" aria-hidden="true"></i>Prêt / retour</a>
       <details class="nav-menu{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'book_list' or request.resolver_match.url_name == 'book_create' or request.resolver_match.url_name == 'book_detail' or request.resolver_match.url_name == 'photo_intake' or request.resolver_match.url_name == 'borrower_list' or request.resolver_match.url_name == 'borrower_detail' or request.resolver_match.url_name == 'overdue_loans' %} active{% endif %}">
         <summary><i data-lucide="library" aria-hidden="true"></i>Bibliothèque</summary>
         <div>
           <a href="{% url 'dashboard' %}"><i data-lucide="layout-dashboard" aria-hidden="true"></i>Vue d'ensemble</a>
+          <a href="{% url 'photo_circulation' %}"><i data-lucide="camera" aria-hidden="true"></i>Borne photo (élèves)</a>
           <a href="{% url 'book_list' %}"><i data-lucide="book-open" aria-hidden="true"></i>Catalogue</a>
           <a href="{% url 'borrower_list' %}"><i data-lucide="users" aria-hidden="true"></i>Élèves</a>
           <a href="{% url 'overdue_loans' %}"><i data-lucide="clock-alert" aria-hidden="true"></i>En retard</a>

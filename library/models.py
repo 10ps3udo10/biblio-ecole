@@ -15,8 +15,9 @@ class UserPreference(models.Model):
         DARK = "dark", "Sombre"
 
     class StartPage(models.TextChoices):
+        DESK = "desk", "Prêt et retour (douchette)"
         OVERVIEW = "dashboard", "Vue d'ensemble"
-        CIRCULATION = "photo_circulation", "Prêts et retours"
+        CIRCULATION = "photo_circulation", "Borne photo (élèves)"
         CATALOG = "book_list", "Catalogue"
 
     class TableDensity(models.TextChoices):
@@ -25,7 +26,7 @@ class UserPreference(models.Model):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_preferences")
     theme = models.CharField(max_length=6, choices=Theme.choices, default=Theme.SYSTEM)
-    start_page = models.CharField(max_length=20, choices=StartPage.choices, default=StartPage.OVERVIEW)
+    start_page = models.CharField(max_length=20, choices=StartPage.choices, default=StartPage.DESK)
     table_density = models.CharField(max_length=12, choices=TableDensity.choices, default=TableDensity.COMFORTABLE)
 
 

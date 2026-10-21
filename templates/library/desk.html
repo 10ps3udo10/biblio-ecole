@@ -1,0 +1,150 @@
+{% extends "library/base.html" %}
+
+{% block title %}Prêt et retour - {{ school_profile.display_name }}{% endblock %}
+
+{% block content %}
+<style>
+  .desk { max-width: 920px; margin: 0 auto; display: grid; gap: 18px; }
+  .desk-scan { display: flex; gap: 10px; }
+  .desk-scan input { flex: 1; font-size: 1.5rem; padding: 14px 16px; border: 3px solid var(--accent); border-radius: 10px; }
+  .desk-scan input:focus { outline: 4px solid var(--focus-ring, #9cc3f0); }
+  .desk-help { margin: 6px 0 0; color: var(--text-secondary); }
+  .desk-state { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  .desk-state.selected { border: 2px solid var(--accent); background: var(--accent-soft); }
+  .desk-state strong { font-size: 1.4rem; }
+  .desk-outcome { padding: 18px 20px; border-radius: 10px; font-size: 1.25rem; font-weight: 650; }
+  .desk-outcome.success { background: #e3f6e8; color: #145a2a; border: 2px solid #2f9e55; }
+  .desk-outcome.info { background: #e8f0fb; color: #173e6d; border: 2px solid #4a7fc1; }
+  .desk-outcome.error { background: #fde8e8; color: #7d1717; border: 2px solid #d14343; }
+  .desk-results { display: grid; gap: 12px; }
+  .desk-results ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .desk-results li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .desk-results form { margin: 0; }
+  .desk-log { color: var(--text-secondary); font-size: .95rem; }
+  .desk-log li.error { color: #a12626; }
+</style>
+
+<div class="desk">
+  <header class="borrower-heading"><h1>Prêt et retour</h1><a class="button" href="{% url 'photo_circulation' %}"><i data-lucide="camera" aria-hidden="true"></i>Borne photo (élèves)</a></header>
+
+  <form id="desk-form" class="desk-scan" method="post" action="{% url 'desk' %}" autocomplete="off">{% csrf_token %}
+    <label class="visually-hidden" for="desk-code">Code scanné ou recherche</label>
+    <input id="desk-code" name="code" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scannez une carte ou un livre, ou tapez un nom ou un titre">
+    <button class="button primary"><i data-lucide="corner-down-left" aria-hidden="true"></i>Valider</button>
+  </form>
+
+  <div id="desk-live" aria-live="polite">
+    {% if outcome %}<p class="desk-outcome {{ outcome.level }}" data-sound="{{ outcome.level }}" role="{% if outcome.level == 'error' %}alert{% else %}status{% endif %}">{{ outcome.text }}</p>{% endif %}
+
+    {% if borrower %}
+    <section class="desk-state selected">
+      <div><span class="eyebrow">Élève sélectionné</span><br><strong>{{ borrower_label }}</strong><p class="desk-help">Scannez maintenant le livre : le prêt est enregistré tout de suite. Sans scan pendant {{ timeout_minutes }} min, l'élève est désélectionné.</p></div>
+      <form method="post" action="{% url 'desk' %}">{% csrf_token %}<button class="button" name="action" value="clear"><i data-lucide="x" aria-hidden="true"></i>Désélectionner</button></form>
+    </section>
+    <section class="desk-results">
+      <h2>Livres de {{ borrower.first_name }} non rendus</h2>
+      <ul>{% for loan in borrower_loans %}
+        <li><a href="{{ loan.copy.get_absolute_url }}">{{ loan.copy.book.title }}</a> n°{{ loan.copy.copy_number }} — emprunté le {{ loan.checkout_date|date:"d/m/Y" }}{% if loan.is_overdue %} <span class="status-badge overdue">En retard</span>{% endif %}
+          <form method="post" action="{% url 'desk' %}">{% csrf_token %}<input type="hidden" name="copy" value="{{ loan.copy.pk }}"><button class="button" name="action" value="return"><i data-lucide="undo-2" aria-hidden="true"></i>Marquer comme rendu</button></form></li>
+      {% empty %}<li>Aucun livre en cours.</li>{% endfor %}</ul>
+    </section>
+    {% else %}
+    <section class="desk-state">
+      <div><strong>En attente</strong><p class="desk-help">Prêt : scannez la carte de l'élève puis le livre. Retour : scannez seulement le livre.</p></div>
+    </section>
+    {% endif %}
+
+    {% if found_borrowers or found_books %}
+    <section class="desk-results">
+      {% if found_borrowers %}<h2>Élèves</h2>
+      <ul>{% for item in found_borrowers %}
+        <li><form method="post" action="{% url 'desk' %}">{% csrf_token %}<button class="button" name="code" value="{{ item.qr_code }}"><i data-lucide="user-round-check" aria-hidden="true"></i>{{ item.first_name }} {{ item.last_name|upper }}{% if item.school_class %} ({{ item.school_class }}){% endif %}</button></form></li>
+      {% endfor %}</ul>{% endif %}
+      {% if found_books %}<h2>Livres</h2>
+      <ul>{% for book in found_books %}
+        <li><strong>{{ book.title }}</strong>{% if book.authors %} — {{ book.authors }}{% endif %}</li>
+        {% for copy in book.desk_copies %}
+        <li>
+          {% if copy.desk_loan %}n°{{ copy.copy_number }} : emprunté par {{ copy.desk_loan.borrower.full_name }} depuis le {{ copy.desk_loan.checkout_date|date:"d/m/Y" }}
+            <form method="post" action="{% url 'desk' %}">{% csrf_token %}<input type="hidden" name="copy" value="{{ copy.pk }}"><button class="button" name="action" value="return"><i data-lucide="undo-2" aria-hidden="true"></i>Marquer comme rendu</button></form>
+          {% elif copy.status == "available" %}n°{{ copy.copy_number }} : disponible
+            <form method="post" action="{% url 'desk' %}">{% csrf_token %}<button class="button{% if borrower %} primary{% endif %}" name="code" value="{{ copy.qr_code }}"><i data-lucide="book-up" aria-hidden="true"></i>{% if borrower %}Prêter à {{ borrower.first_name }}{% else %}Prêter (choisissez d'abord l'élève){% endif %}</button></form>
+          {% else %}n°{{ copy.copy_number }} : {{ copy.get_status_display }}{% endif %}
+        </li>
+        {% empty %}<li>Aucun exemplaire.</li>{% endfor %}
+      {% endfor %}</ul>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if log %}
+    <section class="desk-log"><h2>Dernières opérations</h2><ul>{% for entry in log %}<li class="{{ entry.level }}">{{ entry.text }}</li>{% endfor %}</ul></section>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(() => {
+  const input = document.getElementById("desk-code");
+  let live = document.getElementById("desk-live");
+  let audio;
+
+  function beep(level) {
+    if (!level || level === "info") return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const tones = level === "success" ? [880, 1320] : [220, 180];
+      tones.forEach((frequency, index) => {
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.frequency.value = frequency;
+        gain.gain.value = 0.15;
+        oscillator.connect(gain).connect(audio.destination);
+        const start = audio.currentTime + index * 0.12;
+        oscillator.start(start);
+        oscillator.stop(start + 0.1);
+      });
+    } catch (error) { /* sound is optional */ }
+  }
+
+  function refocus() { input.value = ""; input.focus(); }
+
+  async function submit(form, submitter) {
+    const data = new FormData(form);
+    if (submitter && submitter.name) data.append(submitter.name, submitter.value);
+    try {
+      const response = await fetch(form.action, { method: "POST", body: data, headers: { "X-Requested-With": "fetch" } });
+      const page = new DOMParser().parseFromString(await response.text(), "text/html");
+      const fresh = page.getElementById("desk-live");
+      if (!fresh) { window.location.assign(response.url); return; }
+      live.replaceWith(fresh);
+      live = fresh;
+      if (window.lucide) window.lucide.createIcons();
+      const outcome = fresh.querySelector("[data-sound]");
+      beep(outcome && outcome.dataset.sound);
+    } catch (error) {
+      form.submit();
+      return;
+    }
+    refocus();
+  }
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!form.matches("#desk-form, #desk-live form")) return;
+    event.preventDefault();
+    submit(form, event.submitter);
+  });
+
+  // A scanner types like a keyboard: send any stray keystroke to the scan field.
+  document.addEventListener("keydown", (event) => {
+    const active = document.activeElement;
+    if (active === input || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (active && active.matches("input, textarea, select")) return;
+    if (event.key.length === 1) input.focus();
+  });
+
+  const first = live.querySelector("[data-sound]");
+  if (first) beep(first.dataset.sound);
+})();
+</script>
+{% endblock %}

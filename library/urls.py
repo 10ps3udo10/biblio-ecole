@@ -35,6 +35,7 @@ urlpatterns = [
     path("circulation/", views.photo_circulation, name="circulation_alias"),
     path("circulation/borrowers/search/", views.circulation_borrower_search, name="circulation_borrower_search"),
     path("circulation/borrowers/<uuid:pk>/loans/", views.circulation_borrower_loans, name="circulation_borrower_loans"),
+    path("pret/", views.desk, name="desk"),
     path("checkout/", views.checkout, name="checkout"),
     path("return/", views.return_copy, name="return_copy"),
     path("labels/class/<int:pk>/", views.class_label_sheet, name="class_label_sheet"),
